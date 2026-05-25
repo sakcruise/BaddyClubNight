@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    background-color: #fff7ed;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Nunito", system-ui, sans-serif;
+    font-weight: 800;
+  }
+
+  .kiosk-mode {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+@layer components {
+  .touch-btn {
+    @apply min-h-[56px] min-w-[56px] rounded-2xl font-display font-bold
+           transition-all duration-150 active:scale-95 cursor-pointer;
+  }
+
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-md rounded-3xl border border-white/60;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .card {
+    @apply bg-white rounded-3xl p-5;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-display font-bold;
+  }
+
+  .queue-number {
+    @apply w-11 h-11 rounded-2xl flex items-center justify-center
+           font-display font-black text-lg flex-shrink-0;
+  }
+
+  .section-header {
+    @apply flex items-center gap-2 mb-5;
+  }
+
+  .section-title {
+    @apply text-lg font-display font-black text-gray-800 tracking-tight;
+  }
+
+  .input-field {
+    @apply w-full border-2 border-orange-200 rounded-2xl px-5 py-4 font-body text-gray-900
+           text-lg focus:outline-none focus:border-orange-500 focus:ring-4
+           focus:ring-orange-500/10 transition-all duration-200 bg-white;
+  }
+
+  .live-pulse {
+    @apply relative;
+  }
+
+  .live-pulse::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75;
+  }
+}
+
+/* Scrollbar styling for kiosk */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #fb923c80; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #f97316; }
+
+/* Header pattern */
+.header-pattern {
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255,200,100,0.15) 0%, transparent 40%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, #fff 0%, #fed7aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Court active glow */
+.court-glow {
+  box-shadow: 0 0 0 2px #16a34a40, 0 8px 32px rgba(22,163,74,0.15), 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Score digit animation */
+@keyframes scorePopIn {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.score-pop {
+  animation: scorePopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+}

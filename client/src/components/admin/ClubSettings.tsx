@@ -1,0 +1,206 @@
+import { useState } from "react";
+import { useSessionStore } from "../../store";
+import { MapPin, Clock, MessageCircle, Building2, Check } from "lucide-react";
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function timeLabel(t: string) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
+}
+
+export default function ClubSettings() {
+  const { clubConfig, setClubConfig } = useSessionStore();
+
+  const [form, setForm] = useState({ ...clubConfig });
+  const [saved, setSaved] = useState(false);
+
+  function handleChange(field: keyof typeof form, value: string) {
+    setForm((f) => ({ ...f, [field]: value }));
+    setSaved(false);
+  }
+
+  function handleSave() {
+    setClubConfig(form);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  const hasChanges = JSON.stringify(form) !== JSON.stringify(clubConfig);
+
+  return (
+    <div className="flex flex-col gap-5">
+
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-display font-black text-gray-900">Club Settings</h2>
+        <p className="text-sm text-gray-400 font-body mt-0.5">
+          Your club profile — shown to members and used each session night.
+        </p>
+      </div>
+
+      {/* Club Name */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-orange-600">
+          <Building2 size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Club Identity</span>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+            Club Name
+          </label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => handleChange("name", e.target.value)}
+            placeholder="e.g. Smash Club"
+            className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                       focus:outline-none focus:border-orange-400 w-full"
+          />
+        </div>
+      </div>
+
+      {/* Venue */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-blue-600">
+          <MapPin size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Venue</span>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+            Location / Sports Centre
+          </label>
+          <input
+            type="text"
+            value={form.venue}
+            onChange={(e) => handleChange("venue", e.target.value)}
+            placeholder="e.g. Springfield Sports Centre, Court B"
+            className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-body text-sm
+                       focus:outline-none focus:border-blue-400 w-full"
+          />
+        </div>
+      </div>
+
+      {/* Night & Timings */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-green-600">
+          <Clock size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Club Night</span>
+        </div>
+
+        {/* Day picker */}
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+            Regular Night
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {DAYS.map((day) => (
+              <button
+                key={day}
+                onClick={() => handleChange("nightDay", day)}
+                className={`py-2 rounded-xl text-xs font-display font-bold transition-all border-2
+                  ${form.nightDay === day
+                    ? "bg-green-500 text-white border-green-500 shadow-sm"
+                    : "bg-gray-50 text-gray-500 border-gray-200 hover:border-green-300"
+                  }`}
+              >
+                {day.slice(0, 3)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Time range */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Start Time
+            </label>
+            <input
+              type="time"
+              value={form.nightStart}
+              onChange={(e) => handleChange("nightStart", e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-body text-sm
+                         focus:outline-none focus:border-green-400 w-full"
+            />
+            <p className="text-xs text-gray-400 font-display font-semibold">{timeLabel(form.nightStart)}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              End Time
+            </label>
+            <input
+              type="time"
+              value={form.nightEnd}
+              onChange={(e) => handleChange("nightEnd", e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-body text-sm
+                         focus:outline-none focus:border-green-400 w-full"
+            />
+            <p className="text-xs text-gray-400 font-display font-semibold">{timeLabel(form.nightEnd)}</p>
+          </div>
+        </div>
+
+        {/* Preview */}
+        {form.nightDay && form.nightStart && form.nightEnd && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-sm text-green-800 font-display font-bold">
+            🏸 {form.nightDay}s · {timeLabel(form.nightStart)} – {timeLabel(form.nightEnd)}
+          </div>
+        )}
+      </div>
+
+      {/* WhatsApp / Contact */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-green-500">
+          <MessageCircle size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Contact</span>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+            WhatsApp Group Link or Phone
+          </label>
+          <input
+            type="text"
+            value={form.whatsapp}
+            onChange={(e) => handleChange("whatsapp", e.target.value)}
+            placeholder="https://chat.whatsapp.com/... or +44 7700 000000"
+            className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-body text-sm
+                       focus:outline-none focus:border-green-400 w-full"
+          />
+        </div>
+        {form.whatsapp && (
+          <a
+            href={form.whatsapp.startsWith("http") ? form.whatsapp : `https://wa.me/${form.whatsapp.replace(/\D/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-green-600 font-display font-bold hover:underline"
+          >
+            <MessageCircle size={14} /> Open WhatsApp →
+          </a>
+        )}
+      </div>
+
+      {/* Save button */}
+      <button
+        onClick={handleSave}
+        disabled={!hasChanges && !saved}
+        className={`w-full py-4 rounded-2xl font-display font-black text-base
+          transition-all active:scale-95 flex items-center justify-center gap-2
+          ${saved
+            ? "bg-green-500 text-white"
+            : hasChanges
+              ? "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/25"
+              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+          }`}
+      >
+        {saved ? (
+          <><Check size={18} /> Saved!</>
+        ) : (
+          "Save Settings"
+        )}
+      </button>
+    </div>
+  );
+}
