@@ -1,11 +1,9 @@
 import type { Config } from "tailwindcss";
 
-const clientDir = "/Users/sakthimuruganv/Downloads/sakthi/my-projects/badminton-club-night/client";
-
 export default {
   content: [
-    `${clientDir}/index.html`,
-    `${clientDir}/src/**/*.{ts,tsx}`,
+    "./index.html",
+    "./src/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
