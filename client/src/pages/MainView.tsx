@@ -8,6 +8,8 @@ import CheckInGrid from "../components/admin/CheckInGrid";
 import CourtsView from "../components/courts/CourtsView";
 import Leaderboard from "../components/leaderboard/Leaderboard";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
+import OnboardingTour from "../components/shared/OnboardingTour";
+import EndNightCheers from "../components/shared/EndNightCheers";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import HomeView from "./HomeView";
@@ -24,10 +26,11 @@ export default function MainView() {
   const { session, endSession, clubConfig: rawClubConfig, setCourts, setSession } = useSessionStore();
   const clubConfig = rawClubConfig ?? { name: "", venue: "", nightDay: "", nightStart: "", nightEnd: "", whatsapp: "" };
   const { setQueue, queue, activeMemberIds } = useQueueStore();
-  const { setMatches } = useMatchStore();
+  const { setMatches, matches } = useMatchStore();
   const { setMembers, members } = useMemberStore();
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [ending, setEnding] = useState(false);
+  const [showCheers, setShowCheers] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("courts");
   const [courtsPct, setCourtsPct] = useState(55);
   const centreRef = useRef<HTMLDivElement>(null);
@@ -97,11 +100,17 @@ export default function MainView() {
   const notYetCount = Object.values(members).filter((m) => m.member_type !== "guest" && !queuedIds.has(m.id) && !activeMemberIds.has(m.id)).length;
   const dateStr = new Date(session.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
-  async function handleEndNight() {
-    if (!session || !confirm("End tonight's session? This cannot be undone.")) return;
+  function handleEndNight() {
+    if (!session) return;
+    setShowCheers(true);
+  }
+
+  async function confirmEndNight() {
+    if (!session) return;
     setEnding(true);
     try {
       await sessionsApi.end(session.id);
+      setShowCheers(false);
       endSession();
     } finally {
       setEnding(false);
@@ -302,6 +311,20 @@ export default function MainView() {
           </button>
         ))}
       </nav>
+
+      {/* ── Onboarding Tour ── */}
+      <OnboardingTour onTabChange={(tab) => setMobileTab(tab as MobileTab)} />
+
+      {/* ── End Night Cheers ── */}
+      {showCheers && (
+        <EndNightCheers
+          matches={matches}
+          members={members}
+          onConfirm={confirmEndNight}
+          onCancel={() => setShowCheers(false)}
+          ending={ending}
+        />
+      )}
 
       {/* ── Drawers ── */}
       <AnimatePresence>
