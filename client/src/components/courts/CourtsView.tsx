@@ -10,6 +10,7 @@ export default function CourtsView() {
   const { queue, activeMemberIds, setActiveMemberIds, openPicker, setQueue } = useQueueStore();
   const { members } = useMemberStore();
   const [completing, setCompleting] = useState<string | null>(null);
+  const [editingPairs, setEditingPairs] = useState<string | null>(null); // matchId
 
   function handleGo(courtId: number) {
     const candidates = queue
@@ -60,6 +61,12 @@ export default function CourtsView() {
     }
   }
 
+  async function handleSavePairs(matchId: string, teamA: [string, string], teamB: [string, string]) {
+    const { match } = await matchesApi.updateTeams(matchId, teamA, teamB);
+    updateMatch(matchId, match);
+    setEditingPairs(null);
+  }
+
   const activeMatches = Object.fromEntries(
     matches
       .filter((m) => m.result === "pending")
@@ -97,6 +104,12 @@ export default function CourtsView() {
               : undefined}
             onGo={court.status !== "playing" ? () => handleGo(court.id) : undefined}
             completing={completing === activeMatches[court.id]?.id}
+            onEditPairs={activeMatches[court.id]
+              ? () => setEditingPairs(activeMatches[court.id].id)
+              : undefined}
+            editingPairs={editingPairs === activeMatches[court.id]?.id}
+            onSavePairs={handleSavePairs}
+            onCancelEditPairs={() => setEditingPairs(null)}
           />
         ))}
       </div>

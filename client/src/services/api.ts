@@ -329,4 +329,15 @@ export const matchesApi = {
     if (error) throw new Error(error.message);
     return { match: rowToMatch(data) };
   },
+
+  updateTeams: async (matchId: string, team_a: [string, string], team_b: [string, string]) => {
+    const { data, error } = await supabase
+      .from("matches")
+      .update({ team_a_1: team_a[0], team_a_2: team_a[1], team_b_1: team_b[0], team_b_2: team_b[1] })
+      .eq("id", matchId)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return { match: rowToMatch(data) };
+  },
 };

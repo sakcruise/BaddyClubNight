@@ -57,6 +57,16 @@ matchesRouter.post("/:matchId/complete", (req, res) => {
   res.json({ match: rowToMatch(row) });
 });
 
+// PATCH /api/matches/:matchId/teams
+matchesRouter.patch("/:matchId/teams", (req, res) => {
+  const { team_a, team_b } = req.body as { team_a: [string, string]; team_b: [string, string] };
+  db.prepare(
+    "UPDATE matches SET team_a_1 = ?, team_a_2 = ?, team_b_1 = ?, team_b_2 = ? WHERE id = ?"
+  ).run(team_a[0], team_a[1], team_b[0], team_b[1], req.params.matchId);
+  const row = db.prepare("SELECT * FROM matches WHERE id = ?").get(req.params.matchId) as Record<string, unknown>;
+  res.json({ match: rowToMatch(row) });
+});
+
 // PATCH /api/matches/:matchId/score
 matchesRouter.patch("/:matchId/score", (req, res) => {
   const { score_a, score_b } = req.body as { score_a: number; score_b: number };

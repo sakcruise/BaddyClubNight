@@ -52,6 +52,86 @@ function ScoreEditor({ match, onSave, onCancel }: {
   );
 }
 
+function PairsEditor({ match, members, onSave, onCancel }: {
+  match: Match;
+  members: Record<string, import("../../types").Member>;
+  onSave: (teamA: [string, string], teamB: [string, string]) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const allFour = [...match.team_a, ...match.team_b];
+  const [pairMap, setPairMap] = useState<Record<string, "A" | "B">>(() => {
+    const m: Record<string, "A" | "B"> = {};
+    match.team_a.forEach((id) => { m[id] = "A"; });
+    match.team_b.forEach((id) => { m[id] = "B"; });
+    return m;
+  });
+  const [saving, setSaving] = useState(false);
+
+  const teamA = allFour.filter((id) => pairMap[id] === "A");
+  const teamB = allFour.filter((id) => pairMap[id] === "B");
+  const canSave = teamA.length === 2 && teamB.length === 2;
+
+  async function handleSave() {
+    if (!canSave) return;
+    setSaving(true);
+    try { await onSave(teamA as [string, string], teamB as [string, string]); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="mt-2 bg-gray-50 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2">
+      <p className="text-[10px] font-display font-bold text-gray-400 text-center uppercase tracking-wide">Edit Pairs — tap to switch</p>
+      <div className="grid grid-cols-2 gap-2">
+        {(["A", "B"] as const).map((team) => {
+          const teamMembers = allFour.filter((id) => pairMap[id] === team);
+          return (
+            <div key={team} className={`rounded-xl p-2 border ${team === "A" ? "bg-blue-50 border-blue-200" : "bg-orange-50 border-orange-200"}`}>
+              <p className={`text-[9px] font-display font-black mb-1.5 ${team === "A" ? "text-blue-600" : "text-orange-600"}`}>
+                Team {team} {teamMembers.length === 2 ? "✓" : `(${teamMembers.length}/2)`}
+              </p>
+              <div className="flex flex-col gap-1">
+                {teamMembers.map((id) => {
+                  const m = members[id];
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setPairMap((p) => ({ ...p, [id]: p[id] === "A" ? "B" : "A" }))}
+                      className={`flex items-center gap-1.5 w-full p-1 rounded-lg bg-white border text-left active:scale-95 transition-all
+                        ${team === "A" ? "border-blue-200 hover:border-blue-400" : "border-orange-200 hover:border-orange-400"}`}
+                    >
+                      <Avatar name={m?.name ?? ""} memberType={m?.member_type} size="xs" />
+                      <span className="font-display font-bold text-[10px] text-gray-800 flex-1 truncate">{m?.name}</span>
+                      <span className="text-[9px] text-gray-400">↔</span>
+                    </button>
+                  );
+                })}
+                {teamMembers.length < 2 && (
+                  <div className={`h-6 rounded-lg border border-dashed flex items-center justify-center text-[9px]
+                    ${team === "A" ? "border-blue-300 text-blue-400" : "border-orange-300 text-orange-400"}`}>
+                    + 1 more
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onCancel}
+          className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-500 font-display font-bold text-sm
+                     hover:bg-gray-100 active:scale-95 transition-all flex items-center justify-center gap-1">
+          <X size={13} /> Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving || !canSave}
+          className="flex-1 py-2 rounded-xl bg-blue-500 text-white font-display font-bold text-sm
+                     hover:bg-blue-600 disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-1">
+          <Check size={13} /> {saving ? "Saving…" : "Save Pairs"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MatchRow({ match, members, onUpdated, matchNumber }: {
   match: Match;
   members: Record<string, import("../../types").Member>;
@@ -59,6 +139,7 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
   matchNumber: number;
 }) {
   const [editing, setEditing] = useState(false);
+  const [editingPairs, setEditingPairs] = useState(false);
 
   const hasScore = match.score_a != null && match.score_b != null;
   const rawTeamA = match.team_a.map((id) => members[id]).filter(Boolean);
@@ -81,9 +162,15 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
     setEditing(false);
   }
 
+  async function handleSavePairs(teamA: [string, string], teamB: [string, string]) {
+    const { match: updated } = await matchesApi.updateTeams(match.id, teamA, teamB);
+    onUpdated(updated);
+    setEditingPairs(false);
+  }
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-3">
-      {/* Header row: match number + court badge + edit button */}
+      {/* Header row: match number + court badge + edit buttons */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gray-100 text-gray-400 font-display font-black text-xs
@@ -102,13 +189,24 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
             <span className="text-xs text-gray-400 font-display font-bold italic">No score — tap ✏️ to add</span>
           )}
         </div>
-        <button
-          onClick={() => setEditing(!editing)}
-          className={`p-1.5 rounded-lg transition-colors flex-shrink-0
-            ${editing ? "bg-orange-100 text-orange-600" : "hover:bg-gray-100 text-gray-400"}`}
-        >
-          <Pencil size={13} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setEditingPairs(!editingPairs); setEditing(false); }}
+            title="Edit pairs"
+            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 text-xs font-display font-bold
+              ${editingPairs ? "bg-blue-100 text-blue-600" : "hover:bg-gray-100 text-gray-400"}`}
+          >
+            🤝
+          </button>
+          <button
+            onClick={() => { setEditing(!editing); setEditingPairs(false); }}
+            title="Edit score"
+            className={`p-1.5 rounded-lg transition-colors flex-shrink-0
+              ${editing ? "bg-orange-100 text-orange-600" : "hover:bg-gray-100 text-gray-400"}`}
+          >
+            <Pencil size={13} />
+          </button>
+        </div>
       </div>
 
       {/* Teams side by side — winner always left */}
@@ -152,6 +250,11 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
       {/* Inline score editor */}
       {editing && (
         <ScoreEditor match={match} onSave={handleSave} onCancel={() => setEditing(false)} />
+      )}
+
+      {/* Inline pairs editor */}
+      {editingPairs && (
+        <PairsEditor match={match} members={members} onSave={handleSavePairs} onCancel={() => setEditingPairs(false)} />
       )}
     </div>
   );
