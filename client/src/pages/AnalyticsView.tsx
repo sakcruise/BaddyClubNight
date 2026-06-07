@@ -524,12 +524,31 @@ function GuestsTab({ sessions, members }: {
 
 // ─── Trends Tab ───────────────────────────────────────────────────────────────
 
+function BarChart({ data, colour }: { data: { label: string; value: number; rawValue?: string }[]; colour: string }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const colourMap: Record<string, string> = {
+    blue: "bg-blue-400", green: "bg-green-400", amber: "bg-amber-400",
+  };
+  const bar = colourMap[colour] ?? "bg-gray-400";
+
+  return (
+    <div className="flex items-end gap-2" style={{ height: 80 }}>
+      {data.map((d) => {
+        const pct = Math.max(4, Math.round((d.value / max) * 100));
+        return (
+          <div key={d.label} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: "100%" }}>
+            <span className="text-[9px] font-display font-black text-gray-600">{d.rawValue ?? d.value}</span>
+            <div className={`w-full rounded-t-md ${bar}`} style={{ height: `${pct}%` }} />
+            <span className="text-[9px] font-display text-gray-400 truncate w-full text-center">{d.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TrendsTab({ sessions, tubePrice }: { sessions: SessionSummary[]; tubePrice: number }) {
   const last8 = sessions.slice(0, 8).reverse(); // oldest first for chart
-
-  const maxPlayers = Math.max(...last8.map((s) => s.queue.length), 1);
-  const maxMatches = Math.max(...last8.map((s) => s.matches.length), 1);
-  const maxTubes = Math.max(...last8.map((s) => s.matches.reduce((a, m) => a + ((m as any).shuttles_used ?? 0), 0)), 1);
 
   return (
     <div className="flex flex-col gap-5">
@@ -537,53 +556,35 @@ function TrendsTab({ sessions, tubePrice }: { sessions: SessionSummary[]; tubePr
 
       {/* Players per night */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
-        <p className="font-display font-bold text-sm text-gray-700">👥 Attendance</p>
-        <div className="flex items-end gap-1.5 h-20">
-          {last8.map((s) => {
-            const h = Math.round((s.queue.length / maxPlayers) * 100);
-            return (
-              <div key={s.session.id} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full bg-blue-400 rounded-t-md" style={{ height: `${h}%` }} />
-                <span className="text-[9px] font-display text-gray-400 rotate-45 origin-left">{s.session.date.slice(5)}</span>
-              </div>
-            );
-          })}
-        </div>
+        <p className="font-display font-bold text-sm text-gray-700">👥 Attendance per night</p>
+        <BarChart colour="blue" data={last8.map((s) => ({
+          label: s.session.date.slice(5),
+          value: s.queue.length,
+        }))} />
       </div>
 
       {/* Matches per night */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
-        <p className="font-display font-bold text-sm text-gray-700">🏸 Matches played</p>
-        <div className="flex items-end gap-1.5 h-20">
-          {last8.map((s) => {
-            const h = Math.round((s.matches.length / maxMatches) * 100);
-            return (
-              <div key={s.session.id} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full bg-green-400 rounded-t-md" style={{ height: `${h}%` }} />
-                <span className="text-[9px] font-display text-gray-400 rotate-45 origin-left">{s.session.date.slice(5)}</span>
-              </div>
-            );
-          })}
-        </div>
+        <p className="font-display font-bold text-sm text-gray-700">🏸 Matches played per night</p>
+        <BarChart colour="green" data={last8.map((s) => ({
+          label: s.session.date.slice(5),
+          value: s.matches.length,
+        }))} />
       </div>
 
       {/* Shuttle cost per night */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
-        <p className="font-display font-bold text-sm text-gray-700">💸 Shuttle cost</p>
-        <div className="flex items-end gap-1.5 h-20">
-          {last8.map((s) => {
-            const tubes = s.matches.reduce((a, m) => a + ((m as any).shuttles_used ?? 0), 0);
-            const h = Math.round((tubes / maxTubes) * 100);
-            return (
-              <div key={s.session.id} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full bg-amber-400 rounded-t-md" style={{ height: `${h}%` }} />
-                <span className="text-[9px] font-display text-gray-400 rotate-45 origin-left">{s.session.date.slice(5)}</span>
-              </div>
-            );
-          })}
-        </div>
+        <p className="font-display font-bold text-sm text-gray-700">💸 Shuttle cost per night</p>
+        <BarChart colour="amber" data={last8.map((s) => {
+          const tubes = s.matches.reduce((a, m) => a + ((m as any).shuttles_used ?? 0), 0);
+          return {
+            label: s.session.date.slice(5),
+            value: tubes,
+            rawValue: tubes > 0 ? `£${fmt2(tubes * tubePrice)}` : "—",
+          };
+        })} />
         <p className="text-[10px] text-gray-400 font-display text-right">
-          Total last 8 nights: £{fmt2(last8.reduce((a, s) => {
+          Total last {last8.length} nights: £{fmt2(last8.reduce((a, s) => {
             const t = s.matches.reduce((x, m) => x + ((m as any).shuttles_used ?? 0), 0);
             return a + t * tubePrice;
           }, 0))}
