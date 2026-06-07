@@ -60,9 +60,17 @@ export default function CourtsView() {
       allFour.forEach((id) => next.delete(id));
       setActiveMemberIds(next);
 
-      // Step 5: re-queue all 4 players at the back
+      // Step 5: re-queue at the bottom — winners first, then losers
+      // Winners = team with higher score; if no score or draw, team_a first
       if (session) {
-        for (const memberId of allFour) {
+        const aWon = match.score_a !== undefined && match.score_b !== undefined
+          ? match.score_a >= match.score_b
+          : true; // default: team_a first
+        const winners = aWon ? [...match.team_a] : [...match.team_b];
+        const losers  = aWon ? [...match.team_b] : [...match.team_a];
+        const requeueOrder = [...winners, ...losers]; // winners added first → lower positions at bottom
+
+        for (const memberId of requeueOrder) {
           try { await queueApi.checkIn(session.id, memberId); } catch { /* already in queue */ }
         }
         const { queue: refreshed } = await queueApi.get(session.id);
