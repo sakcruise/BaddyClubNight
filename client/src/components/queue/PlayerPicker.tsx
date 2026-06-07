@@ -4,7 +4,7 @@ import { useQueueStore, useMemberStore, useMatchStore } from "../../store";
 import Avatar from "../shared/Avatar";
 import Button from "../shared/Button";
 import SpeechBubble from "./SpeechBubble";
-import { matchesApi } from "../../services/api";
+import { matchesApi, queueApi } from "../../services/api";
 import { useSessionStore } from "../../store";
 
 export default function PlayerPicker() {
@@ -69,6 +69,10 @@ export default function PlayerPicker() {
 
       addMatch(match);
       updateCourtStatus(picker.target_court, "playing", match.id);
+
+      // Delete from Supabase so re-queue after match puts them at correct position
+      await Promise.all(allFourIds.map((id) => queueApi.remove(session.id, id).catch(() => {})));
+
       allFourIds.forEach(removeFromQueue);
       setActiveMemberIds(new Set([...activeMemberIds, ...allFourIds]));
       closePicker();
