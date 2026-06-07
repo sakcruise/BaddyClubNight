@@ -6,7 +6,7 @@ import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
-import { History, Users, Cog, LogOut, Play, X } from "lucide-react";
+import { History, Users, Cog, LogOut, Play, X, BarChart2 } from "lucide-react";
 
 type Panel = "start" | "members" | "settings" | null;
 
@@ -183,11 +183,12 @@ export default function HomeView() {
           </AnimatePresence>
 
           {/* Secondary options */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {[
-              { icon: History, label: "History",  action: () => navigate("/history") },
-              { icon: Users,   label: "Members",  action: () => setPanel(panel === "members" ? null : "members") },
-              { icon: Cog,     label: "Settings", action: () => setPanel(panel === "settings" ? null : "settings") },
+              { icon: History,   label: "History",   action: () => navigate("/history") },
+              { icon: BarChart2, label: "Analytics", action: () => navigate("/analytics") },
+              { icon: Users,     label: "Members",   action: () => setPanel(panel === "members" ? null : "members") },
+              { icon: Cog,       label: "Settings",  action: () => setPanel(panel === "settings" ? null : "settings") },
             ].map(({ icon: Icon, label, action }) => (
               <motion.button
                 key={label}
