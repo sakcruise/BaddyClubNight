@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { PlayerStats, Match } from "../../src/types/index.js";
+
+// Inline types (mirrors client types to avoid cross-package imports)
+type PlayerStats = { name: string; wins: number; losses: number; matches: number };
+type Match = { id: string; court_id: number; team_a: string[]; team_b: string[]; result: string };
 
 const client = new Anthropic();
 

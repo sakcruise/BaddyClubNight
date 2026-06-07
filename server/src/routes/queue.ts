@@ -16,7 +16,7 @@ function getQueue(sessionId: string) {
       ORDER BY qe.position ASC
     `)
     .all(sessionId)
-    .map((row: Record<string, unknown>) => ({
+    .map((row: any) => ({
       member_id: row.member_id,
       position: row.position,
       checked_in_at: row.checked_in_at,

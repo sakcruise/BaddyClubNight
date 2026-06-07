@@ -20,4 +20,4 @@ chromium-browser \
   --touch-events=enabled \
   --enable-touch-drag-drop \
   --start-fullscreen \
-  "http://localhost:5173/kiosk"
+  "http://localhost:3000"
