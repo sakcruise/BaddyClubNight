@@ -527,7 +527,7 @@ function GuestsTab({ sessions, members }: {
 function BarChart({ data, colour }: { data: { label: string; value: number; rawValue?: string }[]; colour: string }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   const colourMap: Record<string, string> = {
-    blue: "bg-blue-400", green: "bg-green-400", amber: "bg-amber-400",
+    blue: "bg-blue-400", green: "bg-green-400", amber: "bg-amber-400", purple: "bg-purple-400",
   };
   const bar = colourMap[colour] ?? "bg-gray-400";
 
@@ -545,6 +545,27 @@ function BarChart({ data, colour }: { data: { label: string; value: number; rawV
       })}
     </div>
   );
+}
+
+// Compute average wait time in seconds for a single session
+function avgWaitSecsForSession(s: SessionSummary): number {
+  const memberFirstMatch: Record<string, number> = {};
+  for (const m of s.matches) {
+    if (!m.started_at) continue;
+    const t = new Date(m.started_at).getTime();
+    [...m.team_a, ...m.team_b].forEach((id) => {
+      if (!memberFirstMatch[id] || t < memberFirstMatch[id]) memberFirstMatch[id] = t;
+    });
+  }
+  const waits: number[] = [];
+  for (const q of s.queue) {
+    const checkedIn = new Date(q.checked_in_at).getTime();
+    const firstMatch = memberFirstMatch[q.member_id];
+    if (firstMatch && firstMatch > checkedIn) {
+      waits.push((firstMatch - checkedIn) / 1000);
+    }
+  }
+  return waits.length ? waits.reduce((a, b) => a + b, 0) / waits.length : 0;
 }
 
 function TrendsTab({ sessions, tubePrice }: { sessions: SessionSummary[]; tubePrice: number }) {
@@ -570,6 +591,21 @@ function TrendsTab({ sessions, tubePrice }: { sessions: SessionSummary[]; tubePr
           label: s.session.date.slice(5),
           value: s.matches.length,
         }))} />
+      </div>
+
+      {/* Average wait time per night */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
+        <p className="font-display font-bold text-sm text-gray-700">⌛ Avg wait time per night</p>
+        <BarChart colour="purple" data={last8.map((s) => {
+          const secs = avgWaitSecsForSession(s);
+          const mins = Math.round(secs / 60);
+          return {
+            label: s.session.date.slice(5),
+            value: Math.round(secs),
+            rawValue: secs > 0 ? `${mins}m` : "—",
+          };
+        })} />
+        <p className="text-[10px] text-gray-400 font-display">Time from check-in to first match on court</p>
       </div>
 
       {/* Shuttle cost per night */}
@@ -602,17 +638,22 @@ function TrendsTab({ sessions, tubePrice }: { sessions: SessionSummary[]; tubePr
               <th className="text-left px-4 py-2 text-xs font-display font-bold text-gray-500">Date</th>
               <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Players</th>
               <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Matches</th>
+              <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Avg Wait</th>
               <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Cost</th>
             </tr>
           </thead>
           <tbody>
             {sessions.map((s) => {
               const tubes = s.matches.reduce((a, m) => a + ((m as any).shuttles_used ?? 0), 0);
+              const waitSecs = avgWaitSecsForSession(s);
               return (
                 <tr key={s.session.id} className="border-t border-gray-50 hover:bg-gray-50">
                   <td className="px-4 py-2.5 font-display font-bold text-gray-800 text-xs">{s.session.date}</td>
                   <td className="px-4 py-2.5 text-right text-xs text-gray-500 font-display">{s.queue.length}</td>
                   <td className="px-4 py-2.5 text-right text-xs text-gray-600 font-display">{s.matches.length}</td>
+                  <td className="px-4 py-2.5 text-right font-display font-black text-xs text-purple-600">
+                    {waitSecs > 0 ? `${Math.round(waitSecs / 60)}m` : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-4 py-2.5 text-right font-display font-black text-xs text-amber-700">
                     {tubes > 0 ? `£${fmt2(tubes * tubePrice)}` : <span className="text-gray-300">—</span>}
                   </td>
