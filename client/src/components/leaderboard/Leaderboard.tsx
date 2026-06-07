@@ -17,16 +17,17 @@ type Tab = "standings" | "matches";
 
 function ScoreEditor({ match, onSave, onCancel }: {
   match: Match;
-  onSave: (a: number, b: number) => Promise<void>;
+  onSave: (a: number, b: number, shuttles: number) => Promise<void>;
   onCancel: () => void;
 }) {
   const [a, setA] = useState(match.score_a ?? 0);
   const [b, setB] = useState(match.score_b ?? 0);
+  const [shuttles, setShuttles] = useState(match.shuttles_used ?? 1);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
-    try { await onSave(a, b); } finally { setSaving(false); }
+    try { await onSave(a, b, shuttles); } finally { setSaving(false); }
   }
 
   return (
@@ -35,6 +36,21 @@ function ScoreEditor({ match, onSave, onCancel }: {
         <ScoreInput label="Team A" value={a} onChange={setA} />
         <span className="text-gray-300 font-black text-lg mt-4">vs</span>
         <ScoreInput label="Team B" value={b} onChange={setB} />
+      </div>
+      {/* Shuttles used */}
+      <div className="flex items-center justify-center gap-3 py-1 border-t border-gray-200">
+        <span className="text-[10px] font-display font-bold text-gray-500">🏸 Shuttles used</span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShuttles(s => Math.max(0, s - 1))}
+            className="w-6 h-6 rounded-lg bg-gray-200 text-gray-600 font-black text-sm flex items-center justify-center hover:bg-gray-300 active:scale-95 transition-all">
+            −
+          </button>
+          <span className="font-display font-black text-sm text-gray-800 w-4 text-center tabular-nums">{shuttles}</span>
+          <button onClick={() => setShuttles(s => s + 1)}
+            className="w-6 h-6 rounded-lg bg-gray-200 text-gray-600 font-black text-sm flex items-center justify-center hover:bg-gray-300 active:scale-95 transition-all">
+            +
+          </button>
+        </div>
       </div>
       <div className="flex gap-2">
         <button onClick={onCancel}
@@ -156,8 +172,8 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
   const leftScore  = hasScore ? winScore  : null;
   const rightScore = hasScore ? loseScore : null;
 
-  async function handleSave(a: number, b: number) {
-    const { match: updated } = await matchesApi.score(match.id, a, b);
+  async function handleSave(a: number, b: number, shuttles: number) {
+    const { match: updated } = await matchesApi.score(match.id, a, b, shuttles);
     onUpdated(updated);
     setEditing(false);
   }
@@ -187,6 +203,9 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
             </span>
           ) : (
             <span className="text-xs text-gray-400 font-display font-bold italic">No score — tap ✏️ to add</span>
+          )}
+          {match.shuttles_used != null && (
+            <span className="text-[10px] font-display font-bold text-gray-400 ml-1">🏸×{match.shuttles_used}</span>
           )}
         </div>
         <div className="flex items-center gap-1">
