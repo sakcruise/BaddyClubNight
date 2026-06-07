@@ -10,7 +10,6 @@ import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import { sessionsApi, queueApi, matchesApi, membersApi, syncApi } from "../services/api";
 import { X, Users, Cog, LogOut, History, BarChart2 } from "lucide-react";
-import OfflineMode from "../components/shared/OfflineMode";
 
 type Drawer = "members" | "settings" | null;
 
@@ -266,12 +265,7 @@ export default function AdminSessionView() {
               {/* Drawer content */}
               <div className="flex-1 overflow-y-auto p-4">
                 {drawer === "members" && <MemberManagement />}
-                {drawer === "settings" && (
-                  <div className="flex flex-col gap-4">
-                    <OfflineMode />
-                    <ClubSettings />
-                  </div>
-                )}
+                {drawer === "settings" && <ClubSettings />}
               </div>
             </motion.div>
           </>

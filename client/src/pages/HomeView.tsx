@@ -6,7 +6,6 @@ import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
-import OfflineMode from "../components/shared/OfflineMode";
 import { History, Users, Cog, LogOut, Play, X, BarChart2 } from "lucide-react";
 
 type Panel = "start" | "members" | "settings" | null;
@@ -229,12 +228,7 @@ export default function HomeView() {
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {panel === "members" && <MemberManagement />}
-                {panel === "settings" && (
-                  <div className="flex flex-col gap-4">
-                    <OfflineMode />
-                    <ClubSettings />
-                  </div>
-                )}
+                {panel === "settings" && <ClubSettings />}
               </div>
             </motion.div>
           </>

@@ -3,6 +3,7 @@ import { useSessionStore } from "../../store";
 import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag } from "lucide-react";
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
+import OfflineMode from "../shared/OfflineMode";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -36,6 +37,9 @@ export default function ClubSettings() {
 
   return (
     <div className="flex flex-col gap-5">
+
+      {/* Work Offline — always visible at top of settings */}
+      <OfflineMode />
 
       {/* Header */}
       <div>
