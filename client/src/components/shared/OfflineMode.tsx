@@ -182,16 +182,29 @@ export default function OfflineMode() {
   // ── Online — show "Work Offline" button ───────────────────────────────────
   return (
     <div className="flex flex-col gap-2">
-      <button onClick={handleWorkOffline} disabled={caching}
-        className="flex items-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white
-                   px-3 py-2 rounded-xl text-xs font-display font-bold transition-all disabled:opacity-50">
-        {caching
-          ? <RefreshCw size={13} className="animate-spin" />
-          : <WifiOff size={13} />}
-        {caching ? "Caching data…" : "Work Offline"}
-      </button>
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <WifiOff size={16} className="text-blue-600 flex-shrink-0" />
+          <div>
+            <p className="font-display font-black text-blue-900 text-sm">Work Offline</p>
+            <p className="font-display text-blue-600 text-[10px]">Cache data before heading to the club without internet</p>
+          </div>
+        </div>
+        <button onClick={handleWorkOffline} disabled={caching}
+          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700
+                     text-white px-4 py-2.5 rounded-xl text-sm font-display font-black
+                     transition-all disabled:opacity-50 active:scale-95">
+          {caching
+            ? <RefreshCw size={14} className="animate-spin" />
+            : <WifiOff size={14} />}
+          {caching ? "Caching data…" : "Cache & Work Offline"}
+        </button>
+      </div>
       {msg && (
-        <div className="text-xs font-display font-bold px-3 py-1.5 rounded-xl bg-green-50 text-green-700 border border-green-200">
+        <div className={`text-xs font-display font-bold px-3 py-1.5 rounded-xl
+          ${msg.includes("failed") || msg.includes("Error")
+            ? "bg-red-50 text-red-600 border border-red-200"
+            : "bg-green-50 text-green-700 border border-green-200"}`}>
           {msg}
         </div>
       )}
