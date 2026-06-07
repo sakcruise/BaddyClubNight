@@ -31,34 +31,51 @@ export default function CourtsView() {
   async function handleComplete(matchId: string, scoreA?: number, scoreB?: number, shuttles?: number) {
     if (completing) return;
     setCompleting(matchId);
+
+    // Find the match in current state so we can reset UI even if API calls fail
+    const currentMatch = matches.find((m) => m.id === matchId);
+    if (!currentMatch) { setCompleting(null); return; }
+
     try {
-      // Always mark as complete first
+      // Step 1: mark complete — this is the critical call
       let { match } = await matchesApi.complete(matchId);
-      // Then save the score (and shuttle count) if provided
+
+      // Step 2: save score + shuttles — best-effort, never blocks court reset
       if (scoreA !== undefined && scoreB !== undefined) {
-        ({ match } = await matchesApi.score(matchId, scoreA, scoreB, shuttles));
+        try {
+          ({ match } = await matchesApi.score(matchId, scoreA, scoreB, shuttles));
+        } catch (e) {
+          console.warn("Score save failed (column may not exist yet):", e);
+          // match still has result:"complete" from step 1 — carry on
+        }
       }
+
+      // Step 3: always update UI regardless
       updateMatch(matchId, match);
       updateCourtStatus(match.court_id, "idle");
 
-      // Free the 4 players from activeMemberIds
+      // Step 4: free the 4 players from activeMemberIds
       const allFour = [...match.team_a, ...match.team_b];
       const next = new Set(activeMemberIds);
       allFour.forEach((id) => next.delete(id));
       setActiveMemberIds(next);
 
-      // Re-queue all 4 players at the back (so they wait for next court)
+      // Step 5: re-queue all 4 players at the back
       if (session) {
         for (const memberId of allFour) {
-          try {
-            await queueApi.checkIn(session.id, memberId);
-          } catch {
-            // already in queue — ignore
-          }
+          try { await queueApi.checkIn(session.id, memberId); } catch { /* already in queue */ }
         }
         const { queue: refreshed } = await queueApi.get(session.id);
         setQueue(refreshed);
       }
+    } catch (e) {
+      console.error("handleComplete failed:", e);
+      // Even if complete() fails, reset UI so court isn't stuck
+      updateCourtStatus(currentMatch.court_id, "idle");
+      const allFour = [...currentMatch.team_a, ...currentMatch.team_b];
+      const next = new Set(activeMemberIds);
+      allFour.forEach((id) => next.delete(id));
+      setActiveMemberIds(next);
     } finally {
       setCompleting(null);
     }
