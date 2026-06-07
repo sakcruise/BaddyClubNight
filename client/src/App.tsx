@@ -19,16 +19,8 @@ function ThemeApplier() {
 }
 
 export default function App() {
-  // On Vercel (web): show public read-only view — no login needed
-  if (isWeb()) {
-    return (
-      <Routes>
-        <Route path="*" element={<PublicView />} />
-      </Routes>
-    );
-  }
-
-  // On Pi (localhost): full admin app with auth
+  // Same app everywhere — login required, works on web + Pi
+  // isWeb() is used only for behaviour differences (e.g. offline mode display)
   return (
     <>
       <ThemeApplier />
@@ -36,11 +28,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<MainView />} />
           <Route path="/history" element={<SessionHistoryView />} />
+          <Route path="/leaderboard" element={<PublicView />} />
           {/* Legacy redirects */}
           <Route path="/kiosk" element={<Navigate to="/" replace />} />
           <Route path="/mobile" element={<Navigate to="/" replace />} />
           <Route path="/admin" element={<Navigate to="/" replace />} />
-          <Route path="/leaderboard" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthGuard>
     </>

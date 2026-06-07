@@ -1,28 +1,24 @@
 import { useState } from "react";
-import { authApi } from "../services/api";
-import { useAuthStore } from "../store";
+import { supabase } from "../lib/supabase";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
-import SetupView from "./SetupView";
 
 export default function LoginView() {
-  const [email, setEmail]         = useState("");
-  const [password, setPassword]   = useState("");
-  const [error, setError]         = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [showSetup, setShowSetup] = useState(false);
-
-  const { setAuth } = useAuthStore();
-
-  if (showSetup) return <SetupView onBack={() => setShowSetup(false)} />;
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.login(email.trim(), password);
-      setAuth(res.token, res.club_name, res.admin_name, res.email);
-      // AuthGuard watches token in store → transitions to "ok" automatically
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (authError) throw authError;
+      // AuthGuard's onAuthStateChange fires → transitions to "ok" automatically
     } catch (err: any) {
       setError(err.message ?? "Login failed");
       setPassword("");
@@ -67,7 +63,9 @@ export default function LoginView() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-600 font-display font-bold">{error}</div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-600 font-display font-bold">
+            {error}
+          </div>
         )}
 
         <button type="submit" disabled={loading || !email.trim() || !password}
@@ -77,12 +75,9 @@ export default function LoginView() {
           {loading ? "Signing in…" : "Sign In 🏸"}
         </button>
 
-        <div className="border-t border-gray-100 pt-3 text-center">
-          <button type="button" onClick={() => setShowSetup(true)}
-            className="text-xs text-gray-400 font-display font-bold hover:text-orange-500 transition-colors">
-            New club? Create an account →
-          </button>
-        </div>
+        <p className="text-center text-xs text-gray-400 font-display">
+          Contact your club admin to get access.
+        </p>
       </form>
     </div>
   );

@@ -10,6 +10,7 @@ import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import { sessionsApi, queueApi, matchesApi, membersApi, syncApi } from "../services/api";
 import { X, Users, Cog, LogOut, History } from "lucide-react";
+import OfflineMode from "../components/shared/OfflineMode";
 
 type Drawer = "members" | "settings" | null;
 
@@ -178,6 +179,7 @@ export default function AdminSessionView() {
             <Cog size={14} />
             Settings
           </button>
+          <OfflineMode />
           <div className="flex flex-col items-end gap-1">
             <button
               onClick={handleEndNight}

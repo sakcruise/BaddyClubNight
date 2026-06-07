@@ -1,29 +1,68 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../store";
-import { authApi } from "../services/api";
+import { supabase } from "../lib/supabase";
 import LoginView from "../pages/LoginView";
 
 type Status = "loading" | "login" | "ok";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { token, setProfile, clearProfile } = useAuthStore();
+  const { setAuth, clearProfile, token } = useAuthStore();
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
-    if (!token) {
-      setStatus("login");
+    // If offline flag is set and we have a cached token, let them in
+    const offlineMode = localStorage.getItem("offline-mode") === "true";
+    if (offlineMode && token) {
+      setStatus("ok");
       return;
     }
-    authApi.me()
-      .then(({ club }) => {
-        setProfile(club.club_name, club.admin_name, club.email);
+
+    // Check Supabase session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        const meta = session.user.user_metadata;
+        setAuth(
+          session.access_token,
+          meta?.club_name ?? session.user.email ?? "",
+          meta?.admin_name ?? "",
+          session.user.email ?? ""
+        );
         setStatus("ok");
-      })
-      .catch(() => {
+      } else if (offlineMode && token) {
+        // Offline + cached token — allow in
+        setStatus("ok");
+      } else {
         clearProfile();
         setStatus("login");
-      });
-  }, [token]);
+      }
+    }).catch(() => {
+      // Network error — if we have a cached token, allow offline access
+      if (token) {
+        setStatus("ok");
+      } else {
+        setStatus("login");
+      }
+    });
+
+    // Listen for auth state changes (login / logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        const meta = session.user.user_metadata;
+        setAuth(
+          session.access_token,
+          meta?.club_name ?? session.user.email ?? "",
+          meta?.admin_name ?? "",
+          session.user.email ?? ""
+        );
+        setStatus("ok");
+      } else if (localStorage.getItem("offline-mode") !== "true") {
+        clearProfile();
+        setStatus("login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (status === "loading") {
     return (
