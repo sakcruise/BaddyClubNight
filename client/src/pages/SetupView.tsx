@@ -22,9 +22,17 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
     if (password.length < 6)  { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
     try {
-      const res = await authApi.register({ club_name: clubName.trim(), admin_name: adminName.trim(), email: email.trim(), password });
-      setAuth(res.token, res.club_name, res.admin_name, res.email);
-      // AuthGuard transitions to "ok" automatically via store update
+      const { supabase } = await import("../lib/supabase");
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { club_name: clubName.trim(), admin_name: adminName.trim() } },
+      });
+      if (signUpError) throw signUpError;
+      if (data.session) {
+        setAuth(data.session.access_token, clubName.trim(), adminName.trim(), email.trim());
+      }
+      // AuthGuard transitions to "ok" automatically via onAuthStateChange
     } catch (err: any) {
       setError(err.message ?? "Registration failed");
     } finally {
