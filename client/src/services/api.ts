@@ -49,8 +49,12 @@ export const authApi = {
     );
   },
 
-  logout: () => {
-    // Token is cleared by clearProfile() in the store
+  logout: async () => {
+    // Sign out from Supabase + clear offline mode flag
+    const { supabase } = await import("../lib/supabase");
+    await supabase.auth.signOut();
+    localStorage.removeItem("offline-mode");
+    localStorage.removeItem("offline-cached-at");
   },
 };
 
