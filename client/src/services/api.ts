@@ -228,7 +228,10 @@ export const queueApi = {
 
     const { error } = await supabase
       .from("queue_entries")
-      .insert({ id: uuid(), club_id: clubId, session_id: sessionId, member_id: memberId, position });
+      .upsert(
+        { id: uuid(), club_id: clubId, session_id: sessionId, member_id: memberId, position },
+        { onConflict: "session_id,member_id", ignoreDuplicates: true }
+      );
     if (error) throw new Error(error.message);
 
     return queueApi.get(sessionId);
