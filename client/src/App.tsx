@@ -3,22 +3,32 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AuthGuard from "./components/AuthGuard";
 import MainView from "./pages/MainView";
 import SessionHistoryView from "./pages/SessionHistoryView";
+import PublicView from "./pages/PublicView";
 import { useSessionStore } from "./store";
 import { applyTheme } from "./styles/themes";
 import type { ThemeKey } from "./styles/themes";
+import { isWeb } from "./lib/isWeb";
 
 function ThemeApplier() {
   const themeKey = useSessionStore(s => s.clubConfig.themeKey) ?? "orange";
-  // Apply immediately on every render where themeKey changes, including first mount
   useEffect(() => {
     applyTheme(themeKey as ThemeKey);
   }, [themeKey]);
-  // Also apply synchronously before first paint to avoid flash
   applyTheme(themeKey as ThemeKey);
   return null;
 }
 
 export default function App() {
+  // On Vercel (web): show public read-only view — no login needed
+  if (isWeb()) {
+    return (
+      <Routes>
+        <Route path="*" element={<PublicView />} />
+      </Routes>
+    );
+  }
+
+  // On Pi (localhost): full admin app with auth
   return (
     <>
       <ThemeApplier />
