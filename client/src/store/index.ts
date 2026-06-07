@@ -9,11 +9,12 @@ import { normalisePositions } from "../utils/queueLogic";
 
 interface AuthStore {
   token: string | null;
-  clubName: string | null;
-  adminName: string | null;
-  email: string | null;
-  setAuth: (token: string, clubName: string, adminName: string, email: string) => void;
-  setProfile: (clubName: string, adminName: string, email: string) => void;
+  username: string | null;     // login ID, e.g. "oasisbadminton"
+  displayName: string | null;  // shown in UI, e.g. "Oasis Badminton Club"
+  adminName: string | null;    // admin person's name, e.g. "Sakthi"
+  email: string | null;        // for password reset only, not shown in UI
+  setAuth: (token: string, username: string, displayName: string, adminName: string, email: string) => void;
+  setProfile: (username: string, displayName: string, adminName: string, email: string) => void;
   clearProfile: () => void;
 }
 
@@ -21,12 +22,15 @@ export const useAuthStore = create<AuthStore>()(
   persist(
     (set) => ({
       token: null,
-      clubName: null,
+      username: null,
+      displayName: null,
       adminName: null,
       email: null,
-      setAuth: (token, clubName, adminName, email) => set({ token, clubName, adminName, email }),
-      setProfile: (clubName, adminName, email) => set({ clubName, adminName, email }),
-      clearProfile: () => set({ token: null, clubName: null, adminName: null, email: null }),
+      setAuth: (token, username, displayName, adminName, email) =>
+        set({ token, username, displayName, adminName, email }),
+      setProfile: (username, displayName, adminName, email) =>
+        set({ username, displayName, adminName, email }),
+      clearProfile: () => set({ token: null, username: null, displayName: null, adminName: null, email: null }),
     }),
     { name: "auth-store" }
   )

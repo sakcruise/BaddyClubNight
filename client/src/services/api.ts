@@ -50,18 +50,75 @@ function rowToMember(m: any): Member {
   };
 }
 
+// ─── Clubs (username ↔ email lookup) ─────────────────────────────────────────
+// The clubs table is publicly readable so login can resolve username → email
+// without the user being authenticated yet.
+
+export const clubsApi = {
+  /** Resolve a username to an auth email. Returns null if not found. */
+  findEmail: async (username: string): Promise<string | null> => {
+    const { data } = await supabase
+      .from("clubs")
+      .select("email")
+      .eq("username", username.toLowerCase().trim())
+      .maybeSingle();
+    return data?.email ?? null;
+  },
+
+  /** Create a clubs row after successful signup. */
+  create: async (userId: string, username: string, displayName: string, email: string) => {
+    const { error } = await supabase.from("clubs").insert({
+      username: username.toLowerCase().trim(),
+      display_name: displayName.trim(),
+      email: email.trim(),
+      user_id: userId,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Fetch club profile for the currently logged-in user. */
+  getOwn: async (): Promise<{ username: string; display_name: string; email: string } | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from("clubs")
+      .select("username, display_name, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    return data ?? null;
+  },
+
+  /** Check if a username is already taken (anon-safe). */
+  isUsernameTaken: async (username: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from("clubs")
+      .select("username")
+      .eq("username", username.toLowerCase().trim())
+      .maybeSingle();
+    return !!data;
+  },
+};
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  login: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  /**
+   * Login with username (or email as fallback for existing accounts).
+   * Resolves username → email via clubs table, then signs in with email+password.
+   */
+  login: async (usernameOrEmail: string, password: string) => {
+    // Try clubs table lookup first; fall back to treating input as email
+    const resolvedEmail = await clubsApi.findEmail(usernameOrEmail) ?? usernameOrEmail.trim();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: resolvedEmail, password });
     if (error) throw new Error(error.message);
     const user = data.user!;
+    const meta = user.user_metadata ?? {};
     return {
       token: data.session!.access_token,
-      club_name: user.user_metadata?.club_name ?? email,
-      admin_name: user.user_metadata?.admin_name ?? "",
-      email: user.email ?? "",
+      username: meta.username ?? usernameOrEmail,
+      display_name: meta.display_name ?? meta.club_name ?? "",
+      admin_name: meta.admin_name ?? "",
+      email: resolvedEmail,
     };
   },
 

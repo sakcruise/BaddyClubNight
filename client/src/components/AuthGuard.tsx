@@ -21,11 +21,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // Check Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        const meta = session.user.user_metadata;
+        const meta = session.user.user_metadata ?? {};
         setAuth(
           session.access_token,
-          meta?.club_name ?? session.user.email ?? "",
-          meta?.admin_name ?? "",
+          meta.username ?? "",
+          meta.display_name ?? meta.club_name ?? session.user.email ?? "",
+          meta.admin_name ?? "",
           session.user.email ?? ""
         );
         setStatus("ok");
@@ -48,16 +49,16 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // Listen for auth state changes (login / logout / password recovery)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
-        // User clicked the reset link in their email — show the new-password form
         setStatus("reset");
         return;
       }
       if (session) {
-        const meta = session.user.user_metadata;
+        const meta = session.user.user_metadata ?? {};
         setAuth(
           session.access_token,
-          meta?.club_name ?? session.user.email ?? "",
-          meta?.admin_name ?? "",
+          meta.username ?? "",
+          meta.display_name ?? meta.club_name ?? session.user.email ?? "",
+          meta.admin_name ?? "",
           session.user.email ?? ""
         );
         setStatus("ok");

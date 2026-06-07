@@ -12,7 +12,7 @@ type Panel = "start" | "members" | "settings" | null;
 
 export default function HomeView() {
   const navigate = useNavigate();
-  const { adminName, clubName: authClubName } = useAuthStore();
+  const { adminName, displayName: authDisplayName } = useAuthStore();
   const logout = () => authApi.logout();
   const { setSession, setCourts, clubName, setClubName, clubConfig } = useSessionStore();
   const { setMembers } = useMemberStore();
@@ -21,7 +21,7 @@ export default function HomeView() {
   const [numCourts, setNumCourts] = useState(4);
   const [starting, setStarting] = useState(false);
 
-  const displayName = clubName || authClubName || "Club Night";
+  const displayName = clubName || authDisplayName || "Club Night";
 
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
