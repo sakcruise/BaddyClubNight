@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
+import SetupView from "./SetupView";
 
 export default function LoginView() {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
+
+  if (showSetup) return <SetupView onBack={() => setShowSetup(false)} />;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,9 +79,18 @@ export default function LoginView() {
           {loading ? "Signing in…" : "Sign In 🏸"}
         </button>
 
-        <p className="text-center text-xs text-gray-400 font-display">
-          Contact your club admin to get access.
-        </p>
+        <div className="border-t border-gray-100 pt-3 flex flex-col gap-2 text-center">
+          <p className="text-xs text-gray-400 font-display">
+            Already have an account? Sign in above.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowSetup(true)}
+            className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors"
+          >
+            New club? Create your free account →
+          </button>
+        </div>
       </form>
     </div>
   );
