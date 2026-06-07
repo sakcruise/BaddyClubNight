@@ -28,15 +28,15 @@ export default function CourtsView() {
     openPicker(firstPicker.member_id, candidates.slice(1), courtId);
   }
 
-  async function handleComplete(matchId: string, scoreA?: number, scoreB?: number) {
+  async function handleComplete(matchId: string, scoreA?: number, scoreB?: number, shuttles?: number) {
     if (completing) return;
     setCompleting(matchId);
     try {
       // Always mark as complete first
       let { match } = await matchesApi.complete(matchId);
-      // Then save the score if provided
+      // Then save the score (and shuttle count) if provided
       if (scoreA !== undefined && scoreB !== undefined) {
-        ({ match } = await matchesApi.score(matchId, scoreA, scoreB));
+        ({ match } = await matchesApi.score(matchId, scoreA, scoreB, shuttles));
       }
       updateMatch(matchId, match);
       updateCourtStatus(match.court_id, "idle");
@@ -103,7 +103,7 @@ export default function CourtsView() {
             court={court}
             match={activeMatches[court.id]}
             onComplete={court.status === "playing" && activeMatches[court.id]
-              ? (id, a, b) => handleComplete(id, a, b)
+              ? (id, a, b, s) => handleComplete(id, a, b, s)
               : undefined}
             onGo={court.status !== "playing" ? () => handleGo(court.id) : undefined}
             completing={completing === activeMatches[court.id]?.id}

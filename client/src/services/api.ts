@@ -31,6 +31,7 @@ function rowToMatch(m: any): Match {
     team_b: [m.team_b_1, m.team_b_2],
     score_a: m.score_a ?? undefined,
     score_b: m.score_b ?? undefined,
+    shuttles_used: m.shuttles_used ?? undefined,
     result: m.result,
     started_at: m.started_at,
     ended_at: m.ended_at ?? undefined,
@@ -302,10 +303,12 @@ export const matchesApi = {
     return { match: rowToMatch(check(data, error)) };
   },
 
-  score: async (matchId: string, score_a: number, score_b: number) => {
+  score: async (matchId: string, score_a: number, score_b: number, shuttles_used?: number) => {
+    const patch: Record<string, unknown> = { score_a, score_b };
+    if (shuttles_used !== undefined) patch.shuttles_used = shuttles_used;
     const { data, error } = await supabase
       .from("matches")
-      .update({ score_a, score_b })
+      .update(patch)
       .eq("id", matchId)
       .select()
       .single();

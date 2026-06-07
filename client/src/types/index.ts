@@ -36,6 +36,7 @@ export interface Match {
   team_b: [string, string];
   score_a?: number;
   score_b?: number;
+  shuttles_used?: number;
   result: MatchResult;
   started_at: string;
   ended_at?: string;

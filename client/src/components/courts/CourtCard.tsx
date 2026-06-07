@@ -23,7 +23,7 @@ function useMatchTimer(startedAt?: string) {
 interface Props {
   court: Court;
   match?: Match;
-  onComplete?: (matchId: string, scoreA?: number, scoreB?: number) => void;
+  onComplete?: (matchId: string, scoreA?: number, scoreB?: number, shuttles?: number) => void;
   onGo?: () => void;
   completing?: boolean;
   onEditPairs?: () => void;
@@ -37,6 +37,7 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
   const [showScore, setShowScore] = useState(false);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
+  const [shuttles, setShuttles] = useState(1);
   const [pairMap, setPairMap] = useState<Record<string, "A" | "B">>({});
   const [savingPairs, setSavingPairs] = useState(false);
 
@@ -72,7 +73,7 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
   function handleDone(withScore: boolean) {
     if (!onComplete || !match) return;
     if (withScore) {
-      onComplete(match.id, scoreA, scoreB);
+      onComplete(match.id, scoreA, scoreB, shuttles);
     } else {
       onComplete(match.id);
     }
@@ -192,6 +193,22 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
                   <ScoreInput label="" value={scoreB} onChange={setScoreB} />
                 </div>
               </div>
+              {/* Shuttles used */}
+              <div className="flex items-center justify-center gap-3 py-1 border-t border-green-100">
+                <span className="text-[10px] font-display font-bold text-gray-500">🏸 Shuttles used</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShuttles(s => Math.max(0, s - 1))}
+                    className="w-6 h-6 rounded-lg bg-gray-100 text-gray-600 font-black text-sm flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
+                    −
+                  </button>
+                  <span className="font-display font-black text-sm text-gray-800 w-4 text-center tabular-nums">{shuttles}</span>
+                  <button onClick={() => setShuttles(s => s + 1)}
+                    className="w-6 h-6 rounded-lg bg-gray-100 text-gray-600 font-black text-sm flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
+                    +
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-1.5">
                 <button
                   onClick={() => handleDone(false)}
