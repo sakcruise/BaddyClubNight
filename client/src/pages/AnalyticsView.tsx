@@ -376,51 +376,123 @@ function PlayersTab({ sessions, members }: {
   }, [sessions, members]);
 
   const highWaiter = playerStats[0];
+  const [view, setView] = useState<"session" | "player">("session");
+
+  // Per-session wait data
+  const sessionWaits = sessions.map((s) => ({
+    date: s.session.date,
+    avgSecs: avgWaitSecsForSession(s),
+    players: s.queue.filter((q) => q.member_type !== "guest").length,
+    matches: s.matches.length,
+  }));
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Longest Avg Wait" value={highWaiter ? fmtMin(Math.round(highWaiter.avgWaitSecs)) : "—"}
-          sub={highWaiter?.name} colour="red" icon="⌛" />
-        <StatCard label="Players Tracked" value={playerStats.length} sub="across all sessions" colour="blue" icon="👥" />
+      {/* Sub-tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1">
+        <button onClick={() => setView("session")}
+          className={`flex-1 py-2 rounded-xl text-xs font-display font-bold transition-all
+            ${view === "session" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+          📅 By Session
+        </button>
+        <button onClick={() => setView("player")}
+          className={`flex-1 py-2 rounded-xl text-xs font-display font-bold transition-all
+            ${view === "player" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+          👤 By Player
+        </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <p className="font-display font-bold text-sm text-gray-700">⌛ Wait time by player</p>
-          <p className="text-[10px] text-gray-400 font-display">🔥 = waited longest historically</p>
-        </div>
-        {playerStats.length === 0 ? (
-          <p className="text-center text-gray-400 font-display text-sm py-8">No wait time data yet</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-2 text-xs font-display font-bold text-gray-500">Player</th>
-                <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Nights</th>
-                <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Avg Wait</th>
-                <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Badge</th>
-              </tr>
-            </thead>
-            <tbody>
-              {playerStats.map((p, idx) => (
-                <tr key={p.id} className="border-t border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-display font-bold text-gray-800 text-xs">{p.name}</td>
-                  <td className="px-4 py-2.5 text-right text-xs text-gray-500 font-display">{p.nightsPlayed}</td>
-                  <td className="px-4 py-2.5 text-right font-display font-black text-gray-700 text-xs">
-                    {p.avgWaitSecs > 0 ? fmtMin(Math.round(p.avgWaitSecs)) : "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-xs">
-                    {idx === 0 && <span title="Longest waiter — priority next!">🔥</span>}
-                    {idx === 1 && <span title="Second longest waiter">⚠️</span>}
-                    {p.avgWaitSecs > 1800 && idx > 1 && <span title="Waited over 30 mins on average">⏳</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {view === "session" && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Best Night" value={fmtMin(Math.round(Math.min(...sessionWaits.filter(s => s.avgSecs > 0).map(s => s.avgSecs), Infinity) || 0))}
+              sub="shortest avg wait" colour="green" icon="⚡" />
+            <StatCard label="Worst Night" value={fmtMin(Math.round(Math.max(...sessionWaits.map(s => s.avgSecs), 0)))}
+              sub="longest avg wait" colour="red" icon="⌛" />
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="font-display font-bold text-sm text-gray-700">⌛ Avg wait time per session</p>
+              <p className="text-[10px] text-gray-400 font-display mt-0.5">Time from check-in to first match on court</p>
+            </div>
+            {sessionWaits.length === 0 ? (
+              <p className="text-center text-gray-400 font-display text-sm py-8">No data yet</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs font-display font-bold text-gray-500">Date</th>
+                    <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Players</th>
+                    <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Matches</th>
+                    <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Avg Wait</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionWaits.map((row) => (
+                    <tr key={row.date} className="border-t border-gray-50 hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-display font-bold text-gray-800 text-xs">{row.date}</td>
+                      <td className="px-4 py-2.5 text-right text-xs text-gray-500 font-display">{row.players}</td>
+                      <td className="px-4 py-2.5 text-right text-xs text-gray-600 font-display">{row.matches}</td>
+                      <td className={`px-4 py-2.5 text-right font-display font-black text-xs
+                        ${row.avgSecs > 1800 ? "text-red-500" : row.avgSecs > 900 ? "text-amber-600" : "text-green-600"}`}>
+                        {row.avgSecs > 0 ? fmtMin(Math.round(row.avgSecs)) : <span className="text-gray-300">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {view === "player" && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Longest Avg Wait" value={highWaiter ? fmtMin(Math.round(highWaiter.avgWaitSecs)) : "—"}
+              sub={highWaiter?.name} colour="red" icon="🔥" />
+            <StatCard label="Players Tracked" value={playerStats.length} sub="across all sessions" colour="blue" icon="👥" />
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <p className="font-display font-bold text-sm text-gray-700">⌛ Wait time by player</p>
+              <p className="text-[10px] text-gray-400 font-display">🔥 = waited longest</p>
+            </div>
+            {playerStats.length === 0 ? (
+              <p className="text-center text-gray-400 font-display text-sm py-8">No wait time data yet</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs font-display font-bold text-gray-500">Player</th>
+                    <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Nights</th>
+                    <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Avg Wait</th>
+                    <th className="text-right px-4 py-2 text-xs font-display font-bold text-gray-500">Badge</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {playerStats.map((p, idx) => (
+                    <tr key={p.id} className="border-t border-gray-50 hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-display font-bold text-gray-800 text-xs">{p.name}</td>
+                      <td className="px-4 py-2.5 text-right text-xs text-gray-500 font-display">{p.nightsPlayed}</td>
+                      <td className="px-4 py-2.5 text-right font-display font-black text-gray-700 text-xs">
+                        {p.avgWaitSecs > 0 ? fmtMin(Math.round(p.avgWaitSecs)) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs">
+                        {idx === 0 && <span title="Longest waiter — priority next!">🔥</span>}
+                        {idx === 1 && <span title="Second longest waiter">⚠️</span>}
+                        {p.avgWaitSecs > 1800 && idx > 1 && <span title="Waited over 30 mins on average">⏳</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
