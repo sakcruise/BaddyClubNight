@@ -148,22 +148,17 @@ export default function AdminSessionView() {
         </div>
 
         {/* Right: Admin controls */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate("/history")}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-display font-bold transition-all
-              bg-white/15 text-white hover:bg-white/25 border border-white/20"
-          >
-            <History size={14} />
-            History
+        <div className="flex items-center gap-1.5">
+          {/* Icon-only: History & Analytics */}
+          <button onClick={() => navigate("/history")} title="History"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-xs font-display font-bold transition-all
+              bg-white/15 text-white hover:bg-white/25 border border-white/20">
+            <History size={15} />
           </button>
-          <button
-            onClick={() => navigate("/analytics")}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-display font-bold transition-all
-              bg-white/15 text-white hover:bg-white/25 border border-white/20"
-          >
-            <BarChart2 size={14} />
-            Analytics
+          <button onClick={() => navigate("/analytics")} title="Analytics"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-xs font-display font-bold transition-all
+              bg-white/15 text-white hover:bg-white/25 border border-white/20">
+            <BarChart2 size={15} />
           </button>
           <button
             onClick={() => setDrawer(drawer === "members" ? null : "members")}
@@ -187,7 +182,6 @@ export default function AdminSessionView() {
             <Cog size={14} />
             Settings
           </button>
-          <OfflineMode />
           <div className="flex flex-col items-end gap-1">
             <button
               onClick={handleEndNight}
@@ -272,7 +266,12 @@ export default function AdminSessionView() {
               {/* Drawer content */}
               <div className="flex-1 overflow-y-auto p-4">
                 {drawer === "members" && <MemberManagement />}
-                {drawer === "settings" && <ClubSettings />}
+                {drawer === "settings" && (
+                  <div className="flex flex-col gap-4">
+                    <OfflineMode />
+                    <ClubSettings />
+                  </div>
+                )}
               </div>
             </motion.div>
           </>
