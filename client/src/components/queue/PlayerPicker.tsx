@@ -16,6 +16,7 @@ export default function PlayerPicker() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [step, setStep] = useState<"pick" | "pairs">("pick");
+  const [showAll, setShowAll] = useState(false);
   // pairs: Record<memberId, "A" | "B">
   const [pairs, setPairs] = useState<Record<string, "A" | "B">>({});
 
@@ -24,6 +25,7 @@ export default function PlayerPicker() {
       setHoveredId(null);
       setStep("pick");
       setPairs({});
+      setShowAll(false);
     }
   }, [picker.isOpen]);
 
@@ -112,53 +114,92 @@ export default function PlayerPicker() {
                 </p>
               </div>
 
-              {/* Candidate cards */}
-              <div className="grid grid-cols-4 gap-4 mb-8">
-                {picker.candidates.map((candidate, idx) => {
-                  const isPicked = picker.picked.includes(candidate.member_id);
-                  const isHovered = hoveredId === candidate.member_id;
-
-                  return (
-                    <motion.div
-                      key={candidate.member_id}
-                      className="relative"
-                      animate={!isPicked ? { y: [0, -6, 0] } : { scale: [1, 1.05, 1] }}
-                      transition={{
-                        repeat: Infinity,
-                        duration: 1.2 + (idx % 3) * 0.2,
-                        ease: "easeInOut",
-                      }}
-                    >
-                      <SpeechBubble visible={isHovered && !isPicked} memberId={candidate.member_id} />
-                      <button
-                        className={`w-full flex flex-col items-center gap-2 p-4 rounded-3xl
-                          border-3 transition-all duration-150 font-display
-                          ${isPicked
-                            ? "bg-brand-500 border-brand-600 text-white shadow-lg scale-105"
-                            : "bg-white border-brand-200 hover:border-brand-400 hover:shadow-md text-brand-900"
-                          }`}
-                        onMouseEnter={() => setHoveredId(candidate.member_id)}
-                        onMouseLeave={() => setHoveredId(null)}
-                        onClick={() => togglePick(candidate.member_id)}
-                      >
-                        <Avatar
-                          name={candidate.member.name}
-                          url={candidate.member.avatar_url}
-                          memberType={candidate.member.member_type}
-                          size="lg"
-                        />
-                        <span className="font-bold text-sm text-center leading-tight">
-                          {candidate.member.name}
-                        </span>
-                        <span className={`text-xs ${isPicked ? "text-brand-100" : "text-brand-400"}`}>
-                          #{candidate.position} in queue
-                        </span>
-                        {isPicked && <span className="text-2xl">✓</span>}
-                      </button>
-                    </motion.div>
-                  );
-                })}
+              {/* Top-8 rule banner */}
+              <div className="flex items-center justify-center gap-2 mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2">
+                <span className="text-amber-600 text-sm">🏸</span>
+                <p className="text-amber-800 font-display font-bold text-xs">
+                  Top 8 rule — pick from the first 8 players in the queue
+                  {picker.candidates.length > 7 && !showAll && (
+                    <span className="text-amber-500 font-normal"> · {picker.candidates.length - 7} more waiting below</span>
+                  )}
+                </p>
               </div>
+
+              {/* Candidate cards — top 7 (positions #2–8) by default */}
+              {(() => {
+                const TOP = 7; // #1 is auto-picked, so show #2–8 = 7 candidates
+                const visible = showAll ? picker.candidates : picker.candidates.slice(0, TOP);
+                const hiddenCount = picker.candidates.length - TOP;
+
+                return (
+                  <>
+                    <div className="grid grid-cols-4 gap-4 mb-4">
+                      {visible.map((candidate, idx) => {
+                        const isPicked   = picker.picked.includes(candidate.member_id);
+                        const isHovered  = hoveredId === candidate.member_id;
+                        const isOutsideTop8 = idx >= TOP; // only relevant when showAll
+
+                        return (
+                          <motion.div
+                            key={candidate.member_id}
+                            className="relative"
+                            animate={!isPicked ? { y: [0, -6, 0] } : { scale: [1, 1.05, 1] }}
+                            transition={{
+                              repeat: Infinity,
+                              duration: 1.2 + (idx % 3) * 0.2,
+                              ease: "easeInOut",
+                            }}
+                          >
+                            <SpeechBubble visible={isHovered && !isPicked} memberId={candidate.member_id} />
+                            <button
+                              className={`w-full flex flex-col items-center gap-2 p-4 rounded-3xl
+                                border-3 transition-all duration-150 font-display
+                                ${isPicked
+                                  ? "bg-brand-500 border-brand-600 text-white shadow-lg scale-105"
+                                  : isOutsideTop8
+                                    ? "bg-gray-50 border-gray-200 hover:border-gray-400 hover:shadow-md text-gray-500 opacity-70"
+                                    : "bg-white border-brand-200 hover:border-brand-400 hover:shadow-md text-brand-900"
+                                }`}
+                              onMouseEnter={() => setHoveredId(candidate.member_id)}
+                              onMouseLeave={() => setHoveredId(null)}
+                              onClick={() => togglePick(candidate.member_id)}
+                            >
+                              <Avatar
+                                name={candidate.member.name}
+                                url={candidate.member.avatar_url}
+                                memberType={candidate.member.member_type}
+                                size="lg"
+                              />
+                              <span className="font-bold text-sm text-center leading-tight">
+                                {candidate.member.name}
+                              </span>
+                              <span className={`text-xs ${isPicked ? "text-brand-100" : isOutsideTop8 ? "text-gray-400" : "text-brand-400"}`}>
+                                #{candidate.position} in queue
+                              </span>
+                              {isPicked && <span className="text-2xl">✓</span>}
+                            </button>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Show more / collapse toggle */}
+                    {hiddenCount > 0 && (
+                      <div className="flex justify-center mb-4">
+                        <button
+                          onClick={() => setShowAll((v) => !v)}
+                          className="text-xs font-display font-bold text-brand-500 hover:text-brand-700
+                                     bg-brand-50 border border-brand-200 px-4 py-1.5 rounded-xl transition-colors"
+                        >
+                          {showAll
+                            ? "▲ Hide players outside top 8"
+                            : `▼ Show ${hiddenCount} more (outside top 8)`}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Actions */}
               <div className="flex gap-4 justify-end">
