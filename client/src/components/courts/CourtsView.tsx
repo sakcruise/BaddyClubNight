@@ -32,9 +32,12 @@ export default function CourtsView() {
     if (completing) return;
     setCompleting(matchId);
     try {
-      const { match } = scoreA !== undefined && scoreB !== undefined
-        ? await matchesApi.score(matchId, scoreA, scoreB)
-        : await matchesApi.complete(matchId);
+      // Always mark as complete first
+      let { match } = await matchesApi.complete(matchId);
+      // Then save the score if provided
+      if (scoreA !== undefined && scoreB !== undefined) {
+        ({ match } = await matchesApi.score(matchId, scoreA, scoreB));
+      }
       updateMatch(matchId, match);
       updateCourtStatus(match.court_id, "idle");
 
