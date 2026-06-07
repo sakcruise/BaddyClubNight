@@ -42,6 +42,8 @@ export interface ClubConfig {
   nightEnd: string;       // e.g. "22:00"
   whatsapp: string;       // URL or phone number
   themeKey: string;       // e.g. "orange" | "blue" | "green" etc.
+  shuttleTubePrice: number;    // £ per tube, e.g. 2.50
+  shuttleBudgetTubes: number;  // tubes budgeted per night, e.g. 10
 }
 
 interface SessionStore {
@@ -65,6 +67,8 @@ const defaultClubConfig: ClubConfig = {
   nightEnd: "22:00",
   whatsapp: "",
   themeKey: "orange",
+  shuttleTubePrice: 2.50,
+  shuttleBudgetTubes: 10,
 };
 
 export const useSessionStore = create<SessionStore>()(

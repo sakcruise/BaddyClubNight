@@ -9,7 +9,7 @@ import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import { sessionsApi, queueApi, matchesApi, membersApi, syncApi } from "../services/api";
-import { X, Users, Cog, LogOut, History } from "lucide-react";
+import { X, Users, Cog, LogOut, History, BarChart2 } from "lucide-react";
 import OfflineMode from "../components/shared/OfflineMode";
 
 type Drawer = "members" | "settings" | null;
@@ -156,6 +156,14 @@ export default function AdminSessionView() {
           >
             <History size={14} />
             History
+          </button>
+          <button
+            onClick={() => navigate("/analytics")}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-display font-bold transition-all
+              bg-white/15 text-white hover:bg-white/25 border border-white/20"
+          >
+            <BarChart2 size={14} />
+            Analytics
           </button>
           <button
             onClick={() => setDrawer(drawer === "members" ? null : "members")}

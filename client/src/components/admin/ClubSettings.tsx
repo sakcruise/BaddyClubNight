@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSessionStore } from "../../store";
-import { MapPin, Clock, MessageCircle, Building2, Check, Palette } from "lucide-react";
+import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag } from "lucide-react";
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
 
@@ -182,6 +182,49 @@ export default function ClubSettings() {
           >
             <MessageCircle size={14} /> Open WhatsApp →
           </a>
+        )}
+      </div>
+
+      {/* Shuttle Costs */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-amber-600">
+          <ShoppingBag size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Shuttle Costs</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Price per Tube (£)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.10"
+              value={(form as any).shuttleTubePrice ?? 2.50}
+              onChange={(e) => handleChange("shuttleTubePrice" as any, e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                         focus:outline-none focus:border-amber-400 w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Budget (tubes/night)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={(form as any).shuttleBudgetTubes ?? 10}
+              onChange={(e) => handleChange("shuttleBudgetTubes" as any, e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                         focus:outline-none focus:border-amber-400 w-full"
+            />
+          </div>
+        </div>
+        {(form as any).shuttleTubePrice && (form as any).shuttleBudgetTubes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 font-display font-bold">
+            🏸 Budget: {(form as any).shuttleBudgetTubes} tubes × £{parseFloat((form as any).shuttleTubePrice).toFixed(2)} = £{(parseFloat((form as any).shuttleTubePrice) * parseInt((form as any).shuttleBudgetTubes)).toFixed(2)}/night
+          </div>
         )}
       </div>
 

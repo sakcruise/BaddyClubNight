@@ -4,6 +4,7 @@ import AuthGuard from "./components/AuthGuard";
 import MainView from "./pages/MainView";
 import SessionHistoryView from "./pages/SessionHistoryView";
 import PublicView from "./pages/PublicView";
+import AnalyticsView from "./pages/AnalyticsView";
 import { useSessionStore } from "./store";
 import { applyTheme } from "./styles/themes";
 import type { ThemeKey } from "./styles/themes";
@@ -28,6 +29,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<MainView />} />
           <Route path="/history" element={<SessionHistoryView />} />
+          <Route path="/analytics" element={<AnalyticsView />} />
           <Route path="/leaderboard" element={<PublicView />} />
           {/* Legacy redirects */}
           <Route path="/kiosk" element={<Navigate to="/" replace />} />
