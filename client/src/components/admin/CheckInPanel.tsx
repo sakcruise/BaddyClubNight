@@ -1,13 +1,75 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
 import { membersApi, queueApi, matchesApi } from "../../services/api";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../../store";
 import Avatar from "../shared/Avatar";
-import { UserPlus, UserMinus, Search, UserCheck, X, Play } from "lucide-react";
+import ShoutingAvatar from "../shared/ShoutingAvatar";
+import { UserPlus, UserMinus, Search, UserCheck, X, Play, GripVertical } from "lucide-react";
+import type { QueuePosition } from "../../types";
+
+function ReorderQueueItem({
+  q, idx, member, loadingId, onRemove, formatTime,
+}: {
+  q: QueuePosition;
+  idx: number;
+  member: { id: string; name: string; member_type: string; avatar_url?: string };
+  loadingId: string | null;
+  onRemove: (id: string) => void;
+  formatTime: (iso: string) => string;
+}) {
+  const controls = useDragControls();
+  const isFirst = idx === 0;
+  const rowBg = isFirst
+    ? "bg-orange-50 border-orange-200"
+    : member.member_type === "female"
+      ? "bg-pink-50 border-pink-100"
+      : member.member_type === "guest"
+        ? "bg-purple-50 border-purple-100"
+        : "bg-sky-50 border-sky-100";
+
+  return (
+    <Reorder.Item
+      key={q.member_id}
+      value={q}
+      dragListener={false}
+      dragControls={controls}
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-colors ${rowBg}`}
+      style={{ listStyle: "none" }}
+      whileDrag={{ scale: 1.02, boxShadow: "0 6px 20px rgba(0,0,0,0.10)", zIndex: 10, backgroundColor: "rgb(var(--p-50))", borderColor: "#fdba74" }}
+    >
+      <span
+        className="touch-none cursor-grab active:cursor-grabbing text-gray-400 hover:text-orange-400 flex-shrink-0 select-none"
+        onPointerDown={(e) => controls.start(e)}
+      >
+        <GripVertical size={16} />
+      </span>
+      <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-display font-black text-xs flex-shrink-0
+        ${isFirst ? "bg-orange-400 text-white" : "bg-gray-100 text-gray-500"}`}>
+        {idx + 1}
+      </div>
+      <Avatar name={member.name} memberType={member.member_type as any} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="font-display font-bold text-sm text-gray-900 truncate leading-tight">{member.name}</div>
+        <div className="text-[10px] text-gray-400 font-display">
+          {formatTime(q.checked_in_at)}
+          {member.member_type === "guest" && <span className="ml-1 text-purple-400 font-black">GUEST</span>}
+        </div>
+      </div>
+      <button
+        onClick={() => onRemove(member.id)}
+        disabled={loadingId === member.id}
+        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500 transition-colors disabled:opacity-40"
+        title="Remove from queue"
+      >
+        <UserMinus size={13} />
+      </button>
+    </Reorder.Item>
+  );
+}
 
 export default function CheckInPanel() {
   const { members, addMember } = useMemberStore();
-  const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, activeMemberIds, setActiveMemberIds, openPicker } = useQueueStore();
+  const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, reorderQueue, activeMemberIds, setActiveMemberIds, openPicker } = useQueueStore();
   const { session, updateCourtStatus, courts } = useSessionStore();
   const { addMatch } = useMatchStore();
 
@@ -172,6 +234,64 @@ export default function CheckInPanel() {
 
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  const [shoutPhase, setShoutPhase] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(false);
+  mutedRef.current = muted;
+
+  const firstName = firstMember?.name.split(" ")[0] ?? "";
+  const courtId   = freeCourt?.id ?? 0;
+  const BANNER_MSGS = [
+    `${firstName}, it's your pick! 🏸`,
+    `${firstName}... are you there? 👀`,
+    `Court ${courtId} is getting lonely! 😴`,
+    `Don't leave them hanging! 🫣`,
+  ];
+  const SPEECHES = [
+    `${firstName}! ... It's, your, pick!`,
+    `${firstName}, are you there? Hello?`,
+    `Come on ${firstName}! Court ${courtId} is getting lonely!`,
+    `${firstName}! Pick your legends, before the shuttlecock falls asleep!`,
+  ];
+
+  // Stop speech immediately when picker opens
+  useEffect(() => {
+    if (isPicking) {
+      window.speechSynthesis?.cancel();
+      setShoutPhase(0);
+    }
+  }, [isPicking]);
+
+  // Phase cycling — resets when player or court changes, stops when picking
+  useEffect(() => {
+    if (!readyToGo || !firstMember || !freeCourt || isPicking) { setShoutPhase(0); return; }
+    setShoutPhase(0);
+    const iv = setInterval(() => setShoutPhase(p => (p + 1) % 4), 5000);
+    return () => clearInterval(iv);
+  }, [readyToGo, firstMember?.id, freeCourt?.id, isPicking]);
+
+  // Speech — debounced 120ms to absorb React StrictMode double-invoke
+  // Uses mutedRef so the timeout callback always sees the latest muted value
+  useEffect(() => {
+    if (!readyToGo || !firstMember || isPicking || !("speechSynthesis" in window)) return;
+    const text = SPEECHES[shoutPhase];
+    const t = setTimeout(() => {
+      if (mutedRef.current) return;
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.78; utt.pitch = 1.2; utt.volume = 1;
+      window.speechSynthesis.speak(utt);
+    }, 120);
+    return () => { clearTimeout(t); window.speechSynthesis.cancel(); };
+  }, [shoutPhase, readyToGo, firstMember?.id, isPicking]);
+
+  function handleReorder(newOrder: QueuePosition[]) {
+    reorderQueue(newOrder);
+    if (session?.id) {
+      queueApi.reorder(session.id, newOrder.map((q) => q.member_id)).catch(console.error);
+    }
   }
 
   // ── PAIRS STEP ────────────────────────────────────────────────────────────────
@@ -420,83 +540,85 @@ export default function CheckInPanel() {
         <motion.div
           initial={{ scale: 0.97, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="rounded-2xl overflow-hidden shadow-lg shadow-orange-500/25"
-          style={{ background: "linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%)" }}
+          className="rounded-2xl shadow-lg shadow-orange-500/25"
+          style={{ background: "linear-gradient(135deg, rgb(var(--p-600)) 0%, rgb(var(--p-500)) 50%, rgb(var(--p-400)) 100%)" }}
         >
-          <div className="px-4 pt-3 pb-1">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-lg">🔥</span>
-              <span className="text-white/80 text-[10px] font-display font-black uppercase tracking-widest">
-                Court {freeCourt.id} is free!
-              </span>
+          <div className="px-4 pt-3 pb-1 relative">
+            {/* Avatar — top right, slightly overflowing */}
+            {/* Avatar + mute button stacked in top-right */}
+            <div className="absolute top-1 right-1 flex flex-col items-center gap-1">
+              <ShoutingAvatar memberType={firstMember.member_type as any} name={firstMember.name} phase={shoutPhase} />
+              <button
+                onClick={() => {
+                  const next = !mutedRef.current;
+                  mutedRef.current = next;
+                  setMuted(next);
+                  if (next) window.speechSynthesis?.cancel();
+                }}
+                className="text-white/70 hover:text-white transition-colors text-lg leading-none"
+                title={muted ? "Unmute" : "Mute announcements"}
+              >
+                {muted ? "🔇" : "🔊"}
+              </button>
             </div>
-            <div className="text-white font-display font-black text-xl leading-tight">
-              {firstMember.name.split(" ")[0]}, pick your team!
+            <div className="pr-14">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-lg">🔥</span>
+                <span className="text-white/80 text-[10px] font-display font-black uppercase tracking-widest flex-1">
+                  Court {freeCourt.id} is free!
+                </span>
+              </div>
+              <div className="text-white font-display font-black text-xl leading-tight transition-all duration-300">
+                {readyToGo ? BANNER_MSGS[shoutPhase] : `${firstName}, pick your team!`}
+              </div>
+              <div className="text-orange-100 text-xs font-display font-semibold mt-0.5 mb-3">
+                ⚡ You're up — choose 3 legends to smash with
+              </div>
+              <button
+                onClick={() => handleGo(firstMember.id)}
+                className="w-full py-2.5 rounded-xl bg-white text-orange-600 font-display font-black text-sm
+                           hover:bg-orange-50 active:scale-95 transition-all shadow-sm mb-3"
+              >
+                🏸 Let's Go!
+              </button>
             </div>
-            <div className="text-orange-100 text-xs font-display font-semibold mt-0.5 mb-3">
-              ⚡ You're up — choose 3 legends to smash with
-            </div>
-            <button
-              onClick={() => handleGo(firstMember.id)}
-              className="w-full py-2.5 rounded-xl bg-white text-orange-600 font-display font-black text-sm
-                         hover:bg-orange-50 active:scale-95 transition-all shadow-sm mb-3"
-            >
-              🏸 Let's Go!
-            </button>
           </div>
         </motion.div>
       )}
 
       {/* Queue list — scrollable, shows who's next to play (excludes on-court players) */}
-      <div className="flex-1 overflow-y-auto min-h-0 space-y-1 pr-1">
+      <motion.div layoutScroll className="flex-1 overflow-y-auto min-h-0 pr-1">
         {visibleQueue.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 opacity-40">
             <span className="text-3xl">🏸</span>
             <p className="text-gray-500 font-display font-bold text-sm">No one checked in yet</p>
           </div>
         ) : (
-          visibleQueue.map((q, idx) => {
-            const member = members[q.member_id];
-            if (!member) return null;
-            const isFirst = idx === 0;
-
-            return (
-              <div key={q.member_id}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-colors
-                  ${isFirst
-                    ? "bg-orange-50 border-orange-200"
-                    : member.member_type === "female"
-                      ? "bg-pink-50 border-pink-100"
-                      : member.member_type === "guest"
-                        ? "bg-purple-50 border-purple-100"
-                        : "bg-sky-50 border-sky-100"
-                  }`}
-              >
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-display font-black text-xs flex-shrink-0
-                  ${isFirst ? "bg-orange-400 text-white" : "bg-gray-100 text-gray-500"}`}>
-                  {idx + 1}
-                </div>
-                <Avatar name={member.name} memberType={member.member_type} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-display font-bold text-sm text-gray-900 truncate leading-tight">{member.name}</div>
-                  <div className="text-[10px] text-gray-400 font-display">
-                    {formatTime(q.checked_in_at)}
-                    {member.member_type === "guest" && <span className="ml-1 text-purple-400 font-black">GUEST</span>}
-                  </div>
-                </div>
-                <button
-                  onClick={() => toggleCheckIn(member.id)}
-                  disabled={loadingId === member.id}
-                  className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors disabled:opacity-40"
-                  title="Remove from queue"
-                >
-                  <UserMinus size={13} />
-                </button>
-              </div>
-            );
-          })
+          <Reorder.Group
+            axis="y"
+            values={visibleQueue}
+            onReorder={handleReorder}
+            style={{ listStyle: "none", padding: 0, margin: 0 }}
+            className="space-y-1"
+          >
+            {visibleQueue.map((q, idx) => {
+              const member = members[q.member_id];
+              if (!member) return null;
+              return (
+                <ReorderQueueItem
+                  key={q.member_id}
+                  q={q}
+                  idx={idx}
+                  member={member}
+                  loadingId={loadingId}
+                  onRemove={toggleCheckIn}
+                  formatTime={formatTime}
+                />
+              );
+            })}
+          </Reorder.Group>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

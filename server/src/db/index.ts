@@ -17,4 +17,7 @@ db.pragma("foreign_keys = ON");
 const schema = readFileSync(resolve(__dirname, "schema.sql"), "utf-8");
 db.exec(schema);
 
+// Migrations
+try { db.exec("ALTER TABLE sessions ADD COLUMN synced_at TEXT"); } catch { /* column already exists */ }
+
 export default db;

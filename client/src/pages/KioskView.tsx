@@ -48,13 +48,13 @@ export default function KioskView() {
 
   return (
     <div className="kiosk-mode min-h-screen flex flex-col"
-      style={{ background: "linear-gradient(160deg, #fff7ed 0%, #ffedd5 50%, #fef3c7 100%)" }}
+      style={{ background: "linear-gradient(160deg, rgb(var(--p-50)) 0%, rgb(var(--p-100)) 50%, rgb(var(--p-100)) 100%)" }}
     >
       {/* ── Rich Header ─────────────────────────────────────────────────────── */}
       <header
         className="header-pattern flex items-center justify-between px-8 py-0"
         style={{
-          background: "linear-gradient(135deg, #7c2d12 0%, #c2410c 40%, #ea580c 70%, #f59e0b 100%)",
+          background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 70%, rgb(var(--p-500)) 100%)",
           minHeight: "88px",
         }}
       >

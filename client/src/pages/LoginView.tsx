@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authApi } from "../services/api";
+import { useAuthStore } from "../store";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import SetupView from "./SetupView";
 
@@ -10,6 +11,8 @@ export default function LoginView() {
   const [loading, setLoading]     = useState(false);
   const [showSetup, setShowSetup] = useState(false);
 
+  const { setAuth } = useAuthStore();
+
   if (showSetup) return <SetupView onBack={() => setShowSetup(false)} />;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -17,8 +20,9 @@ export default function LoginView() {
     setError("");
     setLoading(true);
     try {
-      await authApi.login(email.trim(), password);
-      // AuthGuard's onAuthStateChange fires automatically → transitions to "ok"
+      const res = await authApi.login(email.trim(), password);
+      setAuth(res.token, res.club_name, res.admin_name, res.email);
+      // AuthGuard watches token in store → transitions to "ok" automatically
     } catch (err: any) {
       setError(err.message ?? "Login failed");
       setPassword("");
@@ -29,7 +33,7 @@ export default function LoginView() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ background: "linear-gradient(160deg, #7c2d12 0%, #c2410c 40%, #ea580c 80%, #f59e0b 100%)" }}>
+      style={{ background: "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)" }}>
       <div className="flex flex-col items-center gap-3 mb-8">
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={56} />

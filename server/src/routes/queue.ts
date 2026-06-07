@@ -9,7 +9,7 @@ queueRouter.use(requireAuth);
 function getQueue(sessionId: string) {
   return db
     .prepare(`
-      SELECT qe.*, m.name, m.avatar_url, m.email
+      SELECT qe.*, m.name, m.avatar_url, m.email, m.member_type
       FROM queue_entries qe
       JOIN members m ON m.id = qe.member_id
       WHERE qe.session_id = ?
@@ -25,6 +25,7 @@ function getQueue(sessionId: string) {
         name: row.name,
         avatar_url: row.avatar_url,
         email: row.email,
+        member_type: row.member_type ?? "male",
         created_at: "",
       },
     }));
@@ -55,6 +56,20 @@ queueRouter.post("/:sessionId/queue/checkin", (req, res) => {
   db.prepare(
     "INSERT INTO queue_entries (id, session_id, member_id, position) VALUES (?, ?, ?, ?)"
   ).run(uuid(), sessionId, member_id, maxPos + 1);
+
+  res.json({ queue: getQueue(sessionId) });
+});
+
+queueRouter.patch("/:sessionId/queue/reorder", (req, res) => {
+  const { sessionId } = req.params;
+  const { member_ids } = req.body as { member_ids: string[] };
+  if (!Array.isArray(member_ids)) { res.status(400).json({ message: "member_ids required" }); return; }
+
+  const update = db.prepare("UPDATE queue_entries SET position = ? WHERE session_id = ? AND member_id = ?");
+  const tx = db.transaction(() => {
+    member_ids.forEach((id, i) => update.run(i + 1, sessionId, id));
+  });
+  tx();
 
   res.json({ queue: getQueue(sessionId) });
 });

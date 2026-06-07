@@ -168,7 +168,7 @@ export default function OnboardingTour({ onTabChange }: Props) {
           >
             <div className="bg-white rounded-2xl shadow-2xl border border-orange-100 overflow-hidden">
               {/* Top accent bar */}
-              <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #c2410c, #f59e0b)" }} />
+              <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, rgb(var(--p-700)), rgb(var(--p-500)))" }} />
 
               <div className="p-5">
                 {/* Step dots */}
@@ -205,7 +205,7 @@ export default function OnboardingTour({ onTabChange }: Props) {
                     onClick={advance}
                     className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl
                       text-sm font-display font-black text-white transition-all active:scale-95"
-                    style={{ background: "linear-gradient(135deg, #c2410c, #ea580c)" }}
+                    style={{ background: "linear-gradient(135deg, rgb(var(--p-700)), rgb(var(--p-600)))" }}
                   >
                     {isLast ? "Done! Let's go 🏸" : (
                       <>Next <ChevronRight size={15} /></>

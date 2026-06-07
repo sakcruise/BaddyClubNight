@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   date        TEXT NOT NULL,
   num_courts  INTEGER NOT NULL DEFAULT 4,
   status      TEXT NOT NULL DEFAULT 'setup',  -- setup | active | ended
+  synced_at   TEXT,                           -- null = not yet synced to cloud
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

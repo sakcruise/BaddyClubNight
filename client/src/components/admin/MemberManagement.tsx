@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { membersApi } from "../../services/api";
+import { membersApi, syncApi } from "../../services/api";
 import { useMemberStore } from "../../store";
 import Avatar from "../shared/Avatar";
-import { UserPlus, Trash2, Check, X, Pencil } from "lucide-react";
+import { UserPlus, Trash2, Check, X, Pencil, CloudDownload } from "lucide-react";
 import type { MemberType } from "../../types";
 
 const TYPE_OPTIONS: { value: MemberType; label: string; color: string }[] = [
@@ -20,10 +20,27 @@ export default function MemberManagement() {
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState<MemberType>("male");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
     membersApi.list().then((res) => setMembers(res.members));
   }, [setMembers]);
+
+  async function handleImport() {
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const { imported } = await syncApi.pullMembers();
+      const res = await membersApi.list();
+      setMembers(res.members);
+      setImportMsg(`✓ Imported ${imported} members from cloud`);
+    } catch {
+      setImportMsg("⚠ Import failed — check Supabase config");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   // Only show permanent members (not guests)
   const roster = Object.values(members)
@@ -77,6 +94,24 @@ export default function MemberManagement() {
           {roster.length} members
         </span>
       </div>
+
+      {/* Import from cloud */}
+      {roster.length === 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-2">
+          <p className="text-sm font-display font-bold text-blue-800">Your member roster is empty</p>
+          <p className="text-xs text-blue-600 font-display">Import your existing members from Supabase to get started.</p>
+          <button
+            onClick={handleImport}
+            disabled={importing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm
+                       font-display font-bold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 self-start"
+          >
+            <CloudDownload size={14} />
+            {importing ? "Importing…" : "Import from Cloud"}
+          </button>
+          {importMsg && <p className="text-xs font-display font-bold text-blue-700">{importMsg}</p>}
+        </div>
+      )}
 
       {/* Add member */}
       <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex flex-col gap-3">

@@ -35,7 +35,7 @@ export default function SessionSetup() {
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{
-        background: "linear-gradient(135deg, #7c2d12 0%, #c2410c 35%, #ea580c 60%, #f59e0b 100%)",
+        background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 35%, rgb(var(--p-600)) 60%, rgb(var(--p-500)) 100%)",
       }}
     >
       {/* Background decoration */}
@@ -43,7 +43,7 @@ export default function SessionSetup() {
       <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-10 blur-3xl"
         style={{ background: "radial-gradient(circle, #fbbf24, transparent)" }} />
       <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-10 blur-3xl"
-        style={{ background: "radial-gradient(circle, #fb923c, transparent)" }} />
+        style={{ background: "radial-gradient(circle, rgb(var(--p-400)), transparent)" }} />
 
       <motion.div
         className="relative z-10 w-full max-w-lg mx-4"

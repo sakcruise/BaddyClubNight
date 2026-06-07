@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authApi } from "../services/api";
+import { useAuthStore } from "../store";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 
 export default function SetupView({ onBack }: { onBack?: () => void }) {
@@ -12,6 +13,8 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
   const [loading, setLoading]     = useState(false);
   const [done, setDone]           = useState(false);
 
+  const { setAuth } = useAuthStore();
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -19,8 +22,9 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
     if (password.length < 6)  { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
     try {
-      await authApi.register({ club_name: clubName.trim(), admin_name: adminName.trim(), email: email.trim(), password });
-      setDone(true); // Supabase may require email confirmation
+      const res = await authApi.register({ club_name: clubName.trim(), admin_name: adminName.trim(), email: email.trim(), password });
+      setAuth(res.token, res.club_name, res.admin_name, res.email);
+      // AuthGuard transitions to "ok" automatically via store update
     } catch (err: any) {
       setError(err.message ?? "Registration failed");
     } finally {
@@ -28,31 +32,12 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
     }
   }
 
-  if (done) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6"
-        style={{ background: "linear-gradient(160deg, #7c2d12 0%, #c2410c 40%, #ea580c 80%, #f59e0b 100%)" }}>
-        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4 text-center">
-          <div className="text-5xl">✅</div>
-          <h2 className="font-display font-black text-gray-900 text-xl">Account Created!</h2>
-          <p className="text-gray-500 text-sm font-display">
-            Check your email <strong>{email}</strong> to confirm your account, then come back and sign in.
-          </p>
-          {onBack && (
-            <button onClick={onBack}
-              className="w-full py-3 rounded-2xl font-display font-black text-white
-                         bg-gradient-to-r from-orange-600 to-orange-500 active:scale-95 transition-all">
-              Back to Login
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // `done` state is unused now — registration logs in directly
+  void done;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ background: "linear-gradient(160deg, #7c2d12 0%, #c2410c 40%, #ea580c 80%, #f59e0b 100%)" }}>
+      style={{ background: "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)" }}>
       <div className="flex flex-col items-center gap-3 mb-8">
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={56} />

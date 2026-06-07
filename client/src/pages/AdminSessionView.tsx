@@ -8,7 +8,7 @@ import Leaderboard from "../components/leaderboard/Leaderboard";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
-import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
+import { sessionsApi, queueApi, matchesApi, membersApi, syncApi } from "../services/api";
 import { X, Users, Cog, LogOut, History } from "lucide-react";
 
 type Drawer = "members" | "settings" | null;
@@ -22,6 +22,8 @@ export default function AdminSessionView() {
   const { setMembers } = useMemberStore();
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [ending, setEnding] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "done" | "error">("idle");
+  const [syncedAt, setSyncedAt] = useState<string | null>(null);
 
   // Bootstrap data on mount
   useEffect(() => {
@@ -31,7 +33,11 @@ export default function AdminSessionView() {
         sessionsApi.current(),
       ]);
       setMembers(membersRes.members);
-      if (!sessionRes.session) return;
+      if (!sessionRes.session) {
+        // No active session on local server — clear stale cached state
+        endSession();
+        return;
+      }
       setSession(sessionRes.session);
       if (courts.length === 0) {
         setCourts(
@@ -86,9 +92,15 @@ export default function AdminSessionView() {
   async function handleEndNight() {
     if (!session || !confirm("End tonight's session? This cannot be undone.")) return;
     setEnding(true);
+    const sessionId = session.id;
     try {
-      await sessionsApi.end(session.id);
-      endSession();
+      await sessionsApi.end(sessionId);
+      // Attempt cloud sync — best effort, don't block End Night
+      setSyncStatus("syncing");
+      syncApi.push(sessionId)
+        .then(({ synced_at }) => { setSyncedAt(synced_at); setSyncStatus("done"); })
+        .catch(() => setSyncStatus("error"))
+        .finally(() => endSession());
     } finally {
       setEnding(false);
     }
@@ -97,13 +109,13 @@ export default function AdminSessionView() {
   return (
     <div
       className="min-h-screen flex flex-col relative"
-      style={{ background: "linear-gradient(160deg, #fff7ed 0%, #ffedd5 50%, #fef3c7 100%)" }}
+      style={{ background: "linear-gradient(160deg, rgb(var(--p-50)) 0%, rgb(var(--p-100)) 50%, rgb(var(--p-100)) 100%)" }}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header
         className="flex items-center justify-between px-6 py-0 flex-shrink-0"
         style={{
-          background: "linear-gradient(135deg, #7c2d12 0%, #c2410c 40%, #ea580c 70%, #f59e0b 100%)",
+          background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 70%, rgb(var(--p-500)) 100%)",
           minHeight: "80px",
         }}
       >
@@ -166,15 +178,26 @@ export default function AdminSessionView() {
             <Cog size={14} />
             Settings
           </button>
-          <button
-            onClick={handleEndNight}
-            disabled={ending}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/80 border border-red-400/40
-                       text-white text-xs font-display font-bold hover:bg-red-600/90 active:scale-95 transition-all"
-          >
-            <LogOut size={14} />
-            {ending ? "Ending…" : "End Night"}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleEndNight}
+              disabled={ending}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/80 border border-red-400/40
+                         text-white text-xs font-display font-bold hover:bg-red-600/90 active:scale-95 transition-all"
+            >
+              <LogOut size={14} />
+              {ending ? "Ending…" : "End Night"}
+            </button>
+            {syncStatus === "syncing" && (
+              <span className="text-[10px] text-orange-200 font-display font-bold animate-pulse">☁ Syncing to cloud…</span>
+            )}
+            {syncStatus === "done" && syncedAt && (
+              <span className="text-[10px] text-green-300 font-display font-bold">✓ Synced to cloud</span>
+            )}
+            {syncStatus === "error" && (
+              <span className="text-[10px] text-red-300 font-display font-bold">⚠ Sync failed — will retry</span>
+            )}
+          </div>
         </div>
       </header>
 

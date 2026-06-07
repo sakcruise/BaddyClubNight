@@ -2,12 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Club Theme CSS Variables (orange default) ── */
+:root {
+  --p-50:  255 247 237;
+  --p-100: 255 237 213;
+  --p-200: 254 215 170;
+  --p-300: 253 186 116;
+  --p-400: 251 146 60;
+  --p-500: 249 115 22;
+  --p-600: 234 88 12;
+  --p-700: 194 65 12;
+  --p-800: 154 52 18;
+  --p-900: 124 45 18;
+}
+
 @layer base {
   html {
     font-family: "Inter", system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-    background-color: #fff7ed;
+    background-color: rgb(var(--p-50));
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -73,8 +87,8 @@
 /* Scrollbar styling for kiosk */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #fb923c80; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #f97316; }
+::-webkit-scrollbar-thumb { background: rgb(var(--p-400) / 0.5); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--p-500)); }
 
 /* Header pattern */
 .header-pattern {

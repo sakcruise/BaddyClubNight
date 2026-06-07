@@ -1,12 +1,73 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { Reorder, AnimatePresence, motion, useDragControls } from "framer-motion";
 import { useQueueStore, useSessionStore } from "../../store";
 import Avatar from "../shared/Avatar";
 import { getCandidates } from "../../utils/queueLogic";
-import { Users } from "lucide-react";
+import { Users, GripVertical } from "lucide-react";
+import { queueApi } from "../../services/api";
+import type { QueuePosition } from "../../types";
+
+function DragHandle({ controls }: { controls: ReturnType<typeof useDragControls> }) {
+  return (
+    <span
+      className="touch-none cursor-grab active:cursor-grabbing text-gray-400 hover:text-orange-400 flex-shrink-0 select-none p-1 -ml-1"
+      onPointerDown={(e) => controls.start(e)}
+    >
+      <GripVertical size={20} />
+    </span>
+  );
+}
+
+function QueueItem({ entry, idx }: { entry: QueuePosition; idx: number }) {
+  const controls = useDragControls();
+
+  if (idx === 0) {
+    return (
+      <div
+        className="flex items-center gap-3 p-4 rounded-2xl border border-orange-300/50"
+        style={{
+          background: "linear-gradient(135deg, rgb(var(--p-50)), rgb(var(--p-100)))",
+          boxShadow: "0 2px 12px rgba(234,88,12,0.12)",
+        }}
+      >
+        <div className="queue-number bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/30 text-base font-black">
+          1
+        </div>
+        <Avatar name={entry.member.name} url={entry.member.avatar_url} memberType={entry.member.member_type} size="md" />
+        <div className="flex-1 min-w-0">
+          <div className="font-display font-black text-gray-900 text-base leading-tight truncate">
+            {entry.member.name}
+          </div>
+          <div className="text-orange-500 text-xs font-display font-bold">Up next ✨</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Reorder.Item
+      key={entry.member_id}
+      value={entry}
+      dragListener={false}
+      dragControls={controls}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-orange-50/60 transition-colors border border-transparent hover:border-orange-100/60"
+      style={{ listStyle: "none" }}
+      whileDrag={{ scale: 1.02, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 10, backgroundColor: "rgb(var(--p-50))" }}
+    >
+      <DragHandle controls={controls} />
+      <div className="queue-number bg-gray-100 text-gray-500 text-sm font-bold flex-shrink-0">
+        {entry.position}
+      </div>
+      <Avatar name={entry.member.name} url={entry.member.avatar_url} memberType={entry.member.member_type} size="sm" />
+      <span className="font-display font-bold text-gray-800 text-sm flex-1 truncate">
+        {entry.member.name}
+      </span>
+    </Reorder.Item>
+  );
+}
 
 export default function QueueList() {
-  const { queue, activeMemberIds, openPicker } = useQueueStore();
-  const { courts } = useSessionStore();
+  const { queue, activeMemberIds, openPicker, reorderQueue } = useQueueStore();
+  const { courts, session } = useSessionStore();
 
   const firstInQueue = queue[0];
   const idleCourt = courts.find((c) => c.status === "idle");
@@ -15,6 +76,14 @@ export default function QueueList() {
     if (!firstInQueue || !idleCourt) return;
     const candidates = getCandidates(queue, firstInQueue.member_id, activeMemberIds);
     openPicker(firstInQueue.member_id, candidates, idleCourt.id);
+  }
+
+  function handleReorder(newTail: QueuePosition[]) {
+    const merged = firstInQueue ? [firstInQueue, ...newTail] : newTail;
+    reorderQueue(merged);
+    if (session?.id) {
+      queueApi.reorder(session.id, merged.map((q) => q.member_id)).catch(console.error);
+    }
   }
 
   return (
@@ -43,7 +112,7 @@ export default function QueueList() {
                        text-left flex items-center gap-3 active:scale-95 transition-all duration-150
                        border border-orange-400/30"
             style={{
-              background: "linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #f97316 100%)",
+              background: "linear-gradient(135deg, rgb(var(--p-700)) 0%, rgb(var(--p-600)) 50%, rgb(var(--p-500)) 100%)",
               boxShadow: "0 4px 20px rgba(234,88,12,0.35), 0 2px 6px rgba(0,0,0,0.1)",
             }}
           >
@@ -60,60 +129,38 @@ export default function QueueList() {
       </AnimatePresence>
 
       {/* Queue entries */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
-        <AnimatePresence initial={false}>
-          {queue.map((entry, idx) => (
-            <motion.div
-              key={entry.member_id}
-              layout
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 16, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {idx === 0 ? (
-                /* First in queue — hero card */
-                <div
-                  className="flex items-center gap-3 p-4 rounded-2xl border border-orange-300/50"
-                  style={{
-                    background: "linear-gradient(135deg, #fff7ed, #ffedd5)",
-                    boxShadow: "0 2px 12px rgba(234,88,12,0.12)",
-                  }}
-                >
-                  <div className="queue-number bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/30 text-base font-black">
-                    1
-                  </div>
-                  <Avatar name={entry.member.name} url={entry.member.avatar_url} memberType={entry.member.member_type} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-display font-black text-gray-900 text-base leading-tight truncate">
-                      {entry.member.name}
-                    </div>
-                    <div className="text-orange-500 text-xs font-display font-bold">Up next ✨</div>
-                  </div>
-                </div>
-              ) : (
-                /* Rest of queue */
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-orange-50/60 transition-colors">
-                  <div className="queue-number bg-gray-100 text-gray-500 text-sm font-bold">
-                    {entry.position}
-                  </div>
-                  <Avatar name={entry.member.name} url={entry.member.avatar_url} memberType={entry.member.member_type} size="sm" />
-                  <span className="font-display font-bold text-gray-800 text-sm flex-1 truncate">
-                    {entry.member.name}
-                  </span>
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {queue.length === 0 && (
+      <motion.div layoutScroll className="flex-1 overflow-y-auto min-h-0 pr-1">
+        {queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 gap-2">
             <span className="text-4xl">🏸</span>
             <p className="text-gray-400 font-display font-bold text-sm">Nobody queued yet!</p>
           </div>
+        ) : (
+          <>
+            {/* First item — locked, not draggable */}
+            {firstInQueue && (
+              <motion.div layout key={firstInQueue.member_id} className="mb-2">
+                <QueueItem entry={firstInQueue} idx={0}  />
+              </motion.div>
+            )}
+
+            {/* Rest — reorderable */}
+            {queue.length > 1 && (
+              <Reorder.Group
+                axis="y"
+                values={queue.slice(1)}
+                onReorder={handleReorder}
+                className="space-y-2"
+                style={{ listStyle: "none", padding: 0, margin: 0 }}
+              >
+                {queue.slice(1).map((entry, i) => (
+                  <QueueItem key={entry.member_id} entry={entry} idx={i + 1}  />
+                ))}
+              </Reorder.Group>
+            )}
+          </>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

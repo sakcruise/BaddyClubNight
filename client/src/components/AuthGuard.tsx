@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
 import { useAuthStore } from "../store";
 import { authApi } from "../services/api";
 import LoginView from "../pages/LoginView";
@@ -7,42 +6,24 @@ import LoginView from "../pages/LoginView";
 type Status = "loading" | "login" | "ok";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { setProfile, clearProfile } = useAuthStore();
+  const { token, setProfile, clearProfile } = useAuthStore();
   const [status, setStatus] = useState<Status>("loading");
 
-  async function loadProfile() {
-    try {
-      const profile = await authApi.getClubProfile();
-      const { data: { user } } = await supabase.auth.getUser();
-      setProfile(profile.club_name, profile.admin_name, user?.email ?? "");
-      setStatus("ok");
-    } catch {
-      setStatus("login");
-    }
-  }
-
   useEffect(() => {
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        loadProfile();
-      } else {
-        setStatus("login");
-      }
-    });
-
-    // Listen for auth changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        loadProfile();
-      } else {
+    if (!token) {
+      setStatus("login");
+      return;
+    }
+    authApi.me()
+      .then(({ club }) => {
+        setProfile(club.club_name, club.admin_name, club.email);
+        setStatus("ok");
+      })
+      .catch(() => {
         clearProfile();
         setStatus("login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+      });
+  }, [token]);
 
   if (status === "loading") {
     return (

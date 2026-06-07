@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useSessionStore } from "../../store";
-import { MapPin, Clock, MessageCircle, Building2, Check } from "lucide-react";
+import { MapPin, Clock, MessageCircle, Building2, Check, Palette } from "lucide-react";
+import { THEMES, applyTheme } from "../../styles/themes";
+import type { ThemeKey } from "../../styles/themes";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -25,6 +27,7 @@ export default function ClubSettings() {
 
   function handleSave() {
     setClubConfig(form);
+    applyTheme(((form as any).themeKey ?? "orange") as ThemeKey);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
@@ -180,6 +183,34 @@ export default function ClubSettings() {
             <MessageCircle size={14} /> Open WhatsApp →
           </a>
         )}
+      </div>
+
+      {/* Theme */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-orange-600">
+          <Palette size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Club Colour Theme</span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {THEMES.map((theme) => {
+            const isActive = (form as any).themeKey === theme.key || (!((form as any).themeKey) && theme.key === "orange");
+            return (
+              <button
+                key={theme.key}
+                onClick={() => {
+                    handleChange("themeKey" as any, theme.key);
+                    applyTheme(theme.key as ThemeKey);
+                  }}
+                className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all
+                  ${isActive ? "border-gray-800 bg-gray-50 shadow-sm" : "border-gray-100 hover:border-gray-300"}`}
+              >
+                <span className="text-2xl">{theme.emoji}</span>
+                <span className="text-[10px] font-display font-bold text-gray-600">{theme.name}</span>
+                {isActive && <span className="text-[9px] font-black text-gray-800">✓ Active</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Save button */}

@@ -174,7 +174,7 @@ export default function EndNightCheers({ matches, members, onConfirm, onCancel, 
 
           {/* Header */}
           <div className="relative px-6 pt-6 pb-4 text-center"
-            style={{ background: "linear-gradient(135deg, #7c2d12 0%, #ea580c 60%, #f59e0b 100%)" }}>
+            style={{ background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-600)) 60%, rgb(var(--p-500)) 100%)" }}>
             <button
               onClick={onCancel}
               className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all"

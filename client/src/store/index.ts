@@ -7,11 +7,12 @@ import { normalisePositions } from "../utils/queueLogic";
 
 // ─── Auth Store ───────────────────────────────────────────────────────────────
 
-// Auth state is now managed by Supabase — this store just caches the club profile
 interface AuthStore {
+  token: string | null;
   clubName: string | null;
   adminName: string | null;
   email: string | null;
+  setAuth: (token: string, clubName: string, adminName: string, email: string) => void;
   setProfile: (clubName: string, adminName: string, email: string) => void;
   clearProfile: () => void;
 }
@@ -19,11 +20,13 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set) => ({
+      token: null,
       clubName: null,
       adminName: null,
       email: null,
+      setAuth: (token, clubName, adminName, email) => set({ token, clubName, adminName, email }),
       setProfile: (clubName, adminName, email) => set({ clubName, adminName, email }),
-      clearProfile: () => set({ clubName: null, adminName: null, email: null }),
+      clearProfile: () => set({ token: null, clubName: null, adminName: null, email: null }),
     }),
     { name: "auth-store" }
   )
@@ -38,6 +41,7 @@ export interface ClubConfig {
   nightStart: string;     // e.g. "19:00"
   nightEnd: string;       // e.g. "22:00"
   whatsapp: string;       // URL or phone number
+  themeKey: string;       // e.g. "orange" | "blue" | "green" etc.
 }
 
 interface SessionStore {
@@ -60,6 +64,7 @@ const defaultClubConfig: ClubConfig = {
   nightStart: "19:00",
   nightEnd: "22:00",
   whatsapp: "",
+  themeKey: "orange",
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -144,6 +149,7 @@ interface QueueStore {
   setQueue: (q: QueuePosition[]) => void;
   addToQueue: (pos: QueuePosition) => void;
   removeFromQueue: (memberId: string) => void;
+  reorderQueue: (q: QueuePosition[]) => void;
   setActiveMemberIds: (ids: Set<string>) => void;
   openPicker: (pickerId: string | null, candidates: QueuePosition[], courtId: number) => void;
   setPickerId: (id: string | null) => void;
@@ -176,6 +182,8 @@ export const useQueueStore = create<QueueStore>()((set) => ({
     set((s) => ({
       queue: normalisePositions(s.queue.filter((q) => q.member_id !== memberId)),
     })),
+
+  reorderQueue: (queue) => set({ queue: normalisePositions(queue) }),
 
   setActiveMemberIds: (ids) => set({ activeMemberIds: ids }),
 
