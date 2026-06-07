@@ -38,7 +38,9 @@ export default defineConfig({
     }),
   ],
   build: {
-    outDir: "../server/public",
+    // On the Pi: BUILD_TARGET=pi → output into server/public so Express serves it.
+    // On Vercel: no env var → output into dist (Vercel's default).
+    outDir: process.env.BUILD_TARGET === "pi" ? "../server/public" : "dist",
     emptyOutDir: true,
   },
   server: {
