@@ -2,10 +2,21 @@
  * API layer — uses Supabase JS directly.
  * Works on Vercel (web) and Pi (when online).
  * The Pi Express server is only used for offline sync.
+ *
+ * OFFLINE MODE: when navigator.onLine === false OR localStorage "offline-mode" === "true",
+ * all read/write operations are routed to the local Zustand stores instead of hitting
+ * Supabase. This allows the full club night flow to work without internet.
  */
 import { supabase } from "../lib/supabase";
 import type { Member, Session, Match, QueuePosition, MemberType } from "../types";
 import { v4 as uuid } from "uuid";
+import { useMemberStore, useSessionStore, useQueueStore, useMatchStore } from "../store";
+
+// ─── Offline detection ────────────────────────────────────────────────────────
+// True when the user explicitly chose offline mode OR the browser reports no network.
+function isOffline(): boolean {
+  return localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
+}
 
 // ─── Helper: get current club's user id ───────────────────────────────────────
 async function getClubId(): Promise<string> {
@@ -133,6 +144,12 @@ export const authApi = {
 
 export const membersApi = {
   list: async () => {
+    if (isOffline()) {
+      const members = Object.values(useMemberStore.getState().members).filter(
+        (m) => m.member_type !== "guest"
+      );
+      return { members };
+    }
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("members")
@@ -144,6 +161,17 @@ export const membersApi = {
   },
 
   create: async (name: string, member_type: MemberType = "male", email?: string) => {
+    if (isOffline()) {
+      const member: Member = {
+        id: uuid(),
+        name,
+        member_type,
+        email: email ?? "",
+        created_at: new Date().toISOString(),
+      };
+      useMemberStore.getState().addMember(member);
+      return { member };
+    }
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("members")
@@ -154,6 +182,11 @@ export const membersApi = {
   },
 
   update: async (id: string, patch: { name?: string; member_type?: MemberType }) => {
+    if (isOffline()) {
+      useMemberStore.getState().updateMember(id, patch);
+      const member = useMemberStore.getState().members[id];
+      return { member };
+    }
     const { data, error } = await supabase
       .from("members")
       .update(patch)
@@ -164,6 +197,10 @@ export const membersApi = {
   },
 
   delete: async (id: string) => {
+    if (isOffline()) {
+      useMemberStore.getState().deleteMember(id);
+      return { ok: true as const };
+    }
     const { error } = await supabase.from("members").delete().eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true as const };
@@ -174,6 +211,9 @@ export const membersApi = {
 
 export const sessionsApi = {
   current: async () => {
+    if (isOffline()) {
+      return { session: useSessionStore.getState().session };
+    }
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("sessions")
@@ -188,6 +228,17 @@ export const sessionsApi = {
   },
 
   start: async (payload: { club_name: string; num_courts: number }) => {
+    if (isOffline()) {
+      const session: Session = {
+        id: uuid(),
+        club_name: payload.club_name,
+        num_courts: payload.num_courts,
+        date: new Date().toISOString().split("T")[0],
+        status: "active",
+        created_at: new Date().toISOString(),
+      };
+      return { session };
+    }
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("sessions")
@@ -205,6 +256,13 @@ export const sessionsApi = {
   },
 
   end: async (sessionId: string) => {
+    if (isOffline()) {
+      const current = useSessionStore.getState().session;
+      const session: Session = current
+        ? { ...current, status: "ended" }
+        : { id: sessionId, club_name: "", num_courts: 0, date: "", status: "ended", created_at: "" };
+      return { session };
+    }
     const { data, error } = await supabase
       .from("sessions")
       .update({ status: "ended" })
@@ -255,6 +313,9 @@ export const sessionsApi = {
 
 export const queueApi = {
   get: async (sessionId: string) => {
+    if (isOffline()) {
+      return { queue: useQueueStore.getState().queue };
+    }
     const { data, error } = await supabase
       .from("queue_entries")
       .select("*, members(id, name, member_type, avatar_url, email, created_at)")
@@ -271,9 +332,17 @@ export const queueApi = {
   },
 
   checkIn: async (sessionId: string, memberId: string) => {
-    const clubId = await getClubId();
+    if (isOffline()) {
+      const store = useQueueStore.getState();
+      // Already in queue? No-op.
+      if (store.queue.some((q) => q.member_id === memberId)) return { queue: store.queue };
+      const nextPos = (store.queue.slice(-1)[0]?.position ?? 0) + 1;
+      const member = useMemberStore.getState().members[memberId];
+      store.addToQueue({ member_id: memberId, position: nextPos, checked_in_at: new Date().toISOString(), member });
+      return { queue: useQueueStore.getState().queue };
+    }
 
-    // Get current max position
+    const clubId = await getClubId();
     const { data: existing } = await supabase
       .from("queue_entries")
       .select("position")
@@ -297,6 +366,13 @@ export const queueApi = {
 
   // Like checkIn but always inserts fresh (no ignoreDuplicates) — used for re-queuing after match
   checkInForce: async (sessionId: string, memberId: string) => {
+    if (isOffline()) {
+      const store = useQueueStore.getState();
+      const member = useMemberStore.getState().members[memberId];
+      const nextPos = (store.queue.slice(-1)[0]?.position ?? 0) + 1;
+      store.addToQueue({ member_id: memberId, position: nextPos, checked_in_at: new Date().toISOString(), member });
+      return;
+    }
     const clubId = await getClubId();
     const { data: existing } = await supabase
       .from("queue_entries")
@@ -313,6 +389,10 @@ export const queueApi = {
   },
 
   remove: async (sessionId: string, memberId: string) => {
+    if (isOffline()) {
+      useQueueStore.getState().removeFromQueue(memberId);
+      return { queue: useQueueStore.getState().queue };
+    }
     const { error } = await supabase
       .from("queue_entries")
       .delete()
@@ -323,6 +403,15 @@ export const queueApi = {
   },
 
   reorder: async (sessionId: string, orderedMemberIds: string[]) => {
+    if (isOffline()) {
+      const currentQueue = useQueueStore.getState().queue;
+      const reordered = orderedMemberIds.map((id, idx) => {
+        const entry = currentQueue.find((q) => q.member_id === id)!;
+        return { ...entry, position: idx + 1 };
+      });
+      useQueueStore.getState().reorderQueue(reordered);
+      return;
+    }
     const updates = orderedMemberIds.map((memberId, idx) =>
       supabase
         .from("queue_entries")
@@ -338,6 +427,9 @@ export const queueApi = {
 
 export const matchesApi = {
   list: async (sessionId: string) => {
+    if (isOffline()) {
+      return { matches: useMatchStore.getState().matches.filter((m) => m.session_id === sessionId) };
+    }
     const { data, error } = await supabase
       .from("matches")
       .select("*")
@@ -347,6 +439,19 @@ export const matchesApi = {
   },
 
   start: async (sessionId: string, payload: { court_id: number; team_a: [string, string]; team_b: [string, string] }) => {
+    if (isOffline()) {
+      const match: Match = {
+        id: uuid(),
+        session_id: sessionId,
+        court_id: payload.court_id,
+        team_a: payload.team_a,
+        team_b: payload.team_b,
+        result: "pending",
+        started_at: new Date().toISOString(),
+      };
+      useMatchStore.getState().addMatch(match);
+      return { match };
+    }
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("matches")
@@ -368,6 +473,12 @@ export const matchesApi = {
   },
 
   complete: async (matchId: string) => {
+    if (isOffline()) {
+      const patch = { result: "complete" as const, ended_at: new Date().toISOString() };
+      useMatchStore.getState().updateMatch(matchId, patch);
+      const match = useMatchStore.getState().matches.find((m) => m.id === matchId)!;
+      return { match };
+    }
     const { data, error } = await supabase
       .from("matches")
       .update({ result: "complete", ended_at: new Date().toISOString() })
@@ -378,6 +489,12 @@ export const matchesApi = {
   },
 
   score: async (matchId: string, score_a: number, score_b: number, shuttles_used?: number) => {
+    if (isOffline()) {
+      const patch: Partial<Match> = { score_a, score_b, ...(shuttles_used !== undefined ? { shuttles_used } : {}) };
+      useMatchStore.getState().updateMatch(matchId, patch);
+      const match = useMatchStore.getState().matches.find((m) => m.id === matchId)!;
+      return { match };
+    }
     const patch: Record<string, unknown> = { score_a, score_b };
     if (shuttles_used !== undefined) patch.shuttles_used = shuttles_used;
     const { data, error } = await supabase
@@ -390,6 +507,11 @@ export const matchesApi = {
   },
 
   updateTeams: async (matchId: string, team_a: [string, string], team_b: [string, string]) => {
+    if (isOffline()) {
+      useMatchStore.getState().updateMatch(matchId, { team_a, team_b });
+      const match = useMatchStore.getState().matches.find((m) => m.id === matchId)!;
+      return { match };
+    }
     const { data, error } = await supabase
       .from("matches")
       .update({ team_a_1: team_a[0], team_a_2: team_a[1], team_b_1: team_b[0], team_b_2: team_b[1] })

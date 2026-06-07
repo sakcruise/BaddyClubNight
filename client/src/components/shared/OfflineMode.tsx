@@ -1,15 +1,19 @@
 /**
  * OfflineMode — "Work Offline" button + offline status banner.
  *
+ * ALWAYS VISIBLE when offline (navigator.onLine = false OR offline-mode flag):
+ *   Amber banner "Offline — using cached data" so the user knows why API calls aren't firing.
+ *
  * BEFORE CLUB NIGHT (online):
  *   Shows "Work Offline" button → syncs members + config to localStorage → sets offline flag.
+ *   This pre-caches data so the night works even without any internet at the venue.
  *
  * AT CLUB (offline flag set):
  *   Shows amber banner "Offline mode — changes saved locally".
  *   Shows "Go Online" button to clear the flag when WiFi is back.
  *
- * AFTER CLUB (back online):
- *   Shows "Sync to Cloud" button → pushes local changes to Supabase.
+ * AFTER CLUB (back online + offline-mode flag still set):
+ *   Shows "Sync to Cloud" button → pushes local session + matches to Supabase.
  */
 import { useState, useEffect } from "react";
 import { WifiOff, Wifi, CloudUpload, RefreshCw } from "lucide-react";
@@ -32,13 +36,21 @@ export default function OfflineMode() {
   const { matches }     = useMatchStore();
   const { setSyncStatus } = useSyncStore();
 
+  // Track browser online/offline events
   useEffect(() => {
-    const up   = () => setIsOnline(true);
+    const up = () => {
+      setIsOnline(true);
+      // Don't auto-clear the offline-mode flag — user must click "Go Online" so we don't
+      // accidentally try to sync partial data mid-session
+    };
     const down = () => setIsOnline(false);
     window.addEventListener("online", up);
     window.addEventListener("offline", down);
     return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
   }, []);
+
+  // If navigator says we're offline but the flag isn't set yet, show a read-only banner
+  const networkOfflineOnly = !isOnline && !offline;
 
   // ── "Work Offline" — cache data locally ───────────────────────────────────
   async function handleWorkOffline() {
@@ -138,6 +150,19 @@ export default function OfflineMode() {
   const cachedAtStr = cachedAt
     ? new Date(cachedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
+
+  // ── Auto-offline banner: WiFi dropped but user never clicked "Work Offline" ─
+  if (networkOfflineOnly) {
+    return (
+      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
+        <WifiOff size={16} className="text-amber-600 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-amber-800 font-display font-black text-xs">No internet — using cached data</div>
+          <div className="text-amber-600 text-[10px] font-display">All changes are saved locally and will sync when you reconnect</div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Offline banner (shown when offline mode is active) ────────────────────
   if (offline) {

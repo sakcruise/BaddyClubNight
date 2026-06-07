@@ -59,6 +59,27 @@ export default function MainView() {
 
   useEffect(() => {
     if (!session) return;
+
+    // In offline mode, trust the persisted Zustand stores — skip all Supabase calls.
+    // Courts may not be in store after a hard refresh, so rebuild them from persisted matches.
+    const offline = localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
+    if (offline) {
+      const pendingByCourt = Object.fromEntries(
+        matches.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
+      );
+      setCourts(Array.from({ length: session.num_courts }, (_, i) => {
+        const id = i + 1;
+        return pendingByCourt[id]
+          ? { id, status: "playing" as const, current_match_id: pendingByCourt[id] }
+          : { id, status: "idle" as const };
+      }));
+      const activePlayers = new Set<string>(
+        matches.filter((m) => m.result === "pending").flatMap((m) => [...m.team_a, ...m.team_b])
+      );
+      useQueueStore.getState().setActiveMemberIds(activePlayers);
+      return;
+    }
+
     async function load() {
       try {
         const [membersRes, sessionRes] = await Promise.all([

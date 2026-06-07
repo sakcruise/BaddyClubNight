@@ -179,65 +179,84 @@ const defaultPicker: PickerState = {
   target_court: null,
 };
 
-export const useQueueStore = create<QueueStore>()((set) => ({
-  queue: [],
-  activeMemberIds: new Set(),
-  picker: defaultPicker,
+export const useQueueStore = create<QueueStore>()(
+  persist(
+    (set) => ({
+      queue: [],
+      activeMemberIds: new Set(),
+      picker: defaultPicker,
 
-  setQueue: (queue) => set({ queue: normalisePositions(queue) }),
+      setQueue: (queue) => set({ queue: normalisePositions(queue) }),
 
-  addToQueue: (pos) =>
-    set((s) => {
-      if (s.queue.some((q) => q.member_id === pos.member_id)) return s;
-      return { queue: normalisePositions([...s.queue, pos]) };
+      addToQueue: (pos) =>
+        set((s) => {
+          if (s.queue.some((q) => q.member_id === pos.member_id)) return s;
+          return { queue: normalisePositions([...s.queue, pos]) };
+        }),
+
+      removeFromQueue: (memberId) =>
+        set((s) => ({
+          queue: normalisePositions(s.queue.filter((q) => q.member_id !== memberId)),
+        })),
+
+      reorderQueue: (queue) => set({ queue: normalisePositions(queue) }),
+
+      setActiveMemberIds: (ids) => set({ activeMemberIds: ids }),
+
+      openPicker: (pickerId, candidates, courtId) =>
+        set({
+          picker: {
+            isOpen: true,
+            picker_id: pickerId,
+            candidates,
+            picked: [],
+            target_court: courtId,
+          },
+        }),
+
+      setPickerId: (id) =>
+        set((s) => ({
+          picker: {
+            ...s.picker,
+            picker_id: id,
+            picked: [],
+          },
+        })),
+
+      togglePick: (memberId) =>
+        set((s) => {
+          const already = s.picker.picked.includes(memberId);
+          if (!already && s.picker.picked.length >= 3) return s;
+          return {
+            picker: {
+              ...s.picker,
+              picked: already
+                ? s.picker.picked.filter((id) => id !== memberId)
+                : [...s.picker.picked, memberId],
+            },
+          };
+        }),
+
+      closePicker: () => set({ picker: defaultPicker }),
     }),
-
-  removeFromQueue: (memberId) =>
-    set((s) => ({
-      queue: normalisePositions(s.queue.filter((q) => q.member_id !== memberId)),
-    })),
-
-  reorderQueue: (queue) => set({ queue: normalisePositions(queue) }),
-
-  setActiveMemberIds: (ids) => set({ activeMemberIds: ids }),
-
-  openPicker: (pickerId, candidates, courtId) =>
-    set({
-      picker: {
-        isOpen: true,
-        picker_id: pickerId,
-        candidates,
-        picked: [],
-        target_court: courtId,
+    {
+      name: "queue-store",
+      // Only persist queue + activeMemberIds (not picker — that's transient UI state)
+      partialize: (state) => ({
+        queue: state.queue,
+        activeMemberIds: [...state.activeMemberIds], // Set → Array for JSON
+      }),
+      merge: (persisted: unknown, current: QueueStore) => {
+        const p = persisted as { queue?: QueuePosition[]; activeMemberIds?: string[] } | null;
+        return {
+          ...current,
+          queue: p?.queue ?? [],
+          activeMemberIds: new Set<string>(p?.activeMemberIds ?? []),
+        };
       },
-    }),
-
-  setPickerId: (id) =>
-    set((s) => ({
-      picker: {
-        ...s.picker,
-        picker_id: id,
-        // clear any picks that were for the old picker's team
-        picked: [],
-      },
-    })),
-
-  togglePick: (memberId) =>
-    set((s) => {
-      const already = s.picker.picked.includes(memberId);
-      if (!already && s.picker.picked.length >= 3) return s;
-      return {
-        picker: {
-          ...s.picker,
-          picked: already
-            ? s.picker.picked.filter((id) => id !== memberId)
-            : [...s.picker.picked, memberId],
-        },
-      };
-    }),
-
-  closePicker: () => set({ picker: defaultPicker }),
-}));
+    }
+  )
+);
 
 // ─── Match Store ──────────────────────────────────────────────────────────────
 
