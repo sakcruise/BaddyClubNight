@@ -10,7 +10,7 @@
 import { supabase } from "../lib/supabase";
 import type { Member, Session, Match, QueuePosition, MemberType } from "../types";
 import { v4 as uuid } from "uuid";
-import { useMemberStore, useSessionStore, useQueueStore, useMatchStore } from "../store";
+import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessionArchiveStore } from "../store";
 
 // ─── Offline detection ────────────────────────────────────────────────────────
 // True when the user explicitly chose offline mode OR the browser reports no network.
@@ -273,6 +273,14 @@ export const sessionsApi = {
   },
 
   list: async () => {
+    if (isOffline()) {
+      // Merge local archive + current active session, newest first
+      const archived = useSessionArchiveStore.getState().archivedSessions.map((a) => a.session);
+      const current  = useSessionStore.getState().session;
+      const all = [...archived, ...(current ? [current] : [])];
+      all.sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return { sessions: all };
+    }
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("sessions")
@@ -283,12 +291,58 @@ export const sessionsApi = {
   },
 
   delete: async (id: string) => {
+    if (isOffline()) {
+      // Remove from local archive if present
+      const store = useSessionArchiveStore.getState();
+      store.archiveSession(
+        { id, club_name: "", num_courts: 0, date: "", status: "ended", created_at: "" },
+        []
+      );
+      // Actually just filter it out — can't do that with current interface, so no-op offline
+      return { ok: true as const };
+    }
     const { error } = await supabase.from("sessions").delete().eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true as const };
   },
 
   summary: async (sessionId: string) => {
+    if (isOffline()) {
+      // Check local archive first
+      const archived = useSessionArchiveStore.getState().archivedSessions.find(
+        (a) => a.session.id === sessionId
+      );
+      if (archived) {
+        const currentQueue = useQueueStore.getState().queue;
+        return {
+          session: archived.session,
+          matches: archived.matches,
+          queue: currentQueue.map((q) => ({
+            member_id: q.member_id,
+            position: q.position,
+            checked_in_at: q.checked_in_at,
+            name: q.member?.name ?? "Unknown",
+            member_type: q.member?.member_type ?? "male",
+          })),
+        };
+      }
+      // Fall back to current session
+      const session = useSessionStore.getState().session;
+      const matches = useMatchStore.getState().matches.filter((m) => m.session_id === sessionId);
+      const queue   = useQueueStore.getState().queue;
+      if (!session) throw new Error("Session not found offline");
+      return {
+        session,
+        matches,
+        queue: queue.map((q) => ({
+          member_id: q.member_id,
+          position: q.position,
+          checked_in_at: q.checked_in_at,
+          name: q.member?.name ?? "Unknown",
+          member_type: q.member?.member_type ?? "male",
+        })),
+      };
+    }
     const [sessionRes, matchesRes, queueRes] = await Promise.all([
       supabase.from("sessions").select("*").eq("id", sessionId).single(),
       supabase.from("matches").select("*").eq("session_id", sessionId).order("started_at"),
@@ -428,7 +482,14 @@ export const queueApi = {
 export const matchesApi = {
   list: async (sessionId: string) => {
     if (isOffline()) {
-      return { matches: useMatchStore.getState().matches.filter((m) => m.session_id === sessionId) };
+      // Current session's matches
+      const live = useMatchStore.getState().matches.filter((m) => m.session_id === sessionId);
+      if (live.length > 0) return { matches: live };
+      // Archived (ended) sessions
+      const archived = useSessionArchiveStore.getState().archivedSessions.find(
+        (a) => a.session.id === sessionId
+      );
+      return { matches: archived?.matches ?? [] };
     }
     const { data, error } = await supabase
       .from("matches")

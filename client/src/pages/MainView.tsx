@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useSessionStore, useQueueStore, useMatchStore, useMemberStore, useAuthStore } from "../store";
+import { useSessionStore, useQueueStore, useMatchStore, useMemberStore, useAuthStore, useSessionArchiveStore } from "../store";
 import { authApi } from "../services/api";
 import CheckInPanel from "../components/admin/CheckInPanel";
 import CheckInGrid from "../components/admin/CheckInGrid";
@@ -27,6 +27,7 @@ export default function MainView() {
   const clubConfig = rawClubConfig ?? { name: "", venue: "", nightDay: "", nightStart: "", nightEnd: "", whatsapp: "" };
   const { setQueue, queue, activeMemberIds } = useQueueStore();
   const { setMatches, matches } = useMatchStore();
+  const { archiveSession } = useSessionArchiveStore();
   const { setMembers, members } = useMemberStore();
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [ending, setEnding] = useState(false);
@@ -144,8 +145,11 @@ export default function MainView() {
     if (!session) return;
     setEnding(true);
     try {
+      // Archive locally BEFORE clearing state.
+      // Offline: this is the only copy. Online: belt-and-braces so History works immediately.
+      archiveSession({ ...session, status: "ended" }, matches);
+
       await sessionsApi.end(session.id);
-      // Clear all session-scoped state so nothing bleeds into the next session
       setShowCheers(false);
       endSession();                                                // session + courts → empty
       setMatches([]);                                             // clear persisted match history
@@ -153,7 +157,6 @@ export default function MainView() {
       useQueueStore.getState().setActiveMemberIds(new Set());     // clear on-court players
     } catch (err: any) {
       console.error("End night failed:", err);
-      // Show error inline — don't leave user with frozen cheers modal
       setShowCheers(false);
       alert(`Could not end the session: ${err?.message ?? "unknown error"}. Please try again.`);
     } finally {

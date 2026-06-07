@@ -774,9 +774,18 @@ export default function AnalyticsView() {
   const [tab, setTab] = useState<Tab>("shuttles");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine || localStorage.getItem("offline-mode") === "true");
 
   const tubePrice = Number(clubConfig.shuttleTubePrice) || 2.50;
   const budgetTubes = Number(clubConfig.shuttleBudgetTubes) || 10;
+
+  useEffect(() => {
+    const up   = () => setIsOffline(localStorage.getItem("offline-mode") === "true");
+    const down = () => setIsOffline(true);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -803,7 +812,6 @@ export default function AnalyticsView() {
             };
           })
         );
-        // Most recent first
         setSessions(summaries.sort((a, b) => b.session.date.localeCompare(a.session.date)));
       } catch (e) {
         console.error("Analytics load error:", e);
@@ -860,10 +868,14 @@ export default function AnalyticsView() {
           </div>
         ) : sessions.length === 0 ? (
           <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="text-4xl mb-3">🏸</div>
+            <div className="text-center max-w-xs">
+              <div className="text-4xl mb-3">📊</div>
               <p className="font-display font-black text-gray-700">No completed sessions yet</p>
-              <p className="font-display text-gray-400 text-sm mt-1">Run a club night and end the session to see analytics</p>
+              <p className="font-display text-gray-400 text-sm mt-1">
+                {isOffline
+                  ? "You're offline. If you've run nights offline, use Settings → Sync to Cloud to upload them, then come back here."
+                  : "Run a club night and press End Night to see analytics here."}
+              </p>
             </div>
           </div>
         ) : (

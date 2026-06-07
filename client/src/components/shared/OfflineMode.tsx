@@ -18,7 +18,7 @@
 import { useState, useEffect } from "react";
 import { WifiOff, Wifi, CloudUpload, RefreshCw } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { useMemberStore, useSessionStore, useMatchStore, useSyncStore } from "../../store";
+import { useMemberStore, useSessionStore, useMatchStore, useSyncStore, useSessionArchiveStore } from "../../store";
 
 function isOfflineMode() {
   return localStorage.getItem("offline-mode") === "true";
@@ -35,6 +35,7 @@ export default function OfflineMode() {
   const { session }     = useSessionStore();
   const { matches }     = useMatchStore();
   const { setSyncStatus } = useSyncStore();
+  const { archivedSessions, clearArchive } = useSessionArchiveStore();
 
   // Track browser online/offline events
   useEffect(() => {
@@ -91,9 +92,12 @@ export default function OfflineMode() {
     setMsg("");
   }
 
-  // ── "Sync to Cloud" — push local session + matches to Supabase ───────────
+  // ── "Sync to Cloud" — push ALL archived nights + current session to Supabase ─
   async function handleSync() {
-    if (!session) { setMsg("No session to sync"); return; }
+    const hasArchived = archivedSessions.length > 0;
+    const hasCurrent  = !!session;
+    if (!hasArchived && !hasCurrent) { setMsg("Nothing to sync"); return; }
+
     setSyncing(true);
     setSyncStatus({ status: "syncing" });
     setMsg("");
@@ -102,42 +106,60 @@ export default function OfflineMode() {
       if (!user) throw new Error("Not logged in");
       const clubId = user.id;
 
-      // Upsert session
-      await supabase.from("sessions").upsert([{
-        id: session.id,
-        club_id: clubId,
-        club_name: session.club_name,
-        date: session.date,
-        num_courts: session.num_courts,
-        status: session.status,
-        created_at: session.created_at,
-        synced_at: new Date().toISOString(),
-      }], { onConflict: "id" });
+      // Build full list: archived completed nights + current active session (if any)
+      const toSync: { session: typeof session; matches: typeof matches }[] = [
+        ...archivedSessions,
+        ...(hasCurrent ? [{ session: session!, matches }] : []),
+      ];
 
-      // Upsert matches
-      if (matches.length > 0) {
-        await supabase.from("matches").upsert(
-          matches.map((m) => ({
-            id: m.id,
-            club_id: clubId,
-            session_id: m.session_id,
-            court_id: m.court_id,
-            team_a_1: m.team_a[0],
-            team_a_2: m.team_a[1],
-            team_b_1: m.team_b[0],
-            team_b_2: m.team_b[1],
-            score_a: m.score_a ?? null,
-            score_b: m.score_b ?? null,
-            result: m.result,
-            started_at: m.started_at,
-            ended_at: m.ended_at ?? null,
-          })),
-          { onConflict: "id" }
-        );
+      let totalMatches = 0;
+
+      for (const entry of toSync) {
+        if (!entry.session) continue;
+
+        // Upsert session row
+        await supabase.from("sessions").upsert([{
+          id: entry.session.id,
+          club_id: clubId,
+          club_name: entry.session.club_name,
+          date: entry.session.date,
+          num_courts: entry.session.num_courts,
+          status: entry.session.status,
+          created_at: entry.session.created_at,
+        }], { onConflict: "id" });
+
+        // Upsert matches for this session
+        if (entry.matches.length > 0) {
+          await supabase.from("matches").upsert(
+            entry.matches.map((m) => ({
+              id: m.id,
+              club_id: clubId,
+              session_id: m.session_id,
+              court_id: m.court_id,
+              team_a_1: m.team_a[0],
+              team_a_2: m.team_a[1],
+              team_b_1: m.team_b[0],
+              team_b_2: m.team_b[1],
+              score_a: m.score_a ?? null,
+              score_b: m.score_b ?? null,
+              shuttles_used: m.shuttles_used ?? null,
+              result: m.result,
+              started_at: m.started_at,
+              ended_at: m.ended_at ?? null,
+            })),
+            { onConflict: "id" }
+          );
+          totalMatches += entry.matches.length;
+        }
       }
 
+      // Clear the local archive — it's now in Supabase
+      clearArchive();
+
       setSyncStatus({ status: "idle", last_synced_at: new Date().toISOString(), pending_changes: 0 });
-      setMsg(`Synced ✓ — ${matches.length} match${matches.length !== 1 ? "es" : ""} uploaded`);
+      setMsg(
+        `Synced ✓ — ${toSync.length} night${toSync.length !== 1 ? "s" : ""}, ${totalMatches} match${totalMatches !== 1 ? "es" : ""} uploaded`
+      );
     } catch (e: any) {
       setSyncStatus({ status: "error", error: e.message });
       setMsg("Sync failed: " + (e.message ?? "unknown"));
@@ -183,7 +205,11 @@ export default function OfflineMode() {
                 {syncing
                   ? <RefreshCw size={11} className="animate-spin" />
                   : <CloudUpload size={11} />}
-                {syncing ? "Syncing…" : "Sync"}
+                {syncing
+                  ? "Syncing…"
+                  : archivedSessions.length > 0
+                    ? `Sync (${archivedSessions.length})`
+                    : "Sync"}
               </button>
             )}
             <button onClick={handleGoOnline}

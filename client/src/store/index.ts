@@ -294,3 +294,37 @@ export const useSyncStore = create<SyncStore>()((set) => ({
   setSyncStatus: (patch) =>
     set((s) => ({ sync: { ...s.sync, ...patch } })),
 }));
+
+// ─── Session Archive Store ────────────────────────────────────────────────────
+// Accumulates completed nights locally so:
+//  (a) History / Analytics work offline
+//  (b) Multiple offline nights don't overwrite each other
+//  (c) OfflineMode sync can push ALL nights to Supabase, not just the latest
+
+export interface ArchivedSession {
+  session: Session;
+  matches: Match[];
+}
+
+interface SessionArchiveStore {
+  archivedSessions: ArchivedSession[];
+  archiveSession: (session: Session, matches: Match[]) => void;
+  clearArchive: () => void;
+}
+
+export const useSessionArchiveStore = create<SessionArchiveStore>()(
+  persist(
+    (set) => ({
+      archivedSessions: [],
+      archiveSession: (session, matches) =>
+        set((s) => ({
+          // Avoid duplicates (same id) — update in place if already archived
+          archivedSessions: s.archivedSessions.some((a) => a.session.id === session.id)
+            ? s.archivedSessions.map((a) => a.session.id === session.id ? { session, matches } : a)
+            : [...s.archivedSessions, { session, matches }],
+        })),
+      clearArchive: () => set({ archivedSessions: [] }),
+    }),
+    { name: "session-archive-store" }
+  )
+);
