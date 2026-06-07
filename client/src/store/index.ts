@@ -90,7 +90,13 @@ export const useSessionStore = create<SessionStore>()(
             c.id === courtId ? { ...c, status, current_match_id: matchId } : c
           ),
         })),
-      endSession: () => set({ session: null, courts: [] }),
+      endSession: () => {
+        set({ session: null, courts: [] });
+        // Also wipe queue and matches so stale data never leaks into the next session
+        useQueueStore.getState().setQueue([]);
+        useQueueStore.getState().setActiveMemberIds(new Set());
+        useMatchStore.getState().setMatches([]);
+      },
       setClubName: (clubName) =>
         set((s) => ({ clubName, clubConfig: { ...s.clubConfig, name: clubName } })),
       setClubConfig: (patch) =>

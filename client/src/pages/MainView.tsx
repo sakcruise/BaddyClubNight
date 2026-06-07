@@ -60,33 +60,47 @@ export default function MainView() {
   useEffect(() => {
     if (!session) return;
     async function load() {
-      const [membersRes, sessionRes] = await Promise.all([
-        membersApi.list(),
-        sessionsApi.current(),
-      ]);
-      setMembers(membersRes.members);
-      if (!sessionRes.session) return;
-      setSession(sessionRes.session);
-      const [queueRes, matchesRes] = await Promise.all([
-        queueApi.get(sessionRes.session.id),
-        matchesApi.list(sessionRes.session.id),
-      ]);
-      setQueue(queueRes.queue);
-      setMatches(matchesRes.matches);
-      const pendingByCourt = Object.fromEntries(
-        matchesRes.matches.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
-      );
-      const numCourts = sessionRes.session.num_courts;
-      setCourts(Array.from({ length: numCourts }, (_, i) => {
-        const id = i + 1;
-        return pendingByCourt[id]
-          ? { id, status: "playing" as const, current_match_id: pendingByCourt[id] }
-          : { id, status: "idle" as const };
-      }));
-      const activePlayers = new Set(
-        matchesRes.matches.filter((m) => m.result === "pending").flatMap((m) => [...m.team_a, ...m.team_b])
-      );
-      useQueueStore.getState().setActiveMemberIds(activePlayers);
+      try {
+        const [membersRes, sessionRes] = await Promise.all([
+          membersApi.list(),
+          sessionsApi.current(),
+        ]);
+        setMembers(membersRes.members);
+
+        if (!sessionRes.session) {
+          // Session ended elsewhere (e.g. another device) — clear stale local state
+          endSession();
+          setMatches([]);
+          setQueue([]);
+          useQueueStore.getState().setActiveMemberIds(new Set());
+          return;
+        }
+
+        setSession(sessionRes.session);
+        const [queueRes, matchesRes] = await Promise.all([
+          queueApi.get(sessionRes.session.id),
+          matchesApi.list(sessionRes.session.id),
+        ]);
+        setQueue(queueRes.queue);
+        setMatches(matchesRes.matches);
+        const pendingByCourt = Object.fromEntries(
+          matchesRes.matches.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
+        );
+        const numCourts = sessionRes.session.num_courts;
+        setCourts(Array.from({ length: numCourts }, (_, i) => {
+          const id = i + 1;
+          return pendingByCourt[id]
+            ? { id, status: "playing" as const, current_match_id: pendingByCourt[id] }
+            : { id, status: "idle" as const };
+        }));
+        const activePlayers = new Set(
+          matchesRes.matches.filter((m) => m.result === "pending").flatMap((m) => [...m.team_a, ...m.team_b])
+        );
+        useQueueStore.getState().setActiveMemberIds(activePlayers);
+      } catch (err) {
+        console.error("Failed to restore session state:", err);
+        // Don't clear state on transient errors (network blip etc.)
+      }
     }
     load();
   }, [session?.id]);
@@ -110,8 +124,17 @@ export default function MainView() {
     setEnding(true);
     try {
       await sessionsApi.end(session.id);
+      // Clear all session-scoped state so nothing bleeds into the next session
       setShowCheers(false);
-      endSession();
+      endSession();                                                // session + courts → empty
+      setMatches([]);                                             // clear persisted match history
+      setQueue([]);                                               // clear queue
+      useQueueStore.getState().setActiveMemberIds(new Set());     // clear on-court players
+    } catch (err: any) {
+      console.error("End night failed:", err);
+      // Show error inline — don't leave user with frozen cheers modal
+      setShowCheers(false);
+      alert(`Could not end the session: ${err?.message ?? "unknown error"}. Please try again.`);
     } finally {
       setEnding(false);
     }
