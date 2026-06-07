@@ -114,8 +114,8 @@ export default function CheckInGrid() {
         </div>
       )}
 
-      {/* Member grid — 10 columns */}
-      <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(10, 1fr)" }}>
+      {/* Member grid — 8 columns (overflow-visible on each card so the ✓ badge isn't clipped) */}
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
         {allMembers.map((member) => {
           const checked = queuedIds.has(member.id);
           const onCourt = activeMemberIds.has(member.id);
@@ -128,8 +128,9 @@ export default function CheckInGrid() {
               onClick={() => !onCourt && toggle(member.id)}
               disabled={onCourt || !!loading}
               title={member.name}
-              className={`relative py-2 px-1 rounded-xl text-[11px] font-display font-bold text-center
-                transition-all leading-tight truncate
+              style={{ overflow: "visible" }}
+              className={`relative py-2.5 px-1 rounded-xl text-xs font-display font-bold text-center
+                transition-all leading-tight
                 ${onCourt
                   ? "bg-green-100 text-green-700 border-2 border-green-200 opacity-60 cursor-not-allowed"
                   : checked
@@ -139,10 +140,10 @@ export default function CheckInGrid() {
                     : "bg-gray-100 text-gray-500 border-2 border-transparent hover:border-gray-300 hover:bg-gray-200"
                 }`}
             >
-              {loading ? "…" : member.name.split(" ")[0]}
+              <span className="block truncate">{loading ? "…" : member.name.split(" ")[0]}</span>
               {checked && !onCourt && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full
-                                 flex items-center justify-center text-white text-[8px] font-black">✓</span>
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-green-500 rounded-full
+                                 flex items-center justify-center text-white text-[9px] font-black shadow-sm z-10">✓</span>
               )}
             </motion.button>
           );
@@ -156,13 +157,14 @@ export default function CheckInGrid() {
             onClick={() => toggle(member.id)}
             disabled={!!loadingId}
             title={member.name + " (Guest)"}
-            className="relative py-2 px-1 rounded-xl text-[11px] font-display font-bold text-center
-                       transition-all leading-tight truncate
+            style={{ overflow: "visible" }}
+            className="relative py-2.5 px-1 rounded-xl text-xs font-display font-bold text-center
+                       transition-all leading-tight
                        bg-purple-500 text-white border-2 border-purple-400 shadow-sm"
           >
-            {member.name.split(" ")[0]}
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full
-                             flex items-center justify-center text-white text-[8px] font-black">✓</span>
+            <span className="block truncate">{member.name.split(" ")[0]}</span>
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-green-500 rounded-full
+                             flex items-center justify-center text-white text-[9px] font-black shadow-sm z-10">✓</span>
           </motion.button>
         ))}
       </div>
