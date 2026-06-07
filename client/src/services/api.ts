@@ -238,6 +238,23 @@ export const queueApi = {
     return queueApi.get(sessionId);
   },
 
+  // Like checkIn but always inserts fresh (no ignoreDuplicates) — used for re-queuing after match
+  checkInForce: async (sessionId: string, memberId: string) => {
+    const clubId = await getClubId();
+    const { data: existing } = await supabase
+      .from("queue_entries")
+      .select("position")
+      .eq("session_id", sessionId)
+      .order("position", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const position = (existing?.position ?? 0) + 1;
+    const { error } = await supabase
+      .from("queue_entries")
+      .insert({ id: uuid(), club_id: clubId, session_id: sessionId, member_id: memberId, position });
+    if (error) throw new Error(error.message);
+  },
+
   remove: async (sessionId: string, memberId: string) => {
     const { error } = await supabase
       .from("queue_entries")

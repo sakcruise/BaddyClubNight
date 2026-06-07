@@ -61,17 +61,19 @@ export default function CourtsView() {
       setActiveMemberIds(next);
 
       // Step 5: re-queue at the bottom — winners first, then losers
-      // Winners = team with higher score; if no score or draw, team_a first
       if (session) {
         const aWon = match.score_a !== undefined && match.score_b !== undefined
           ? match.score_a >= match.score_b
-          : true; // default: team_a first
+          : true;
         const winners = aWon ? [...match.team_a] : [...match.team_b];
         const losers  = aWon ? [...match.team_b] : [...match.team_a];
-        const requeueOrder = [...winners, ...losers]; // winners added first → lower positions at bottom
+        const requeueOrder = [...winners, ...losers];
 
+        // Force-delete all 4 first (ignore errors), then re-insert in order
+        // Using remove() not checkIn() to avoid ignoreDuplicates keeping old position
+        await Promise.all(requeueOrder.map((id) => queueApi.remove(session.id, id).catch(() => {})));
         for (const memberId of requeueOrder) {
-          try { await queueApi.checkIn(session.id, memberId); } catch { /* already in queue */ }
+          await queueApi.checkInForce(session.id, memberId);
         }
         const { queue: refreshed } = await queueApi.get(session.id);
         setQueue(refreshed);
