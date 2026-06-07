@@ -3,16 +3,21 @@ import { supabase } from "../lib/supabase";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import SetupView from "./SetupView";
 
+type Mode = "login" | "forgot";
+
 export default function LoginView() {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [mode, setMode]           = useState<Mode>("login");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [error, setError]         = useState("");
+  const [loading, setLoading]     = useState(false);
   const [showSetup, setShowSetup] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   if (showSetup) return <SetupView onBack={() => setShowSetup(false)} />;
 
-  async function handleSubmit(e: React.FormEvent) {
+  // ── Sign In ───────────────────────────────────────────────────────────────
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -31,9 +36,38 @@ export default function LoginView() {
     }
   }
 
+  // ── Forgot Password ───────────────────────────────────────────────────────
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo: window.location.origin }
+      );
+      if (resetError) throw resetError;
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message ?? "Could not send reset email");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError("");
+    setResetSent(false);
+    setPassword("");
+  }
+
+  const background = "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)";
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ background: "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)" }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background }}>
+
+      {/* Logo */}
       <div className="flex flex-col items-center gap-3 mb-8">
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={56} />
@@ -42,56 +76,117 @@ export default function LoginView() {
         <p className="text-orange-200 font-display font-semibold text-sm">Club Night Manager</p>
       </div>
 
-      <form onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
-        <div>
-          <h2 className="font-display font-black text-gray-900 text-xl">Sign In 👋</h2>
-          <p className="text-gray-500 text-sm font-display mt-0.5">Enter your club email and password.</p>
-        </div>
-
-        <div className="flex flex-col gap-3">
+      {/* ── Sign In form ── */}
+      {mode === "login" && (
+        <form onSubmit={handleSignIn}
+          className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
           <div>
-            <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com" autoFocus required
-              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm
-                         focus:outline-none focus:border-orange-400 transition-colors" />
+            <h2 className="font-display font-black text-gray-900 text-xl">Sign In 👋</h2>
+            <p className="text-gray-500 text-sm font-display mt-0.5">Enter your club email and password.</p>
           </div>
-          <div>
-            <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your password" required
-              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm
-                         focus:outline-none focus:border-orange-400 transition-colors" />
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com" autoFocus required
+                className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm
+                           focus:outline-none focus:border-orange-400 transition-colors" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-display font-bold text-gray-600">Password</label>
+                <button type="button" onClick={() => switchMode("forgot")}
+                  className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors">
+                  Forgot password?
+                </button>
+              </div>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your password" required
+                className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm
+                           focus:outline-none focus:border-orange-400 transition-colors" />
+            </div>
           </div>
-        </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-600 font-display font-bold">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-600 font-display font-bold">
+              {error}
+            </div>
+          )}
 
-        <button type="submit" disabled={loading || !email.trim() || !password}
-          className="w-full py-3 rounded-2xl font-display font-black text-white text-base
-                     bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600
-                     disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30">
-          {loading ? "Signing in…" : "Sign In 🏸"}
-        </button>
-
-        <div className="border-t border-gray-100 pt-3 flex flex-col gap-2 text-center">
-          <p className="text-xs text-gray-400 font-display">
-            Already have an account? Sign in above.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowSetup(true)}
-            className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors"
-          >
-            New club? Create your free account →
+          <button type="submit" disabled={loading || !email.trim() || !password}
+            className="w-full py-3 rounded-2xl font-display font-black text-white text-base
+                       bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600
+                       disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30">
+            {loading ? "Signing in…" : "Sign In 🏸"}
           </button>
+
+          <div className="border-t border-gray-100 pt-3 flex flex-col gap-2 text-center">
+            <button type="button" onClick={() => setShowSetup(true)}
+              className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors">
+              New club? Create your free account →
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ── Forgot Password form ── */}
+      {mode === "forgot" && (
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
+          {resetSent ? (
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center text-2xl">✉️</div>
+              <h2 className="font-display font-black text-gray-900 text-xl">Check your email</h2>
+              <p className="text-gray-500 text-sm font-display">
+                We sent a password reset link to <strong>{email}</strong>.<br />
+                Click the link in the email to set a new password.
+              </p>
+              <button type="button" onClick={() => switchMode("login")}
+                className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors mt-2">
+                ← Back to sign in
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgot} className="flex flex-col gap-4">
+              <div>
+                <h2 className="font-display font-black text-gray-900 text-xl">Reset password 🔑</h2>
+                <p className="text-gray-500 text-sm font-display mt-0.5">
+                  Enter your email and we'll send you a reset link.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com" autoFocus required
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm
+                             focus:outline-none focus:border-orange-400 transition-colors" />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-600 font-display font-bold">
+                  {error}
+                </div>
+              )}
+
+              <button type="submit" disabled={loading || !email.trim()}
+                className="w-full py-3 rounded-2xl font-display font-black text-white text-base
+                           bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600
+                           disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30">
+                {loading ? "Sending…" : "Send Reset Link 📧"}
+              </button>
+
+              <div className="border-t border-gray-100 pt-3 text-center">
+                <button type="button" onClick={() => switchMode("login")}
+                  className="text-xs text-gray-400 font-display font-bold hover:text-orange-500 transition-colors">
+                  ← Back to sign in
+                </button>
+              </div>
+            </form>
+          )}
         </div>
-      </form>
+      )}
+
     </div>
   );
 }

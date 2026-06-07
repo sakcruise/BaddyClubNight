@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "../store";
 import { supabase } from "../lib/supabase";
 import LoginView from "../pages/LoginView";
+import ResetPasswordView from "../pages/ResetPasswordView";
 
-type Status = "loading" | "login" | "ok";
+type Status = "loading" | "login" | "reset" | "ok";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { setAuth, clearProfile, token } = useAuthStore();
@@ -44,8 +45,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Listen for auth state changes (login / logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth state changes (login / logout / password recovery)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        // User clicked the reset link in their email — show the new-password form
+        setStatus("reset");
+        return;
+      }
       if (session) {
         const meta = session.user.user_metadata;
         setAuth(
@@ -74,5 +80,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (status === "login") return <LoginView />;
+  if (status === "reset") return <ResetPasswordView />;
   return <>{children}</>;
 }
