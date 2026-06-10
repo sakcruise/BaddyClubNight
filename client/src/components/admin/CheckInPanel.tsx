@@ -81,9 +81,15 @@ export default function CheckInPanel() {
   const [confirming, setConfirming] = useState(false);
   const [pairsStep, setPairsStep] = useState(false);
   const [pairs, setPairs] = useState<Record<string, "A" | "B">>({});
+  const [showAllCandidates, setShowAllCandidates] = useState(false);
 
   const isPicking = picker.isOpen;
   const queuedIds = new Set(queue.map((q) => q.member_id));
+
+  // Reset "show all" whenever the picker closes
+  useEffect(() => {
+    if (!isPicking) setShowAllCandidates(false);
+  }, [isPicking]);
 
   // Full sorted queue (all queued players, including on-court — used in picking mode)
   const sortedQueue = [...queue].sort((a, b) => a.position - b.position);
@@ -443,55 +449,90 @@ export default function CheckInPanel() {
           ))}
         </div>
 
+        {/* Top-8 rule banner */}
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2">
+          <span className="text-amber-600 text-sm flex-shrink-0">🏸</span>
+          <p className="text-amber-800 font-display font-bold text-xs">
+            Top 8 rule — pick from the first 8 in the queue
+          </p>
+        </div>
+
         {/* Queue list — scrollable */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 scroll-smooth">
-          {sortedQueue.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-8">No players in queue</p>
-          ) : (
-            sortedQueue.map((q, idx) => {
-              const member = members[q.member_id];
-              if (!member) return null;
+          {(() => {
+            const TOP = 7; // picker is #1, so candidates #2–8 = 7 slots
+            // Pre-filter: exclude the picker and anyone already on court
+            const allCandidates = sortedQueue.filter((q) => {
+              if (!members[q.member_id]) return false;
+              if (q.member_id === picker.picker_id) return false;
+              if (activeMemberIds.has(q.member_id)) return false;
+              return true;
+            });
+            const visible = showAllCandidates ? allCandidates : allCandidates.slice(0, TOP);
+            const hiddenCount = allCandidates.length - TOP;
 
-              // Hide the picker and anyone already on court
-              const isThisPicker = q.member_id === picker.picker_id;
-              if (isThisPicker) return null;
-              if (activeMemberIds.has(q.member_id)) return null;
-              const isSelected = picked.includes(q.member_id);
-              const canSelect = isSelected || picked.length < 3;
+            if (allCandidates.length === 0) {
+              return <p className="text-center text-gray-400 text-sm py-8">No players in queue</p>;
+            }
 
-              return (
-                <motion.div
-                  key={q.member_id}
-                  layout
-                  onClick={() => canSelect && togglePick(q.member_id)}
-                  className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all
-                    ${isSelected
-                      ? "bg-orange-500 border-orange-400 cursor-pointer"
-                      : canSelect
-                        ? "bg-white border-gray-200 hover:border-orange-300 cursor-pointer"
-                        : "bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed"
-                    }`}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0
-                    font-display font-black text-xs
-                    ${isSelected ? "bg-white/30 text-white" : "bg-gray-100 text-gray-500"}`}
+            return (
+              <>
+                {visible.map((q, idx) => {
+                  const member = members[q.member_id]!;
+                  const isOutsideTop8 = idx >= TOP; // only when showAll
+                  const isSelected = picked.includes(q.member_id);
+                  const canSelect = isSelected || picked.length < 3;
+
+                  return (
+                    <motion.div
+                      key={q.member_id}
+                      layout
+                      onClick={() => canSelect && togglePick(q.member_id)}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all
+                        ${isSelected
+                          ? "bg-orange-500 border-orange-400 cursor-pointer"
+                          : isOutsideTop8
+                            ? "bg-gray-50 border-gray-100 opacity-70 cursor-pointer"
+                            : canSelect
+                              ? "bg-white border-gray-200 hover:border-orange-300 cursor-pointer"
+                              : "bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed"
+                        }`}
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0
+                        font-display font-black text-xs
+                        ${isSelected ? "bg-white/30 text-white" : "bg-gray-100 text-gray-500"}`}
+                      >
+                        {idx + 1}
+                      </div>
+                      <Avatar name={member.name} memberType={member.member_type} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-display font-bold text-sm truncate ${isSelected ? "text-white" : isOutsideTop8 ? "text-gray-500" : "text-gray-900"}`}>
+                          {member.name}
+                        </div>
+                        <div className={`text-xs font-display ${isSelected ? "text-orange-100" : "text-gray-400"}`}>
+                          {formatTime(q.checked_in_at)}
+                        </div>
+                      </div>
+                      {isSelected && <span className="text-white text-lg flex-shrink-0">✓</span>}
+                    </motion.div>
+                  );
+                })}
+
+                {/* Show more / collapse toggle */}
+                {hiddenCount > 0 && (
+                  <button
+                    onClick={() => setShowAllCandidates((v) => !v)}
+                    className="w-full text-xs font-display font-bold text-orange-500 hover:text-orange-700
+                               bg-orange-50 border border-orange-200 py-2 rounded-xl transition-colors"
                   >
-                    {idx + 1}
-                  </div>
-                  <Avatar name={member.name} memberType={member.member_type} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className={`font-display font-bold text-sm truncate ${isSelected ? "text-white" : "text-gray-900"}`}>
-                      {member.name}
-                    </div>
-                    <div className={`text-xs font-display ${isSelected ? "text-orange-100" : "text-gray-400"}`}>
-                      {formatTime(q.checked_in_at)}
-                    </div>
-                  </div>
-                  {isSelected && <span className="text-white text-lg flex-shrink-0">✓</span>}
-                </motion.div>
-              );
-            })
-          )}
+                    {showAllCandidates
+                      ? "▲ Hide players outside top 8"
+                      : `▼ Show ${hiddenCount} more (outside top 8)`}
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Choose Pairs button */}
