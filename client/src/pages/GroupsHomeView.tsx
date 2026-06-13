@@ -1,11 +1,26 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Users, ChevronRight, X, LogOut } from "lucide-react";
+import { Plus, Users, ChevronRight, X, LogOut, Calendar, Clock, Zap } from "lucide-react";
 import { useGroupStore, useAuthStore } from "../store";
 import { authApi } from "../services/api";
 import { groupsApi } from "../services/groups";
+import { supabase } from "../lib/supabase";
+import type { GroupSession } from "../types";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
+
+function sessionLabel(s: GroupSession, isPast: boolean): { icon: React.ReactNode; text: string; color: string } {
+  if (s.status === "active") return { icon: <Zap size={11} />, text: "Happening now!", color: "text-green-600 bg-green-50" };
+  const d = new Date(s.scheduled_at ?? s.created_at);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = diffDays === 0 ? "Today" : diffDays === 1 ? "Tomorrow" : diffDays === -1 ? "Yesterday" :
+    d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  if (isPast) return { icon: <Clock size={11} />, text: `Last: ${dateStr}`, color: "text-gray-400 bg-gray-50" };
+  return { icon: <Calendar size={11} />, text: `${dateStr} · ${time}`, color: "text-purple-600 bg-purple-50" };
+}
 
 /** Splitwise-style home: the list of friends-groups this person belongs to. */
 export default function GroupsHomeView() {
@@ -15,11 +30,46 @@ export default function GroupsHomeView() {
   const isGuest = localStorage.getItem("friends-guest") === "true";
   const [loading, setLoading] = useState(!isGuest);
 
-  // Account users: load groups from Supabase. Guests stay on the local store.
+  // Account users: load groups from Supabase, then fetch featured session per group.
   useEffect(() => {
     if (isGuest) return;
     groupsApi.list()
-      .then(setGroups)
+      .then((gs) => {
+        setGroups(gs);
+        // Fetch sessions for each group in parallel
+        gs.forEach(async (g) => {
+          try {
+            // Upcoming/active first
+            const upcoming = await groupsApi.listSessions(g.id);
+            if (upcoming.length > 0) {
+              setFeaturedSessions((prev) => ({ ...prev, [g.id]: { session: upcoming[0], isPast: false } }));
+              return;
+            }
+            // Fall back to most recent completed session
+            const { data } = await supabase
+              .from("sessions")
+              .select("id, group_id, club_name, scheduled_at, venue, num_courts, status, created_at")
+              .eq("group_id", g.id)
+              .eq("status", "completed")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (data) {
+              const past: GroupSession = {
+                id: data.id, group_id: data.group_id, club_name: data.club_name,
+                scheduled_at: data.scheduled_at ?? data.created_at, venue: data.venue,
+                num_courts: data.num_courts, status: data.status, created_at: data.created_at,
+                rsvps: [], going_count: 0,
+              };
+              setFeaturedSessions((prev) => ({ ...prev, [g.id]: { session: past, isPast: true } }));
+            } else {
+              setFeaturedSessions((prev) => ({ ...prev, [g.id]: null }));
+            }
+          } catch {
+            setFeaturedSessions((prev) => ({ ...prev, [g.id]: null }));
+          }
+        });
+      })
       .catch((e) => console.error("Failed to load groups:", e))
       .finally(() => setLoading(false));
   }, [isGuest]);
@@ -37,8 +87,8 @@ export default function GroupsHomeView() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [courts, setCourts] = useState(1);
-
   const [saving, setSaving] = useState(false);
+  const [featuredSessions, setFeaturedSessions] = useState<Record<string, { session: GroupSession; isPast: boolean } | null>>({});
 
   async function handleCreate() {
     if (!name.trim() || saving) return;
@@ -114,25 +164,34 @@ export default function GroupsHomeView() {
           </div>
         ) : (
           <div className="flex flex-col gap-3 mt-2">
-            {groups.map((g) => (
-              <motion.button
-                key={g.id}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => navigate(`/groups/${g.id}`)}
-                className="w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-lg shadow-black/10 text-left"
-              >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center flex-shrink-0">
-                  <Users size={22} className="text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-display font-black text-gray-900 text-base truncate">{g.name}</div>
-                  <div className="text-gray-500 text-sm font-display">
-                    {g.members.length} {g.members.length === 1 ? "member" : "members"} · {g.num_courts} court{g.num_courts > 1 ? "s" : ""}
+            {groups.map((g) => {
+              const featured = featuredSessions[g.id];
+              const label = featured ? sessionLabel(featured.session, featured.isPast) : null;
+              return (
+                <motion.button
+                  key={g.id}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate(`/groups/${g.id}`)}
+                  className="w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-lg shadow-black/10 text-left"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-purple-500/20">
+                    <Users size={22} className="text-white" />
                   </div>
-                </div>
-                <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
-              </motion.button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-display font-black text-gray-900 text-base truncate">{g.name}</div>
+                    <div className="text-gray-500 text-xs font-display mt-0.5">
+                      {g.members.length} {g.members.length === 1 ? "member" : "members"} · {g.num_courts} court{g.num_courts > 1 ? "s" : ""}
+                    </div>
+                    {label && (
+                      <div className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-xs font-display font-bold ${label.color}`}>
+                        {label.icon} {label.text}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
+                </motion.button>
+              );
+            })}
           </div>
         )}
       </main>
