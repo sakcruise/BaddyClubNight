@@ -103,11 +103,13 @@ export default function GroupsHomeView() {
         navigate(`/groups/${g.id}`);
       } else {
         const created = await groupsApi.create(name, { num_courts: courts });
-        // Add owner as the first member so they appear in the group by default
-        try {
-          const member = await groupsApi.addMember(created.id, ownerName);
-          created.members = [member];
-        } catch { /* non-fatal */ }
+        // Add owner as first member only if none were created automatically
+        if (created.members.length === 0) {
+          try {
+            const member = await groupsApi.addMember(created.id, ownerName);
+            created.members = [member];
+          } catch { /* non-fatal */ }
+        }
         useGroupStore.getState().upsertGroup(created);
         setName("");
         setCreating(false);

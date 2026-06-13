@@ -42,7 +42,7 @@ function rowToGroup(g: any): Group {
     themeKey: g.theme_key ?? "orange",
     invite_token: g.invite_token,
     owner_id: g.owner_id,
-    members: (g.group_members ?? []).map(rowToMember),
+    members: (g.group_members ?? []).filter((m: any) => m.display_name?.trim()).map(rowToMember),
     created_at: g.created_at,
   };
 }
