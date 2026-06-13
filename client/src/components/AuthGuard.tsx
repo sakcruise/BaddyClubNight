@@ -22,6 +22,14 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
+    // If the URL hash contains a Supabase recovery token (user clicked a reset link),
+    // go straight to the reset view — don't let getSession() race ahead to "ok".
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    if (hashParams.get("type") === "recovery") {
+      setStatus("reset");
+      return;
+    }
+
     // Friends-group "guest" mode runs entirely locally (no Supabase) — let them in
     // without a club login.
     if (localStorage.getItem("friends-guest") === "true") {
