@@ -2,8 +2,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
   Session, Court, QueuePosition, Match, Member, PickerState, SyncState,
+  Group, GroupMember, MemberType,
 } from "../types";
 import { normalisePositions } from "../utils/queueLogic";
+import { v4 as uuid } from "uuid";
 
 // ─── Auth Store ───────────────────────────────────────────────────────────────
 
@@ -294,6 +296,102 @@ export const useSyncStore = create<SyncStore>()((set) => ({
   setSyncStatus: (patch) =>
     set((s) => ({ sync: { ...s.sync, ...patch } })),
 }));
+
+// ─── Group Store ──────────────────────────────────────────────────────────────
+// Friends-group mode (Splitwise-style): one person, many groups, each with its
+// own members. Persisted locally — group sessions run on the local engine, so no
+// Supabase tables are required for the prototype.
+
+export type AppMode = "club" | "friends" | null;
+
+interface GroupStore {
+  appMode: AppMode;
+  groups: Group[];
+  setAppMode: (m: AppMode) => void;
+  setGroups: (groups: Group[]) => void;
+  upsertGroup: (group: Group) => void;
+  createGroup: (name: string, opts?: Partial<Pick<Group, "venue" | "num_courts" | "themeKey">>) => Group;
+  updateGroup: (id: string, patch: Partial<Omit<Group, "id" | "members">>) => void;
+  deleteGroup: (id: string) => void;
+  addGroupMember: (groupId: string, name: string, member_type?: MemberType) => void;
+  updateGroupMember: (groupId: string, memberId: string, patch: Partial<Pick<GroupMember, "name" | "member_type">>) => void;
+  removeGroupMember: (groupId: string, memberId: string) => void;
+}
+
+export const useGroupStore = create<GroupStore>()(
+  persist(
+    (set) => ({
+      appMode: null,
+      groups: [],
+
+      setAppMode: (appMode) => set({ appMode }),
+
+      setGroups: (groups) => set({ groups }),
+
+      upsertGroup: (group) =>
+        set((s) => ({
+          groups: s.groups.some((g) => g.id === group.id)
+            ? s.groups.map((g) => (g.id === group.id ? group : g))
+            : [...s.groups, group],
+        })),
+
+      createGroup: (name, opts) => {
+        const group: Group = {
+          id: uuid(),
+          name: name.trim(),
+          venue: opts?.venue ?? "",
+          num_courts: opts?.num_courts ?? 1,
+          themeKey: opts?.themeKey ?? "orange",
+          invite_token: uuid().slice(0, 8),
+          members: [],
+          created_at: new Date().toISOString(),
+        };
+        set((s) => ({ groups: [...s.groups, group] }));
+        return group;
+      },
+
+      updateGroup: (id, patch) =>
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+        })),
+
+      deleteGroup: (id) =>
+        set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
+
+      addGroupMember: (groupId, name, member_type = "male") =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === groupId
+              ? {
+                  ...g,
+                  members: [
+                    ...g.members,
+                    { id: uuid(), name: name.trim(), member_type, created_at: new Date().toISOString() },
+                  ],
+                }
+              : g
+          ),
+        })),
+
+      updateGroupMember: (groupId, memberId, patch) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, members: g.members.map((m) => (m.id === memberId ? { ...m, ...patch } : m)) }
+              : g
+          ),
+        })),
+
+      removeGroupMember: (groupId, memberId) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== memberId) } : g
+          ),
+        })),
+    }),
+    { name: "group-store" }
+  )
+);
 
 // ─── Session Archive Store ────────────────────────────────────────────────────
 // Accumulates completed nights locally so:

@@ -1,74 +1,78 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { clubsApi } from "../services/api";
-import { useAuthStore } from "../store";
+import { clubsApi } from "../services/api"; // used for username availability check
+import { useAuthStore, useGroupStore } from "../store";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 
-export default function SetupView({ onBack }: { onBack?: () => void }) {
-  const [username, setUsername]       = useState("");
+type AccountType = "club" | "group";
+
+export default function SetupView({ onBack, accountType = "club" }: { onBack?: () => void; accountType?: AccountType }) {
+  const isGroup = accountType === "group";
+
+  const [userId, setUserId]           = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [adminName, setAdminName]     = useState("");
   const [email, setEmail]             = useState("");
   const [password, setPassword]       = useState("");
   const [confirm, setConfirm]         = useState("");
   const [error, setError]             = useState("");
   const [loading, setLoading]         = useState(false);
-  const [usernameOk, setUsernameOk]   = useState<boolean | null>(null);
+  const [userIdOk, setUserIdOk]       = useState<boolean | null>(null);
+  const [showPwd, setShowPwd]         = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const { setAuth } = useAuthStore();
 
-  // ── Check username availability on blur ───────────────────────────────────
-  async function checkUsername() {
-    const u = username.toLowerCase().trim();
+  async function checkUserId() {
+    const u = userId.toLowerCase().trim();
     if (!u || u.length < 3) return;
     const taken = await clubsApi.isUsernameTaken(u);
-    setUsernameOk(!taken);
-    if (taken) setError("That Club ID is already taken — choose another");
+    setUserIdOk(!taken);
+    if (taken) setError("That User ID is already taken — choose another");
     else setError("");
   }
 
-  // ── Register ──────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    const u = username.toLowerCase().trim();
-    if (u.length < 3) { setError("Club ID must be at least 3 characters"); return; }
-    if (!/^[a-z0-9_-]+$/.test(u)) { setError("Club ID can only contain letters, numbers, _ and -"); return; }
-    if (password !== confirm)     { setError("Passwords don't match"); return; }
-    if (password.length < 6)     { setError("Password must be at least 6 characters"); return; }
+    const u = userId.toLowerCase().trim();
+    if (u.length < 3)                    { setError("User ID must be at least 3 characters"); return; }
+    if (!/^[a-z0-9_-]+$/.test(u))       { setError("User ID can only contain letters, numbers, _ and -"); return; }
+    if (!displayName.trim())             { setError("Display name is required"); return; }
+    if (password !== confirm)            { setError("Passwords don't match"); return; }
+    if (password.length < 6)            { setError("Password must be at least 6 characters"); return; }
 
     setLoading(true);
     try {
-      // Check username isn't taken
       const taken = await clubsApi.isUsernameTaken(u);
-      if (taken) { setError("That Club ID is already taken — choose another"); return; }
+      if (taken) { setError("That User ID is already taken — choose another"); return; }
 
-      // Create Supabase auth user — store all profile info in user_metadata
+      // All accounts use a synthetic Supabase auth email so any real email
+      // can be reused freely across different accounts.
+      const authEmail = `${u}@baddyapp.internal`;
+
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: authEmail,
         password,
         options: {
           data: {
             username: u,
             display_name: displayName.trim(),
-            admin_name: adminName.trim(),
+            account_type: accountType,
+            real_email: email.trim(), // stored by the DB trigger into accounts.email
           },
         },
       });
       if (signUpError) throw signUpError;
 
-      const userId = data.user?.id;
-      if (!userId) throw new Error("Signup succeeded but no user ID returned");
+      if (!data.user?.id) throw new Error("Signup succeeded but no user ID returned");
 
-      // Create clubs row for username → email lookup
-      await clubsApi.create(userId, u, displayName.trim(), email.trim());
+      useGroupStore.getState().setAppMode(isGroup ? "friends" : "club");
 
-      // Update store immediately if session was returned
       if (data.session) {
-        setAuth(data.session.access_token, u, displayName.trim(), adminName.trim(), email.trim());
+        setAuth(data.session.access_token, u, displayName.trim(), "", email.trim());
       }
-      // AuthGuard's onAuthStateChange will fire and transition to "ok"
     } catch (err: any) {
       setError(err.message ?? "Registration failed");
     } finally {
@@ -87,34 +91,42 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={56} />
         </div>
-        <h1 className="font-display font-black text-white text-3xl tracking-tight">Badminton Club</h1>
-        <p className="text-orange-200 font-display font-semibold text-sm">Create your club account</p>
+        <h1 className="font-display font-black text-white text-3xl tracking-tight">
+          {isGroup ? "Badminton" : "Badminton Club"}
+        </h1>
+        <p className="text-orange-200 font-display font-semibold text-sm">
+          {isGroup ? "Create your account" : "Create your club account"}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit}
         className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
         <div>
           <h2 className="font-display font-black text-gray-900 text-xl">Welcome! 🏸</h2>
-          <p className="text-gray-500 text-sm font-display mt-0.5">Each club gets their own private account.</p>
+          <p className="text-gray-500 text-sm font-display mt-0.5">
+            {isGroup
+              ? "Set up your account to create groups and invite friends."
+              : "Each club gets their own private account."}
+          </p>
         </div>
 
         <div className="flex flex-col gap-3">
 
-          {/* Club ID — used to log in */}
+          {/* User ID — unique login identifier */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Club ID <span className="text-gray-400 font-normal">(used to log in)</span>
+              User ID <span className="text-gray-400 font-normal">(used to log in)</span>
             </label>
             <div className="relative">
               <input
-                type="text" value={username}
-                onChange={(e) => { setUsername(e.target.value.toLowerCase()); setUsernameOk(null); setError(""); }}
-                onBlur={checkUsername}
-                placeholder="e.g. oasisbadminton"
+                type="text" value={userId}
+                onChange={(e) => { setUserId(e.target.value.toLowerCase()); setUserIdOk(null); setError(""); }}
+                onBlur={checkUserId}
+                placeholder={isGroup ? "e.g. jsmith" : "e.g. rivermead-badminton"}
                 autoCapitalize="none" required
-                className={`${inputCls} ${usernameOk === true ? "border-green-400" : usernameOk === false ? "border-red-400" : ""}`}
+                className={`${inputCls} ${userIdOk === true ? "border-green-400" : userIdOk === false ? "border-red-400" : ""}`}
               />
-              {usernameOk === true && (
+              {userIdOk === true && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓ available</span>
               )}
             </div>
@@ -123,45 +135,67 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
             </p>
           </div>
 
-          {/* Display name — shown in the app header */}
+          {/* Display name */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Club Display Name <span className="text-gray-400 font-normal">(shown in the app)</span>
+              {isGroup ? "Display Name" : "Club Display Name"}{" "}
+              <span className="text-gray-400 font-normal">(shown in the app)</span>
             </label>
-            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Oasis Badminton Club" required className={inputCls} />
+            <input
+              type="text" value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={isGroup ? "e.g. Jane Smith" : "e.g. Rivermead Badminton Club"}
+              required className={inputCls}
+            />
           </div>
 
-          {/* Admin name */}
+          {/* Email */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Your Name <span className="text-gray-400 font-normal">(admin)</span>
+              Email <span className="text-gray-400 font-normal">(for password reset)</span>
             </label>
-            <input type="text" value={adminName} onChange={(e) => setAdminName(e.target.value)}
-              placeholder="e.g. Sakthi" required className={inputCls} />
-          </div>
-
-          {/* Email — for password reset only */}
-          <div>
-            <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Email <span className="text-gray-400 font-normal">(for password reset only)</span>
-            </label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@yourclub.com" required className={inputCls} />
+            <input
+              type="email" value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              required className={inputCls}
+            />
           </div>
 
           {/* Password */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 6 characters" required className={inputCls} />
+            <div className="relative">
+              <input
+                type={showPwd ? "text" : "password"}
+                value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min. 6 characters" required
+                className={`${inputCls} pr-10`}
+              />
+              <button type="button" tabIndex={-1}
+                onClick={() => setShowPwd((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
-          {/* Confirm */}
+          {/* Confirm password */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Confirm Password</label>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Repeat password" required className={inputCls} />
+            <div className="relative">
+              <input
+                type={showConfirm ? "text" : "password"}
+                value={confirm} onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Repeat password" required
+                className={`${inputCls} pr-10`}
+              />
+              <button type="button" tabIndex={-1}
+                onClick={() => setShowConfirm((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -172,7 +206,7 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
         )}
 
         <button type="submit"
-          disabled={loading || !username.trim() || !displayName.trim() || !adminName.trim() || !email.trim() || !password || !confirm}
+          disabled={loading || !userId.trim() || !displayName.trim() || !email.trim() || !password || !confirm}
           className={btnCls}>
           {loading ? "Creating account…" : "Create Account 🚀"}
         </button>

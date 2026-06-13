@@ -14,8 +14,12 @@ import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessi
 
 // ─── Offline detection ────────────────────────────────────────────────────────
 // True when the user explicitly chose offline mode OR the browser reports no network.
+// Friends-group sessions also route here: they run entirely on the local engine
+// (no Supabase tables yet), so any active session carrying a group_id is "local".
 function isOffline(): boolean {
-  return localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
+  if (localStorage.getItem("offline-mode") === "true" || !navigator.onLine) return true;
+  if (useSessionStore.getState().session?.group_id) return true;
+  return false;
 }
 
 // ─── Helper: get current club's user id ───────────────────────────────────────
@@ -66,23 +70,28 @@ function rowToMember(m: any): Member {
 // without the user being authenticated yet.
 
 export const clubsApi = {
-  /** Resolve a username to an auth email. Returns null if not found. */
+  /** Resolve a username to the Supabase auth email (always username@baddyapp.internal).
+   *  Returns null if the username doesn't exist. */
   findEmail: async (username: string): Promise<string | null> => {
     const { data } = await supabase
-      .from("clubs")
-      .select("email")
+      .from("accounts")
+      .select("username")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();
-    return data?.email ?? null;
+    if (!data) return null;
+    return `${data.username}@baddyapp.internal`;
   },
 
-  /** Create a clubs row after successful signup. */
-  create: async (userId: string, username: string, displayName: string, email: string) => {
-    const { error } = await supabase.from("clubs").insert({
+  /** Create an accounts row after successful signup.
+   *  email is always the user's real email for password recovery.
+   *  Supabase auth uses username@baddyapp.internal for all account types. */
+  create: async (userId: string, username: string, displayName: string, email: string, accountType: "club" | "group" = "club") => {
+    const { error } = await supabase.from("accounts").insert({
       username: username.toLowerCase().trim(),
       display_name: displayName.trim(),
       email: email.trim(),
       user_id: userId,
+      account_type: accountType,
     });
     if (error) throw new Error(error.message);
   },
@@ -92,7 +101,7 @@ export const clubsApi = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     const { data } = await supabase
-      .from("clubs")
+      .from("accounts")
       .select("username, display_name, email")
       .eq("user_id", user.id)
       .maybeSingle();
@@ -102,7 +111,7 @@ export const clubsApi = {
   /** Check if a username is already taken (anon-safe). */
   isUsernameTaken: async (username: string): Promise<boolean> => {
     const { data } = await supabase
-      .from("clubs")
+      .from("accounts")
       .select("username")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();
@@ -137,6 +146,28 @@ export const authApi = {
     await supabase.auth.signOut();
     localStorage.removeItem("offline-mode");
     localStorage.removeItem("offline-cached-at");
+    // Reset app mode so the next user starts fresh (avoids stale "friends" mode
+    // when a club account logs in after a group/guest session)
+    try {
+      const { useGroupStore } = await import("../store");
+      useGroupStore.getState().setAppMode(null);
+    } catch { /* best effort */ }
+  },
+
+  /**
+   * Password reset for personal/group accounts (which use a synthetic Supabase
+   * auth email). Verifies username + recovery email match, then returns a
+   * single-use reset link generated server-side via the Supabase admin API.
+   */
+  forgotPersonal: async (username: string, email: string): Promise<string> => {
+    const res = await fetch("/api/auth/forgot-personal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username.trim(), email: email.trim() }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message ?? "Could not generate reset link");
+    return json.reset_link as string;
   },
 };
 

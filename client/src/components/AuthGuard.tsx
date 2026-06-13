@@ -1,16 +1,79 @@
 import { useEffect, useState } from "react";
-import { useAuthStore } from "../store";
+import { useNavigate } from "react-router-dom";
+import { useAuthStore, useGroupStore } from "../store";
 import { supabase } from "../lib/supabase";
+
+/**
+ * Derive the app mode from the account type.
+ * user_metadata is the fast path; the accounts table is the authoritative source.
+ * We always query the table so stale/wrong metadata can't override it.
+ */
+async function applyAccountMode(userId: string, meta: Record<string, any>) {
+  // Start with the metadata hint so the store is set immediately (no flash)
+  const metaMode = meta?.account_type === "group" ? "friends" : "club";
+  useGroupStore.getState().setAppMode(metaMode);
+
+  // Then verify against the accounts table (source of truth)
+  try {
+    const { data } = await supabase
+      .from("accounts")
+      .select("account_type")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (data) {
+      const dbMode = data.account_type === "group" ? "friends" : "club";
+      if (dbMode !== metaMode) {
+        useGroupStore.getState().setAppMode(dbMode);
+      }
+    }
+  } catch {
+    // network error — stick with metadata hint
+  }
+}
 import LoginView from "../pages/LoginView";
 import ResetPasswordView from "../pages/ResetPasswordView";
 
 type Status = "loading" | "login" | "reset" | "ok";
 
+function redirectPendingInvite(navigate: ReturnType<typeof useNavigate>) {
+  const token = sessionStorage.getItem("pending_invite");
+  if (token) {
+    sessionStorage.removeItem("pending_invite");
+    navigate(`/groups/join/${token}`, { replace: true });
+  }
+}
+
+/**
+ * After a club account logs in, if the browser URL happens to be /groups
+ * (stale from a previous friends session), send them to / instead.
+ */
+function redirectClubHome(mode: "club" | "friends", navigate: ReturnType<typeof useNavigate>) {
+  if (mode === "club" && window.location.pathname.startsWith("/groups")) {
+    navigate("/", { replace: true });
+  }
+}
+
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const { setAuth, clearProfile, token } = useAuthStore();
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
+    // If the URL hash contains a Supabase recovery token (user clicked a reset link),
+    // go straight to the reset view — don't let getSession() race ahead to "ok".
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    if (hashParams.get("type") === "recovery") {
+      setStatus("reset");
+      return;
+    }
+
+    // Friends-group "guest" mode runs entirely locally (no Supabase) — let them in
+    // without a club login.
+    if (localStorage.getItem("friends-guest") === "true") {
+      setStatus("ok");
+      return;
+    }
+
     // If offline flag is set and we have a cached token, let them in
     const offlineMode = localStorage.getItem("offline-mode") === "true";
     if (offlineMode && token) {
@@ -19,9 +82,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     // Check Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         const meta = session.user.user_metadata ?? {};
+        const mode = meta?.account_type === "group" ? "friends" : "club";
+        applyAccountMode(session.user.id, meta); // fire-and-forget; fast path already set
         setAuth(
           session.access_token,
           meta.username ?? "",
@@ -30,6 +95,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           session.user.email ?? ""
         );
         setStatus("ok");
+        redirectPendingInvite(navigate);
+        redirectClubHome(mode, navigate);
       } else if (offlineMode && token) {
         // Offline + cached token — allow in
         setStatus("ok");
@@ -54,6 +121,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
       if (session) {
         const meta = session.user.user_metadata ?? {};
+        const mode = meta?.account_type === "group" ? "friends" : "club";
+        applyAccountMode(session.user.id, meta); // fire-and-forget; fast path already set
         setAuth(
           session.access_token,
           meta.username ?? "",
@@ -62,6 +131,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           session.user.email ?? ""
         );
         setStatus("ok");
+        redirectPendingInvite(navigate);
+        redirectClubHome(mode, navigate);
       } else if (localStorage.getItem("offline-mode") !== "true") {
         clearProfile();
         setStatus("login");

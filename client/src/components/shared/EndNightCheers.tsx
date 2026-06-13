@@ -11,6 +11,7 @@ interface Props {
   onConfirm: () => void;
   onCancel: () => void;
   ending: boolean;
+  isGroup?: boolean;   // group sessions say "session" instead of "night"
 }
 
 // Lightweight confetti burst
@@ -135,7 +136,8 @@ function AwardCard({
   );
 }
 
-export default function EndNightCheers({ matches, members, onConfirm, onCancel, ending }: Props) {
+export default function EndNightCheers({ matches, members, onConfirm, onCancel, ending, isGroup }: Props) {
+  const period = isGroup ? "this session" : "tonight";
   const stats = useMemo(() => computeLeaderboard(matches, members), [matches, members]);
 
   const top3 = stats.slice(0, 3);
@@ -191,7 +193,7 @@ export default function EndNightCheers({ matches, members, onConfirm, onCancel, 
             </motion.div>
             <h2 className="font-display font-black text-white text-xl leading-tight">That's a wrap!</h2>
             <p className="text-orange-200 text-sm font-display mt-1">
-              {totalMatches} match{totalMatches !== 1 ? "es" : ""} played tonight
+              {totalMatches} match{totalMatches !== 1 ? "es" : ""} played {period}
             </p>
           </div>
 
@@ -200,7 +202,7 @@ export default function EndNightCheers({ matches, members, onConfirm, onCancel, 
             {!hasData ? (
               <div className="text-center py-8">
                 <span className="text-4xl">🏸</span>
-                <p className="text-gray-400 font-display font-bold text-sm mt-2">No matches played tonight</p>
+                <p className="text-gray-400 font-display font-bold text-sm mt-2">No matches played {period}</p>
               </div>
             ) : (
               <>
@@ -232,7 +234,7 @@ export default function EndNightCheers({ matches, members, onConfirm, onCancel, 
                 {(topMale || topFemale || mostPlayed) && (
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-display font-black text-gray-500 uppercase tracking-wide">🏅 Tonight's awards</span>
+                      <span className="text-xs font-display font-black text-gray-500 uppercase tracking-wide">🏅 {isGroup ? "Session" : "Tonight's"} awards</span>
                     </div>
                     <div className="flex gap-2">
                       {topMale && (
@@ -288,7 +290,7 @@ export default function EndNightCheers({ matches, members, onConfirm, onCancel, 
                 bg-red-500 text-white font-display font-black text-sm
                 hover:bg-red-600 disabled:opacity-60 active:scale-95 transition-all"
             >
-              <LogOut size={15} /> {ending ? "Ending night…" : "End Night"}
+              <LogOut size={15} /> {ending ? (isGroup ? "Ending session…" : "Ending night…") : (isGroup ? "End Session" : "End Night")}
             </button>
           </div>
         </motion.div>

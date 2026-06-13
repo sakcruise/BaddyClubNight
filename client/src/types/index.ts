@@ -47,7 +47,53 @@ export interface Session {
   club_name: string;
   date: string;           // ISO date YYYY-MM-DD
   num_courts: number;
-  status: "setup" | "active" | "ended";
+  status: "setup" | "active" | "ended" | "upcoming";
+  group_id?: string;      // set when this session belongs to a friends-group (runs on local engine)
+  scheduled_at?: string;  // ISO datetime for upcoming/scheduled sessions
+  venue?: string;
+  created_at: string;
+}
+
+export interface GroupRsvp {
+  id: string;
+  member_id: string;
+  member_name: string;
+  status: "yes" | "no" | "maybe";
+}
+
+export interface GroupSession {
+  id: string;
+  group_id: string;
+  club_name: string;
+  scheduled_at: string;
+  venue?: string;
+  num_courts: number;
+  status: "upcoming" | "active" | "ended";
+  created_at: string;
+  rsvps: GroupRsvp[];
+  going_count: number;
+}
+
+// ─── Friends Groups (Splitwise-style casual play) ──────────────────────────────
+// A logged-in person can own multiple groups, each with its own members and
+// sessions. Unlike a club, a group has no fixed night — sessions are ad-hoc.
+
+export interface GroupMember {
+  id: string;
+  name: string;
+  member_type: MemberType;   // male | female | guest
+  created_at: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  venue?: string;
+  num_courts: number;        // default 1 — small groups usually share one court
+  themeKey: string;
+  invite_token: string;      // basis for the shareable join link
+  owner_id?: string;         // Supabase auth user id of the organiser (undefined for local/guest groups)
+  members: GroupMember[];
   created_at: string;
 }
 

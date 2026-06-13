@@ -2,7 +2,15 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v4 as uuid } from "uuid";
+import { createClient } from "@supabase/supabase-js";
 import db from "../db/index.js";
+
+// Admin Supabase client — used for password-reset link generation only
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL ?? "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 export const authRouter = Router();
 
@@ -79,5 +87,54 @@ authRouter.get("/me", (req, res) => {
     res.json({ club });
   } catch {
     res.status(401).json({ message: "Invalid or expired token" });
+  }
+});
+
+// ── Forgot password — personal/group accounts ─────────────────────────────────
+// Personal accounts use a synthetic Supabase auth email ({username}@baddyapp.internal)
+// so Supabase's built-in resetPasswordForEmail won't reach the user. Instead:
+//   1. Caller supplies username + their real recovery email (double-verification)
+//   2. We confirm they match what's stored in the clubs table
+//   3. We generate a password-reset link via the Supabase admin API
+//   4. Return the link — client redirects to it immediately (user is on their own device)
+authRouter.post("/forgot-personal", async (req, res) => {
+  const { username, email } = req.body as { username: string; email: string };
+  if (!username?.trim() || !email?.trim()) {
+    res.status(400).json({ message: "Username and email are required" });
+    return;
+  }
+
+  try {
+    const { data: row, error: lookupErr } = await supabaseAdmin
+      .from("accounts")
+      .select("email, username")
+      .eq("username", username.toLowerCase().trim())
+      .maybeSingle();
+
+    if (lookupErr || !row) {
+      res.status(404).json({ message: "No account found with that username" });
+      return;
+    }
+
+    if (row.email.toLowerCase() !== email.toLowerCase().trim()) {
+      res.status(401).json({ message: "Email doesn't match our records" });
+      return;
+    }
+
+    // All accounts use username@baddyapp.internal as their Supabase auth email
+    const syntheticEmail = `${row.username}@baddyapp.internal`;
+    const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email: syntheticEmail,
+    });
+
+    if (linkErr || !linkData?.properties?.action_link) {
+      res.status(500).json({ message: "Could not generate reset link" });
+      return;
+    }
+
+    res.json({ reset_link: linkData.properties.action_link });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message ?? "Server error" });
   }
 });
