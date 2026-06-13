@@ -47,9 +47,31 @@ export interface Session {
   club_name: string;
   date: string;           // ISO date YYYY-MM-DD
   num_courts: number;
-  status: "setup" | "active" | "ended";
+  status: "setup" | "active" | "ended" | "upcoming";
   group_id?: string;      // set when this session belongs to a friends-group (runs on local engine)
+  scheduled_at?: string;  // ISO datetime for upcoming/scheduled sessions
+  venue?: string;
   created_at: string;
+}
+
+export interface GroupRsvp {
+  id: string;
+  member_id: string;
+  member_name: string;
+  status: "yes" | "no" | "maybe";
+}
+
+export interface GroupSession {
+  id: string;
+  group_id: string;
+  club_name: string;
+  scheduled_at: string;
+  venue?: string;
+  num_courts: number;
+  status: "upcoming" | "active" | "ended";
+  created_at: string;
+  rsvps: GroupRsvp[];
+  going_count: number;
 }
 
 // ─── Friends Groups (Splitwise-style casual play) ──────────────────────────────

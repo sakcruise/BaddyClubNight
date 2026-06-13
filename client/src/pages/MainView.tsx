@@ -14,7 +14,7 @@ import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
-import { X, Users, Cog, LogOut, History, LayoutGrid, ListOrdered, Trophy, Menu, Maximize2, Minimize2, Swords } from "lucide-react";
+import { X, Users, Cog, LogOut, History, LayoutGrid, ListOrdered, Trophy, Menu, Maximize2, Minimize2 } from "lucide-react";
 
 type Drawer = "members" | "settings" | "menu" | null;
 type MobileTab = "queue" | "courts" | "checkins" | "leaderboard";
@@ -444,12 +444,6 @@ export default function MainView() {
                         <Cog size={18} className="text-orange-500" /> Settings
                       </button>
                     </>
-                  )}
-                  {!session.group_id && (
-                    <button onClick={() => { useGroupStore.getState().setAppMode("friends"); navigate("/groups"); setDrawer(null); }}
-                      className="flex items-center gap-3 p-4 rounded-2xl bg-purple-50 border border-purple-100 text-purple-700 font-display font-bold text-sm">
-                      <Swords size={18} className="text-purple-500" /> Play with Friends
-                    </button>
                   )}
                   <button onClick={handleEndNight} disabled={ending}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-display font-bold text-sm">

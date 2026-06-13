@@ -98,17 +98,16 @@ authRouter.get("/me", (req, res) => {
 //   3. We generate a password-reset link via the Supabase admin API
 //   4. Return the link — client redirects to it immediately (user is on their own device)
 authRouter.post("/forgot-personal", async (req, res) => {
-  const { username, recovery_email } = req.body as { username: string; recovery_email: string };
-  if (!username?.trim() || !recovery_email?.trim()) {
-    res.status(400).json({ message: "Username and recovery email are required" });
+  const { username, email } = req.body as { username: string; email: string };
+  if (!username?.trim() || !email?.trim()) {
+    res.status(400).json({ message: "Username and email are required" });
     return;
   }
 
   try {
-    // Look up the clubs row in Supabase
     const { data: row, error: lookupErr } = await supabaseAdmin
       .from("accounts")
-      .select("email, recovery_email")
+      .select("email, username")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();
 
@@ -117,22 +116,16 @@ authRouter.post("/forgot-personal", async (req, res) => {
       return;
     }
 
-    // Only handle personal accounts (synthetic auth email)
-    if (!row.email?.endsWith("@baddyapp.internal")) {
-      res.status(400).json({ message: "Use the standard forgot-password flow for club accounts" });
+    if (row.email.toLowerCase() !== email.toLowerCase().trim()) {
+      res.status(401).json({ message: "Email doesn't match our records" });
       return;
     }
 
-    // Verify the supplied recovery email matches what's on record
-    if (!row.recovery_email || row.recovery_email.toLowerCase() !== recovery_email.toLowerCase().trim()) {
-      res.status(401).json({ message: "Recovery email doesn't match our records" });
-      return;
-    }
-
-    // Generate a single-use password reset link via the admin API
+    // All accounts use username@baddyapp.internal as their Supabase auth email
+    const syntheticEmail = `${row.username}@baddyapp.internal`;
     const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
-      email: row.email, // synthetic email — Supabase resolves it to the right user
+      email: syntheticEmail,
     });
 
     if (linkErr || !linkData?.properties?.action_link) {

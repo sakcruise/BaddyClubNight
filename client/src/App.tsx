@@ -8,6 +8,7 @@ import ModeChooser from "./pages/ModeChooser";
 import GroupsHomeView from "./pages/GroupsHomeView";
 import GroupDetailView from "./pages/GroupDetailView";
 import JoinView from "./pages/JoinView";
+import SessionRsvpView from "./pages/SessionRsvpView";
 import MasterAdminView from "./pages/MasterAdminView";
 import { useSessionStore, useGroupStore } from "./store";
 import { applyTheme } from "./styles/themes";
@@ -56,6 +57,7 @@ export default function App() {
       <Routes>
         {/* Public — invite links must work without a login */}
         <Route path="/groups/join/:token" element={<JoinView />} />
+        <Route path="/sessions/:id/rsvp" element={<SessionRsvpView />} />
         {/* Master admin — auth guard still required, page itself checks master username */}
         <Route path="/master" element={<AuthGuard><MasterAdminView /></AuthGuard>} />
         <Route path="*" element={<AuthGuard><AppRoutes /></AuthGuard>} />

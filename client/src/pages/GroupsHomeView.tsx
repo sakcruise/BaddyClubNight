@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Users, ChevronRight, X, Building2, LogOut } from "lucide-react";
+import { Plus, Users, ChevronRight, X, LogOut } from "lucide-react";
 import { useGroupStore } from "../store";
 import { authApi } from "../services/api";
 import { groupsApi } from "../services/groups";
@@ -22,19 +22,6 @@ export default function GroupsHomeView() {
       .catch((e) => console.error("Failed to load groups:", e))
       .finally(() => setLoading(false));
   }, [isGuest]);
-
-  // Leaving friends mode: a guest (no club account) goes back to the login screen;
-  // a logged-in club user just switches their stored mode.
-  function switchToClub() {
-    if (isGuest) {
-      localStorage.removeItem("friends-guest");
-      setAppMode(null);
-      window.location.href = window.location.origin + "/";
-    } else {
-      setAppMode("club");
-      navigate("/");
-    }
-  }
 
   function signOut() {
     if (isGuest) {
@@ -89,15 +76,6 @@ export default function GroupsHomeView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!isGuest && (
-            <button
-              onClick={switchToClub}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/80 text-xs font-display font-bold hover:bg-white/20 transition-all"
-              title="Switch to club mode"
-            >
-              <Building2 size={13} /> Club
-            </button>
-          )}
           <button
             onClick={signOut}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white/70 text-xs font-display font-bold hover:bg-white/20 transition-all"

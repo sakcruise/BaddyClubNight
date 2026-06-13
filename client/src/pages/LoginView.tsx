@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { clubsApi, authApi } from "../services/api";
 import { useGroupStore } from "../store";
@@ -18,8 +19,18 @@ export default function LoginView() {
   const [setupType, setSetupType] = useState<"club" | "group">("club");
   const [chooseType, setChooseType] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
   const [personalResetLink, setPersonalResetLink] = useState<string | null>(null);
+  const [showPwd, setShowPwd] = useState(false);
+
+  useEffect(() => {
+    const mode = sessionStorage.getItem("pending_auth_mode");
+    if (mode === "signup_group") {
+      sessionStorage.removeItem("pending_auth_mode");
+      setSetupType("group");
+      setShowSetup(true);
+    }
+  }, []);
 
   const bg = "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)";
   const inputCls = "w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm focus:outline-none focus:border-orange-400 transition-colors";
@@ -108,27 +119,10 @@ export default function LoginView() {
     setError("");
     setLoading(true);
     try {
-      const authEmail = await clubsApi.findEmail(username);
-      if (!authEmail) throw new Error("No account found with that username");
-
-      if (clubsApi.isPersonalAccount(authEmail)) {
-        // Personal account: synthetic auth email — use server-side reset flow.
-        // recoveryEmail must be supplied by the user (second form field).
-        if (!recoveryEmail.trim()) {
-          setError("Enter the recovery email you registered with");
-          return;
-        }
-        const link = await authApi.forgotPersonal(username, recoveryEmail);
-        setPersonalResetLink(link);
-        setResetSent(true);
-      } else {
-        // Club account: real Supabase auth email — standard reset flow.
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(authEmail, {
-          redirectTo: window.location.origin,
-        });
-        if (resetError) throw resetError;
-        setResetSent(true);
-      }
+      // All accounts use synthetic auth emails — reset always goes server-side.
+      const link = await authApi.forgotPersonal(username, forgotEmail);
+      setPersonalResetLink(link);
+      setResetSent(true);
     } catch (err: any) {
       setError(err.message ?? "Could not send reset email");
     } finally {
@@ -141,7 +135,7 @@ export default function LoginView() {
     setError("");
     setResetSent(false);
     setPassword("");
-    setRecoveryEmail("");
+    setForgotEmail("");
     setPersonalResetLink(null);
   }
 
@@ -168,11 +162,10 @@ export default function LoginView() {
 
           <div className="flex flex-col gap-3">
             <div>
-              <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Username</label>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1 block">User ID</label>
               <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                placeholder="your username" autoFocus required autoCapitalize="none"
+                placeholder="User ID" autoFocus required autoCapitalize="none"
                 className={inputCls} />
-              <p className="text-[10px] text-gray-400 font-display mt-1">Your unique login ID — set when you created the account</p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -182,8 +175,15 @@ export default function LoginView() {
                   Forgot password?
                 </button>
               </div>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your password" required className={inputCls} />
+              <div className="relative">
+                <input type={showPwd ? "text" : "password"} value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password" required className={`${inputCls} pr-10`} />
+                <button type="button" tabIndex={-1} onClick={() => setShowPwd((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -248,27 +248,22 @@ export default function LoginView() {
               <div>
                 <h2 className="font-display font-black text-gray-900 text-xl">Reset password 🔑</h2>
                 <p className="text-gray-500 text-sm font-display mt-0.5">
-                  Enter your username and we'll send a reset link.
+                  Enter your User ID and registered email.
                 </p>
               </div>
 
               <div>
-                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Username</label>
+                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">User ID</label>
                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                  placeholder="your username" autoFocus required autoCapitalize="none"
+                  placeholder="your user ID" autoFocus required autoCapitalize="none"
                   className={inputCls} />
               </div>
 
               <div>
-                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-                  Recovery email <span className="text-gray-400 font-normal">(personal accounts only)</span>
-                </label>
-                <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)}
+                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Email</label>
+                <input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
                   placeholder="the email you registered with"
-                  className={inputCls} />
-                <p className="text-[10px] text-gray-400 font-display mt-1">
-                  Club accounts: leave blank — reset link goes to your registered email.
-                </p>
+                  required className={inputCls} />
               </div>
 
               {error && (
@@ -277,7 +272,7 @@ export default function LoginView() {
                 </div>
               )}
 
-              <button type="submit" disabled={loading || !username.trim()} className={btnCls}>
+              <button type="submit" disabled={loading || !username.trim() || !forgotEmail.trim()} className={btnCls}>
                 {loading ? "Sending…" : "Send Reset Link 📧"}
               </button>
 

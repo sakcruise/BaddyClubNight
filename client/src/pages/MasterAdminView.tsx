@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trash2, RefreshCw, ShieldAlert, Building2, Users } from "lucide-react";
-import { useAuthStore } from "../store";
 import { supabase } from "../lib/supabase";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 
@@ -15,8 +14,6 @@ interface AccountRow {
   auth_created_at?: string;
 }
 
-const MASTER_USERNAME = "sakthi"; // must match server MASTER_USERNAME env var
-
 async function apiFetch(path: string, opts?: RequestInit) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token ?? "";
@@ -24,20 +21,19 @@ async function apiFetch(path: string, opts?: RequestInit) {
     ...opts,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...opts?.headers },
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message ?? "Request failed");
+  const text = await res.text();
+  let json: any = {};
+  try { json = text ? JSON.parse(text) : {}; } catch { /* non-JSON response */ }
+  if (!res.ok) throw new Error(json.message ?? `Server error ${res.status}`);
   return json;
 }
 
 export default function MasterAdminView() {
   const navigate = useNavigate();
-  const { username } = useAuthStore();
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
-
-  const isMaster = username === MASTER_USERNAME;
 
   async function load() {
     setLoading(true);
@@ -52,7 +48,7 @@ export default function MasterAdminView() {
     }
   }
 
-  useEffect(() => { if (isMaster) load(); }, [isMaster]);
+  useEffect(() => { load(); }, []);
 
   async function handleDelete(userId: string, uname: string) {
     if (!confirm(`Delete account "${uname}"? This permanently removes the user and all their data.`)) return;
@@ -67,12 +63,15 @@ export default function MasterAdminView() {
     }
   }
 
-  if (!isMaster) {
+  const isForbidden = error.toLowerCase().includes("forbidden") || error.toLowerCase().includes("master");
+
+  if (isForbidden) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6"
         style={{ background: "linear-gradient(160deg, #1e1e2e 0%, #2d1b69 100%)" }}>
         <ShieldAlert size={48} className="text-red-400" />
         <p className="text-white font-display font-black text-xl">Access denied</p>
+        <p className="text-white/50 text-sm font-display">This page is only available to the master account.</p>
         <button onClick={() => navigate("/")}
           className="px-4 py-2 rounded-xl bg-white/10 text-white font-display font-bold text-sm">
           Go back
@@ -166,8 +165,8 @@ export default function MasterAdminView() {
                 {/* Delete */}
                 <button
                   onClick={() => handleDelete(a.user_id, a.username)}
-                  disabled={deleting === a.user_id || a.username === MASTER_USERNAME}
-                  title={a.username === MASTER_USERNAME ? "Cannot delete master account" : "Delete account"}
+                  disabled={deleting === a.user_id}
+                  title="Delete account"
                   className="p-2 rounded-xl text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-20 flex-shrink-0"
                 >
                   <Trash2 size={16} />

@@ -7,7 +7,7 @@ A PWA for managing badminton club nights. Admin manages a permanent member roste
 - **Client**: React 18 + TypeScript + Vite PWA, Tailwind CSS v3, Framer Motion, Zustand (persist middleware), Lucide icons
 - **Server**: Node.js + Express + better-sqlite3 (SQLite), runs on port 3000
 - **Dev preview**: Vite on port 5173
-- **Node version**: v20 via nvm — always use `/Users/sakthimuruganv/.nvm/versions/node/v20.20.2/bin/node`
+- **Node version**: v22 via nvm — always use `/Users/sakcruise/.nvm/versions/node/v22.22.3/bin/node`
 - **DB path**: `server/data/club.db`
 
 ## Running Locally

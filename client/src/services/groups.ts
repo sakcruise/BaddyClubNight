@@ -10,7 +10,7 @@
  *   group_members → GroupMember (display_name→name, joined_at→created_at)
  */
 import { supabase } from "../lib/supabase";
-import type { Group, GroupMember, MemberType } from "../types";
+import type { Group, GroupMember, GroupSession, GroupRsvp, MemberType } from "../types";
 
 async function getUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -41,19 +41,18 @@ function rowToGroup(g: any): Group {
     num_courts: g.num_courts ?? 1,
     themeKey: g.theme_key ?? "orange",
     invite_token: g.invite_token,
+    owner_id: g.owner_id,
     members: (g.group_members ?? []).map(rowToMember),
     created_at: g.created_at,
   };
 }
 
 export const groupsApi = {
-  /** All groups the signed-in person owns, members included. */
+  /** All groups the signed-in person owns or has joined, members included. */
   list: async (): Promise<Group[]> => {
-    const ownerId = await getUserId();
     const { data, error } = await supabase
       .from("groups")
       .select("*, group_members(*)")
-      .eq("owner_id", ownerId)
       .order("created_at", { ascending: true });
     return check(data, error).map(rowToGroup);
   },
@@ -148,4 +147,105 @@ export const groupsApi = {
     if (error) throw new Error(error.message);
     return data as string;
   },
+
+  // ── Sessions (upcoming / scheduled) ──────────────────────────────────────
+
+  /** List upcoming (and recently ended) sessions for a group. */
+  listSessions: async (groupId: string): Promise<GroupSession[]> => {
+    const { data, error } = await supabase.rpc("list_group_sessions", { p_group_id: groupId });
+    if (error) throw new Error(error.message);
+    if (!data) return [];
+    const rows = Array.isArray(data) ? data : [data];
+    return rows.filter(Boolean).map(rowToGroupSession);
+  },
+
+  /** Create a scheduled or immediate session for a group. */
+  createSession: async (
+    groupId: string,
+    groupName: string,
+    opts: { scheduled_at: string; venue?: string; num_courts: number; status: "upcoming" | "active" }
+  ): Promise<GroupSession> => {
+    const { data, error } = await supabase
+      .from("sessions")
+      .insert({
+        group_id: groupId,
+        club_name: groupName,
+        date: opts.scheduled_at.split("T")[0],
+        num_courts: opts.num_courts,
+        status: opts.status,
+        scheduled_at: opts.scheduled_at,
+        venue: opts.venue?.trim() || null,
+      })
+      .select("*, session_rsvps(id, member_id, status, group_members(display_name))")
+      .single();
+    return rowToGroupSession(check(data, error));
+  },
+
+  /** Update details of an upcoming session (owner only). */
+  updateSession: async (
+    sessionId: string,
+    opts: { scheduled_at: string; venue?: string; num_courts: number }
+  ): Promise<void> => {
+    const { error } = await supabase
+      .from("sessions")
+      .update({
+        scheduled_at: opts.scheduled_at,
+        venue: opts.venue?.trim() || null,
+        num_courts: opts.num_courts,
+        date: opts.scheduled_at.split("T")[0],
+      })
+      .eq("id", sessionId);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Activate an upcoming session (owner only). */
+  activateSession: async (sessionId: string): Promise<void> => {
+    const { error } = await supabase
+      .from("sessions")
+      .update({ status: "active" })
+      .eq("id", sessionId);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Set RSVP for the current user's group member record. */
+  rsvp: async (sessionId: string, memberId: string, status: "yes" | "no" | "maybe"): Promise<void> => {
+    const { error } = await supabase
+      .from("session_rsvps")
+      .upsert({ session_id: sessionId, member_id: memberId, status }, { onConflict: "session_id,member_id" });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Find the group_member row for the current user in a group. */
+  myMemberId: async (groupId: string): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from("group_members")
+      .select("id")
+      .eq("group_id", groupId)
+      .eq("member_user_id", user.id)
+      .maybeSingle();
+    return data?.id ?? null;
+  },
 };
+
+function rowToGroupSession(s: any): GroupSession {
+  const rsvps: GroupRsvp[] = (s.session_rsvps ?? []).map((r: any) => ({
+    id: r.id,
+    member_id: r.member_id,
+    member_name: r.group_members?.display_name ?? "",
+    status: r.status,
+  }));
+  return {
+    id: s.id,
+    group_id: s.group_id,
+    club_name: s.club_name,
+    scheduled_at: s.scheduled_at ?? s.created_at,
+    venue: s.venue ?? undefined,
+    num_courts: s.num_courts,
+    status: s.status,
+    created_at: s.created_at,
+    rsvps,
+    going_count: rsvps.filter((r) => r.status === "yes").length,
+  };
+}

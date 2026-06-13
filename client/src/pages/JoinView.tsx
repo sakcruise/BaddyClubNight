@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Check } from "lucide-react";
+import { Users, Check, UserPlus, LogIn } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { groupsApi } from "../services/groups";
 import { useGroupStore } from "../store";
@@ -19,15 +19,31 @@ export default function JoinView() {
   const navigate = useNavigate();
   const { token } = useParams<{ token: string }>();
 
-  const [loading, setLoading] = useState(true);
-  const [preview, setPreview] = useState<{ id: string; name: string; member_count: number } | null>(null);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<MemberType>("male");
-  const [joining, setJoining] = useState(false);
-  const [joined, setJoined] = useState(false);
-  const [error, setError] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthed, setIsAuthed]       = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [preview, setPreview]         = useState<{ id: string; name: string; member_count: number } | null>(null);
+  const [name, setName]               = useState("");
+  const [type, setType]               = useState<MemberType>("male");
+  const [joining, setJoining]         = useState(false);
+  const [joined, setJoined]           = useState(false);
+  const [error, setError]             = useState("");
 
   useEffect(() => {
+    // Check auth first — unauthenticated users must sign up / sign in before joining
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthed(!!session);
+      setAuthChecked(true);
+      if (!session && token) {
+        // Store token so AuthGuard can redirect back here after login
+        sessionStorage.setItem("pending_invite", token);
+      }
+      // Pre-fill name from account
+      if (session?.user.user_metadata?.display_name) {
+        setName(session.user.user_metadata.display_name);
+      }
+    });
+
     if (!token) { setLoading(false); return; }
     groupsApi.getByInvite(token)
       .then(setPreview)
@@ -41,9 +57,14 @@ export default function JoinView() {
     setError("");
     try {
       const groupId = await groupsApi.join(token, name, type);
-      // If the joiner is signed in, take them straight into the group.
+      // If the joiner is signed in, pre-load the group into the store then navigate.
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        // Pre-fetch so GroupDetailView finds the group immediately (avoids race on first load)
+        try {
+          const g = await groupsApi.get(groupId);
+          if (g) useGroupStore.getState().upsertGroup(g);
+        } catch (_) { /* best effort */ }
         useGroupStore.getState().setAppMode("friends");
         navigate(`/groups/${groupId}`, { replace: true });
       } else {
@@ -58,10 +79,52 @@ export default function JoinView() {
 
   const bg = "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-500)) 100%)";
 
-  if (loading) {
+  if (loading || !authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: bg }}>
         <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Unauthenticated — must sign in or create an account first
+  if (!isAuthed) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-6" style={{ background: bg }}>
+        <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
+          <ShuttlecockIcon size={48} />
+        </div>
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 text-center">
+          <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+            <Users size={22} className="text-purple-600" />
+          </div>
+          {preview && (
+            <>
+              <p className="font-display font-black text-gray-900 text-xl">Join {preview.name}</p>
+              <p className="text-gray-400 text-sm font-display">
+                {preview.member_count} {preview.member_count === 1 ? "member" : "members"} · {preview.name}
+              </p>
+            </>
+          )}
+          <p className="text-gray-500 text-sm font-display leading-relaxed">
+            You need an account to join this group and track your games.
+          </p>
+          <div className="w-full flex flex-col gap-2 mt-1">
+            <button
+              onClick={() => {
+                sessionStorage.setItem("pending_auth_mode", "signup_group");
+                window.location.href = "/";
+              }}
+              className="w-full py-3 rounded-2xl font-display font-black text-white text-sm bg-gradient-to-r from-purple-600 to-purple-500 active:scale-95 transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2">
+              <UserPlus size={15} /> Create account
+            </button>
+            <button
+              onClick={() => { window.location.href = "/"; }}
+              className="w-full py-3 rounded-2xl font-display font-black text-sm border-2 border-gray-200 text-gray-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <LogIn size={15} /> Sign in
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -81,14 +144,31 @@ export default function JoinView() {
         </div>
       ) : joined ? (
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 text-center flex flex-col items-center gap-3">
+          className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 text-center flex flex-col items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
             <Check size={28} className="text-green-600" />
           </div>
-          <p className="font-display font-black text-gray-900 text-xl">You're in! 🏸</p>
-          <p className="text-gray-500 text-sm font-display">
-            You've joined <span className="font-bold text-gray-700">{preview.name}</span>. See you on court!
-          </p>
+          <div>
+            <p className="font-display font-black text-gray-900 text-xl">You're in!</p>
+            <p className="text-gray-500 text-sm font-display mt-1">
+              You've joined <span className="font-bold text-gray-700">{preview.name}</span>.
+            </p>
+          </div>
+
+          <div className="w-full border-t border-gray-100 pt-4 flex flex-col gap-2">
+            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mx-auto">
+              <UserPlus size={20} className="text-purple-600" />
+            </div>
+            <p className="font-display font-black text-gray-900 text-base">Create your account</p>
+            <p className="text-gray-400 text-xs font-display leading-relaxed">
+              You need an account to RSVP, see session details, and track your games.
+            </p>
+            <button
+              onClick={() => { window.location.href = "/"; }}
+              className="w-full mt-1 py-3 rounded-2xl font-display font-black text-white text-sm bg-gradient-to-r from-purple-600 to-purple-500 active:scale-95 transition-all shadow-lg shadow-purple-500/20">
+              Create account →
+            </button>
+          </div>
         </motion.div>
       ) : (
         <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
