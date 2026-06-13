@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
-import { useAuthStore } from "../store";
+import { useAuthStore, useGroupStore } from "../store";
 import { supabase } from "../lib/supabase";
+
+/** Land each account in the right mode based on how it was created. */
+function applyAccountMode(meta: Record<string, any>) {
+  if (meta?.account_type === "group") useGroupStore.getState().setAppMode("friends");
+  else if (meta?.account_type === "club") useGroupStore.getState().setAppMode("club");
+}
 import LoginView from "../pages/LoginView";
 import ResetPasswordView from "../pages/ResetPasswordView";
 
@@ -11,6 +17,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
+    // Friends-group "guest" mode runs entirely locally (no Supabase) — let them in
+    // without a club login.
+    if (localStorage.getItem("friends-guest") === "true") {
+      setStatus("ok");
+      return;
+    }
+
     // If offline flag is set and we have a cached token, let them in
     const offlineMode = localStorage.getItem("offline-mode") === "true";
     if (offlineMode && token) {
@@ -22,6 +35,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         const meta = session.user.user_metadata ?? {};
+        applyAccountMode(meta);
         setAuth(
           session.access_token,
           meta.username ?? "",
@@ -54,6 +68,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
       if (session) {
         const meta = session.user.user_metadata ?? {};
+        applyAccountMode(meta);
         setAuth(
           session.access_token,
           meta.username ?? "",

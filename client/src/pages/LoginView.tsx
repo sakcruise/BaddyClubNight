@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { clubsApi } from "../services/api";
+import { useGroupStore } from "../store";
+import { Building2, Users } from "lucide-react";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import SetupView from "./SetupView";
 
@@ -13,9 +15,67 @@ export default function LoginView() {
   const [error, setError]         = useState("");
   const [loading, setLoading]     = useState(false);
   const [showSetup, setShowSetup] = useState(false);
+  const [setupType, setSetupType] = useState<"club" | "group">("club");
+  const [chooseType, setChooseType] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
-  if (showSetup) return <SetupView onBack={() => setShowSetup(false)} />;
+  const bg = "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)";
+  const inputCls = "w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm focus:outline-none focus:border-orange-400 transition-colors";
+  const btnCls   = "w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30";
+
+  if (showSetup) return <SetupView accountType={setupType} onBack={() => { setShowSetup(false); setChooseType(true); }} />;
+
+  // ── Play with friends (no account) ─────────────────────────────────────────
+  // Friends-group mode is fully local, so it needs no Supabase login.
+  function enterFriends() {
+    localStorage.setItem("friends-guest", "true");
+    useGroupStore.getState().setAppMode("friends");
+    window.location.href = window.location.origin + "/groups";
+  }
+
+  // ── Account type chooser (shown before account creation) ───────────────────
+  if (chooseType) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-8" style={{ background: bg }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
+            <ShuttlecockIcon size={48} />
+          </div>
+          <h1 className="font-display font-black text-white text-2xl tracking-tight">Get started</h1>
+          <p className="text-orange-200 font-display font-semibold text-sm">What are you setting up?</p>
+        </div>
+
+        <div className="w-full max-w-sm flex flex-col gap-3">
+          <button onClick={() => { setSetupType("club"); setChooseType(false); setShowSetup(true); }}
+            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left active:scale-95 transition-transform">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center flex-shrink-0">
+              <Building2 size={26} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-display font-black text-gray-900 text-lg">A Club</div>
+              <div className="text-gray-500 text-sm font-display">Fixed venue & nights, permanent roster</div>
+            </div>
+          </button>
+
+          <button onClick={() => { setSetupType("group"); setChooseType(false); setShowSetup(true); }}
+            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left active:scale-95 transition-transform">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center flex-shrink-0">
+              <Users size={26} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-display font-black text-gray-900 text-lg">A Group of Friends</div>
+              <div className="text-gray-500 text-sm font-display">Casual play any day, split the costs & invite friends</div>
+            </div>
+          </button>
+        </div>
+
+        <button type="button" onClick={() => setChooseType(false)}
+          className="text-xs text-white/70 font-display font-bold hover:text-white transition-colors">
+          ← Back to sign in
+        </button>
+      </div>
+    );
+  }
 
   // ── Sign In ───────────────────────────────────────────────────────────────
   async function handleSignIn(e: React.FormEvent) {
@@ -32,7 +92,7 @@ export default function LoginView() {
       if (authError) throw authError;
       // AuthGuard's onAuthStateChange fires → transitions to "ok" automatically
     } catch (err: any) {
-      setError(err.message ?? "Login failed — check your Club ID and password");
+      setError(err.message ?? "Login failed — check your username and password");
       setPassword("");
     } finally {
       setLoading(false);
@@ -46,7 +106,7 @@ export default function LoginView() {
     setLoading(true);
     try {
       const email = await clubsApi.findEmail(username);
-      if (!email) throw new Error("No account found with that Club ID");
+      if (!email) throw new Error("No account found with that username");
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
@@ -66,10 +126,6 @@ export default function LoginView() {
     setPassword("");
   }
 
-  const bg = "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)";
-  const inputCls = "w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm focus:outline-none focus:border-orange-400 transition-colors";
-  const btnCls   = "w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30";
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: bg }}>
 
@@ -78,8 +134,8 @@ export default function LoginView() {
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={56} />
         </div>
-        <h1 className="font-display font-black text-white text-3xl tracking-tight">Badminton Club</h1>
-        <p className="text-orange-200 font-display font-semibold text-sm">Club Night Manager</p>
+        <h1 className="font-display font-black text-white text-3xl tracking-tight">Badminton</h1>
+        <p className="text-orange-200 font-display font-semibold text-sm">Game night, sorted</p>
       </div>
 
       {/* ── Sign In ── */}
@@ -88,14 +144,14 @@ export default function LoginView() {
           className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
           <div>
             <h2 className="font-display font-black text-gray-900 text-xl">Sign In 👋</h2>
-            <p className="text-gray-500 text-sm font-display mt-0.5">Use your Club ID and password.</p>
+            <p className="text-gray-500 text-sm font-display mt-0.5">Enter your login details.</p>
           </div>
 
           <div className="flex flex-col gap-3">
             <div>
-              <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Club ID</label>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Username</label>
               <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. oasisbadminton" autoFocus required autoCapitalize="none"
+                placeholder="your username" autoFocus required autoCapitalize="none"
                 className={inputCls} />
               <p className="text-[10px] text-gray-400 font-display mt-1">Your unique login ID — set when you created the account</p>
             </div>
@@ -123,11 +179,16 @@ export default function LoginView() {
           </button>
 
           <div className="border-t border-gray-100 pt-3 text-center">
-            <button type="button" onClick={() => setShowSetup(true)}
+            <button type="button" onClick={() => setChooseType(true)}
               className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors">
-              New club? Create your free account →
+              New here? Create a free account →
             </button>
           </div>
+
+          <button type="button" onClick={enterFriends}
+            className="w-full py-3 rounded-2xl font-display font-black text-purple-700 text-sm bg-purple-50 border-2 border-purple-200 hover:bg-purple-100 active:scale-95 transition-all">
+            🏸 Just exploring? Continue as guest →
+          </button>
         </form>
       )}
 
@@ -152,14 +213,14 @@ export default function LoginView() {
               <div>
                 <h2 className="font-display font-black text-gray-900 text-xl">Reset password 🔑</h2>
                 <p className="text-gray-500 text-sm font-display mt-0.5">
-                  Enter your Club ID and we'll email you a reset link.
+                  Enter your username and we'll email you a reset link.
                 </p>
               </div>
 
               <div>
-                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Club ID</label>
+                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">Username</label>
                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. oasisbadminton" autoFocus required autoCapitalize="none"
+                  placeholder="your username" autoFocus required autoCapitalize="none"
                   className={inputCls} />
               </div>
 

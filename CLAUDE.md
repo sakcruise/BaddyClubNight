@@ -110,6 +110,15 @@ matches (id, session_id, court_id, team_a, team_b, result, created_at)
 - PlayerPicker must call `addMatch`, `updateCourtStatus`, `removeFromQueue`, `setActiveMemberIds` after API call — not just `closePicker`
 - Courts number input supports 1–20 (not just 1–6)
 
+## Friends Groups (prototype — Splitwise-style casual play)
+A second mode alongside clubs, for friends who organise ad-hoc games.
+- **Entry**: `ModeChooser` (shown when `useGroupStore.appMode === null`) → "Run a Club" or "Play with Friends".
+- **Model**: one logged-in person → many groups → each group has its own `GroupMember[]`. Persisted in `useGroupStore` ("group-store"). No fixed night; sessions are ad-hoc.
+- **Pages**: `pages/GroupsHomeView.tsx` (group list + create), `pages/GroupDetailView.tsx` (members, invite link, Start Session). Routes `/groups`, `/groups/:id`.
+- **Session re-scoping**: a group session is a normal `Session` carrying `group_id`. `api.ts isOffline()` returns true whenever the active session has a `group_id`, so the *entire* queue/court/match engine runs on local Zustand for groups — **no Supabase tables needed yet**. Start Session hydrates `useMemberStore` from the group's members, then opens the session.
+- **Future backend**: `supabase/migrations/003_groups.sql` documents the real schema (groups, group_members, expenses/shares/settlements, session_rsvps, + `group_id` on sessions/queue/matches). NOT YET APPLIED.
+- **v1 roadmap** (agreed): Core loop ✅ → Splitwise expenses → RSVP + reminders.
+
 ## Preview Server
 - Preview server ID: `bd895075-0b59-409b-b439-2a42c3139835` (port 5173)
 - Routes: `/admin`, `/kiosk`, `/mobile`, `/leaderboard`

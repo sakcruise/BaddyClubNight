@@ -14,8 +14,12 @@ import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessi
 
 // ─── Offline detection ────────────────────────────────────────────────────────
 // True when the user explicitly chose offline mode OR the browser reports no network.
+// Friends-group sessions also route here: they run entirely on the local engine
+// (no Supabase tables yet), so any active session carrying a group_id is "local".
 function isOffline(): boolean {
-  return localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
+  if (localStorage.getItem("offline-mode") === "true" || !navigator.onLine) return true;
+  if (useSessionStore.getState().session?.group_id) return true;
+  return false;
 }
 
 // ─── Helper: get current club's user id ───────────────────────────────────────

@@ -48,6 +48,29 @@ export interface Session {
   date: string;           // ISO date YYYY-MM-DD
   num_courts: number;
   status: "setup" | "active" | "ended";
+  group_id?: string;      // set when this session belongs to a friends-group (runs on local engine)
+  created_at: string;
+}
+
+// ─── Friends Groups (Splitwise-style casual play) ──────────────────────────────
+// A logged-in person can own multiple groups, each with its own members and
+// sessions. Unlike a club, a group has no fixed night — sessions are ad-hoc.
+
+export interface GroupMember {
+  id: string;
+  name: string;
+  member_type: MemberType;   // male | female | guest
+  created_at: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  venue?: string;
+  num_courts: number;        // default 1 — small groups usually share one court
+  themeKey: string;
+  invite_token: string;      // basis for the shareable join link
+  members: GroupMember[];
   created_at: string;
 }
 

@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { clubsApi } from "../services/api";
-import { useAuthStore } from "../store";
+import { useAuthStore, useGroupStore } from "../store";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 
-export default function SetupView({ onBack }: { onBack?: () => void }) {
+type AccountType = "club" | "group";
+
+export default function SetupView({ onBack, accountType = "club" }: { onBack?: () => void; accountType?: AccountType }) {
+  const isGroup = accountType === "group";
+  const idLabel = isGroup ? "Username" : "Club ID";
+
   const [username, setUsername]       = useState("");
   const [displayName, setDisplayName] = useState("");
   const [adminName, setAdminName]     = useState("");
@@ -23,7 +28,7 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
     if (!u || u.length < 3) return;
     const taken = await clubsApi.isUsernameTaken(u);
     setUsernameOk(!taken);
-    if (taken) setError("That Club ID is already taken — choose another");
+    if (taken) setError(`That ${idLabel} is already taken — choose another`);
     else setError("");
   }
 
@@ -33,16 +38,19 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
     setError("");
 
     const u = username.toLowerCase().trim();
-    if (u.length < 3) { setError("Club ID must be at least 3 characters"); return; }
-    if (!/^[a-z0-9_-]+$/.test(u)) { setError("Club ID can only contain letters, numbers, _ and -"); return; }
+    if (u.length < 3) { setError(`${idLabel} must be at least 3 characters`); return; }
+    if (!/^[a-z0-9_-]+$/.test(u)) { setError(`${idLabel} can only contain letters, numbers, _ and -`); return; }
     if (password !== confirm)     { setError("Passwords don't match"); return; }
     if (password.length < 6)     { setError("Password must be at least 6 characters"); return; }
+
+    // For a group account the person's name doubles as the display name.
+    const display = isGroup ? adminName.trim() : displayName.trim();
 
     setLoading(true);
     try {
       // Check username isn't taken
       const taken = await clubsApi.isUsernameTaken(u);
-      if (taken) { setError("That Club ID is already taken — choose another"); return; }
+      if (taken) { setError(`That ${idLabel} is already taken — choose another`); return; }
 
       // Create Supabase auth user — store all profile info in user_metadata
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -51,8 +59,9 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
         options: {
           data: {
             username: u,
-            display_name: displayName.trim(),
+            display_name: display,
             admin_name: adminName.trim(),
+            account_type: accountType,
           },
         },
       });
@@ -61,12 +70,15 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
       const userId = data.user?.id;
       if (!userId) throw new Error("Signup succeeded but no user ID returned");
 
-      // Create clubs row for username → email lookup
-      await clubsApi.create(userId, u, displayName.trim(), email.trim());
+      // Create lookup row for username → email login resolution
+      await clubsApi.create(userId, u, display, email.trim());
+
+      // Remember which mode this account is for, so we land in the right place.
+      useGroupStore.getState().setAppMode(isGroup ? "friends" : "club");
 
       // Update store immediately if session was returned
       if (data.session) {
-        setAuth(data.session.access_token, u, displayName.trim(), adminName.trim(), email.trim());
+        setAuth(data.session.access_token, u, display, adminName.trim(), email.trim());
       }
       // AuthGuard's onAuthStateChange will fire and transition to "ok"
     } catch (err: any) {
@@ -87,30 +99,32 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={56} />
         </div>
-        <h1 className="font-display font-black text-white text-3xl tracking-tight">Badminton Club</h1>
-        <p className="text-orange-200 font-display font-semibold text-sm">Create your club account</p>
+        <h1 className="font-display font-black text-white text-3xl tracking-tight">{isGroup ? "Badminton" : "Badminton Club"}</h1>
+        <p className="text-orange-200 font-display font-semibold text-sm">{isGroup ? "Create your account" : "Create your club account"}</p>
       </div>
 
       <form onSubmit={handleSubmit}
         className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
         <div>
           <h2 className="font-display font-black text-gray-900 text-xl">Welcome! 🏸</h2>
-          <p className="text-gray-500 text-sm font-display mt-0.5">Each club gets their own private account.</p>
+          <p className="text-gray-500 text-sm font-display mt-0.5">
+            {isGroup ? "Set up your account to create groups and invite friends." : "Each club gets their own private account."}
+          </p>
         </div>
 
         <div className="flex flex-col gap-3">
 
-          {/* Club ID — used to log in */}
+          {/* Username / Club ID — used to log in */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Club ID <span className="text-gray-400 font-normal">(used to log in)</span>
+              {idLabel} <span className="text-gray-400 font-normal">(used to log in)</span>
             </label>
             <div className="relative">
               <input
                 type="text" value={username}
                 onChange={(e) => { setUsername(e.target.value.toLowerCase()); setUsernameOk(null); setError(""); }}
                 onBlur={checkUsername}
-                placeholder="e.g. oasisbadminton"
+                placeholder={isGroup ? "e.g. sakthi" : "e.g. oasisbadminton"}
                 autoCapitalize="none" required
                 className={`${inputCls} ${usernameOk === true ? "border-green-400" : usernameOk === false ? "border-red-400" : ""}`}
               />
@@ -123,19 +137,21 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
             </p>
           </div>
 
-          {/* Display name — shown in the app header */}
-          <div>
-            <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Club Display Name <span className="text-gray-400 font-normal">(shown in the app)</span>
-            </label>
-            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Oasis Badminton Club" required className={inputCls} />
-          </div>
+          {/* Display name — club only (group uses the person's name) */}
+          {!isGroup && (
+            <div>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
+                Club Display Name <span className="text-gray-400 font-normal">(shown in the app)</span>
+              </label>
+              <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Oasis Badminton Club" required className={inputCls} />
+            </div>
+          )}
 
-          {/* Admin name */}
+          {/* Person's name */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Your Name <span className="text-gray-400 font-normal">(admin)</span>
+              Your Name {!isGroup && <span className="text-gray-400 font-normal">(admin)</span>}
             </label>
             <input type="text" value={adminName} onChange={(e) => setAdminName(e.target.value)}
               placeholder="e.g. Sakthi" required className={inputCls} />
@@ -147,7 +163,7 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
               Email <span className="text-gray-400 font-normal">(for password reset only)</span>
             </label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@yourclub.com" required className={inputCls} />
+              placeholder={isGroup ? "you@email.com" : "admin@yourclub.com"} required className={inputCls} />
           </div>
 
           {/* Password */}
@@ -172,7 +188,7 @@ export default function SetupView({ onBack }: { onBack?: () => void }) {
         )}
 
         <button type="submit"
-          disabled={loading || !username.trim() || !displayName.trim() || !adminName.trim() || !email.trim() || !password || !confirm}
+          disabled={loading || !username.trim() || (!isGroup && !displayName.trim()) || !adminName.trim() || !email.trim() || !password || !confirm}
           className={btnCls}>
           {loading ? "Creating account…" : "Create Account 🚀"}
         </button>

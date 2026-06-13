@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { useSessionStore, useQueueStore, useMatchStore, useMemberStore, useAuthStore, useSessionArchiveStore } from "../store";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useSessionStore, useQueueStore, useMatchStore, useMemberStore, useAuthStore, useSessionArchiveStore, useGroupStore } from "../store";
 import { authApi } from "../services/api";
 import CheckInPanel from "../components/admin/CheckInPanel";
 import CheckInGrid from "../components/admin/CheckInGrid";
@@ -14,7 +14,7 @@ import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
-import { X, Users, Cog, LogOut, History, LayoutGrid, ListOrdered, Trophy, Menu } from "lucide-react";
+import { X, Users, Cog, LogOut, History, LayoutGrid, ListOrdered, Trophy, Menu, Maximize2, Minimize2 } from "lucide-react";
 
 type Drawer = "members" | "settings" | "menu" | null;
 type MobileTab = "queue" | "courts" | "checkins" | "leaderboard";
@@ -22,6 +22,7 @@ type MobileTab = "queue" | "courts" | "checkins" | "leaderboard";
 export default function MainView() {
   const navigate = useNavigate();
   const { adminName } = useAuthStore();
+  const appMode = useGroupStore((s) => s.appMode);
   const logout = () => authApi.logout();
   const { session, endSession, clubConfig: rawClubConfig, setCourts, setSession } = useSessionStore();
   const clubConfig = rawClubConfig ?? { name: "", venue: "", nightDay: "", nightStart: "", nightEnd: "", whatsapp: "" };
@@ -32,6 +33,21 @@ export default function MainView() {
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [ending, setEnding] = useState(false);
   const [showCheers, setShowCheers] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
   const [mobileTab, setMobileTab] = useState<MobileTab>("courts");
   const [courtsPct, setCourtsPct] = useState(55);
   const centreRef = useRef<HTMLDivElement>(null);
@@ -127,7 +143,7 @@ export default function MainView() {
     load();
   }, [session?.id]);
 
-  if (!session) return <HomeView />;
+  if (!session) return appMode === "friends" ? <Navigate to="/groups" replace /> : <HomeView />;
 
   const queuedIds = new Set(queue.map((q) => q.member_id));
   const allCheckedInIds = new Set([...queuedIds, ...activeMemberIds]);
@@ -189,7 +205,7 @@ export default function MainView() {
           </div>
           <div>
             <h1 className="font-display font-black text-white text-sm leading-tight">
-              {clubConfig.name || session.club_name}
+              {session.group_id ? session.club_name : (clubConfig.name || session.club_name)}
             </h1>
             <p className="text-orange-200 text-[10px] font-display">{dateStr}</p>
           </div>
@@ -225,20 +241,30 @@ export default function MainView() {
                 bg-white/15 text-white hover:bg-white/25 border border-white/20 transition-all">
               <History size={13} /> History
             </button>
-            <button onClick={() => setDrawer(drawer === "members" ? null : "members")}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
-                ${drawer === "members" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
-              <Users size={13} /> Members
-            </button>
-            <button onClick={() => setDrawer(drawer === "settings" ? null : "settings")}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
-                ${drawer === "settings" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
-              <Cog size={13} /> Settings
+            {!session.group_id && (
+              <>
+                <button onClick={() => setDrawer(drawer === "members" ? null : "members")}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
+                    ${drawer === "members" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
+                  <Users size={13} /> Members
+                </button>
+                <button onClick={() => setDrawer(drawer === "settings" ? null : "settings")}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
+                    ${drawer === "settings" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
+                  <Cog size={13} /> Settings
+                </button>
+              </>
+            )}
+            <button onClick={toggleFullscreen}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/15 border border-white/20
+                text-white text-xs font-display font-bold hover:bg-white/25 active:scale-95 transition-all"
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
             <button onClick={handleEndNight} disabled={ending}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-500/80 border border-red-400/40
                 text-white text-xs font-display font-bold hover:bg-red-600/90 active:scale-95 transition-all">
-              <LogOut size={13} /> {ending ? "Ending…" : "End Night"}
+              <LogOut size={13} /> {ending ? "Ending…" : session.group_id ? "End Session" : "End Night"}
             </button>
             <button onClick={() => logout()}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/20
@@ -359,8 +385,8 @@ export default function MainView() {
         ))}
       </nav>
 
-      {/* ── Onboarding Tour ── */}
-      <OnboardingTour onTabChange={(tab) => setMobileTab(tab as MobileTab)} />
+      {/* ── Onboarding Tour (club only — its copy is club-specific) ── */}
+      {!session.group_id && <OnboardingTour onTabChange={(tab) => setMobileTab(tab as MobileTab)} />}
 
       {/* ── End Night Cheers ── */}
       {showCheers && (
@@ -370,6 +396,7 @@ export default function MainView() {
           onConfirm={confirmEndNight}
           onCancel={() => setShowCheers(false)}
           ending={ending}
+          isGroup={!!session.group_id}
         />
       )}
 
@@ -387,7 +414,7 @@ export default function MainView() {
 
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <span className="font-display font-black text-gray-900 text-lg">
-                  {drawer === "members" ? "Club Roster" : drawer === "settings" ? "Club Settings" : "Menu"}
+                  {drawer === "members" ? (session.group_id ? "Members" : "Club Roster") : drawer === "settings" ? (session.group_id ? "Settings" : "Club Settings") : "Menu"}
                 </span>
                 <button onClick={() => setDrawer(null)}
                   className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
@@ -397,25 +424,34 @@ export default function MainView() {
 
               {drawer === "menu" && (
                 <div className="flex flex-col p-4 gap-2">
+                  <button onClick={toggleFullscreen}
+                    className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                    {isFullscreen ? <Minimize2 size={18} className="text-orange-500" /> : <Maximize2 size={18} className="text-orange-500" />}
+                    {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                  </button>
                   <button onClick={() => { navigate("/history"); setDrawer(null); }}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
                     <History size={18} className="text-orange-500" /> Session History
                   </button>
-                  <button onClick={() => setDrawer("members")}
-                    className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
-                    <Users size={18} className="text-orange-500" /> Club Roster
-                  </button>
-                  <button onClick={() => setDrawer("settings")}
-                    className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
-                    <Cog size={18} className="text-orange-500" /> Settings
-                  </button>
+                  {!session.group_id && (
+                    <>
+                      <button onClick={() => setDrawer("members")}
+                        className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                        <Users size={18} className="text-orange-500" /> Club Roster
+                      </button>
+                      <button onClick={() => setDrawer("settings")}
+                        className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                        <Cog size={18} className="text-orange-500" /> Settings
+                      </button>
+                    </>
+                  )}
                   <button onClick={handleEndNight} disabled={ending}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-display font-bold text-sm">
-                    <LogOut size={18} /> {ending ? "Ending…" : "End Night"}
+                    <LogOut size={18} /> {ending ? "Ending…" : session.group_id ? "End Session" : "End Night"}
                   </button>
                   <button onClick={() => logout()}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-500 font-display font-bold text-sm">
-                    <LogOut size={18} /> Sign Out ({adminName})
+                    <LogOut size={18} /> Sign Out{adminName ? ` (${adminName})` : ""}
                   </button>
                 </div>
               )}
