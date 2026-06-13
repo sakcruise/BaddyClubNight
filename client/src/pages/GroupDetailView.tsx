@@ -539,10 +539,9 @@ export default function GroupDetailView() {
       {isOwner && (
         <div className="fixed bottom-0 left-0 right-0 p-4 max-w-xl mx-auto">
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowModal(true)}
-            disabled={group.members.length < 4}
-            className="w-full py-4 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 disabled:opacity-50 shadow-2xl shadow-purple-500/30 flex items-center justify-center gap-2">
+            className="w-full py-4 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 shadow-2xl shadow-purple-500/30 flex items-center justify-center gap-2">
             <CalendarPlus size={20} />
-            {group.members.length < 4 ? "Add at least 4 members first" : "Schedule / Start Session"}
+            Schedule / Start Session
           </motion.button>
         </div>
       )}
