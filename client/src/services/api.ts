@@ -73,7 +73,7 @@ export const clubsApi = {
   /** Resolve a username to an auth email. Returns null if not found. */
   findEmail: async (username: string): Promise<string | null> => {
     const { data } = await supabase
-      .from("clubs")
+      .from("accounts")
       .select("email")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();
@@ -82,7 +82,7 @@ export const clubsApi = {
 
   /** Create a clubs row after successful signup. */
   create: async (userId: string, username: string, displayName: string, email: string, recoveryEmail?: string) => {
-    const { error } = await supabase.from("clubs").insert({
+    const { error } = await supabase.from("accounts").insert({
       username: username.toLowerCase().trim(),
       display_name: displayName.trim(),
       email: email.trim(),
@@ -100,7 +100,7 @@ export const clubsApi = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     const { data } = await supabase
-      .from("clubs")
+      .from("accounts")
       .select("username, display_name, email")
       .eq("user_id", user.id)
       .maybeSingle();
@@ -110,7 +110,7 @@ export const clubsApi = {
   /** Check if a username is already taken (anon-safe). */
   isUsernameTaken: async (username: string): Promise<boolean> => {
     const { data } = await supabase
-      .from("clubs")
+      .from("accounts")
       .select("username")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();

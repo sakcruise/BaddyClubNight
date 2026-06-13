@@ -107,7 +107,7 @@ authRouter.post("/forgot-personal", async (req, res) => {
   try {
     // Look up the clubs row in Supabase
     const { data: row, error: lookupErr } = await supabaseAdmin
-      .from("clubs")
+      .from("accounts")
       .select("email, recovery_email")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();
