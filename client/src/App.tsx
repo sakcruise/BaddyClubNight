@@ -7,6 +7,7 @@ import AnalyticsView from "./pages/AnalyticsView";
 import ModeChooser from "./pages/ModeChooser";
 import GroupsHomeView from "./pages/GroupsHomeView";
 import GroupDetailView from "./pages/GroupDetailView";
+import JoinView from "./pages/JoinView";
 import { useSessionStore, useGroupStore } from "./store";
 import { applyTheme } from "./styles/themes";
 import type { ThemeKey } from "./styles/themes";
@@ -51,9 +52,11 @@ export default function App() {
   return (
     <>
       <ThemeApplier />
-      <AuthGuard>
-        <AppRoutes />
-      </AuthGuard>
+      <Routes>
+        {/* Public — invite links must work without a login */}
+        <Route path="/groups/join/:token" element={<JoinView />} />
+        <Route path="*" element={<AuthGuard><AppRoutes /></AuthGuard>} />
+      </Routes>
     </>
   );
 }

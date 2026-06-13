@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Plus, Trash2, Link2, Check, Play, Users } from "lucide-react";
 import { useGroupStore, useSessionStore, useMemberStore } from "../store";
+import { groupsApi } from "../services/groups";
 import type { MemberType, Member, Session } from "../types";
 import { v4 as uuid } from "uuid";
 
@@ -12,10 +13,12 @@ const TYPE_DOT: Record<MemberType, string> = {
   guest: "bg-purple-500",
 };
 
+const isGuest = () => localStorage.getItem("friends-guest") === "true";
+
 export default function GroupDetailView() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { groups, addGroupMember, removeGroupMember, deleteGroup } = useGroupStore();
+  const { groups, addGroupMember, removeGroupMember, deleteGroup, upsertGroup, setGroups } = useGroupStore();
   const { setSession, setCourts } = useSessionStore();
   const { setMembers } = useMemberStore();
 
@@ -24,6 +27,33 @@ export default function GroupDetailView() {
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<MemberType>("male");
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(!isGuest() && !group);
+  const [busy, setBusy] = useState(false);
+
+  // Account users: pull the latest group + members from Supabase.
+  useEffect(() => {
+    if (isGuest() || !id) return;
+    groupsApi.get(id)
+      .then((g) => { if (g) upsertGroup(g); })
+      .catch((e) => console.error("Failed to load group:", e))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // For accounts, re-fetch after a write so the list stays in sync with the DB.
+  async function refresh() {
+    if (isGuest() || !id) return;
+    const g = await groupsApi.get(id);
+    if (g) upsertGroup(g);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center"
+        style={{ background: "linear-gradient(135deg, rgb(var(--p-900)), rgb(var(--p-600)))" }}>
+        <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!group) {
     return (
@@ -46,10 +76,44 @@ export default function GroupDetailView() {
     });
   }
 
-  function handleAdd() {
-    if (!newName.trim()) return;
-    addGroupMember(group!.id, newName, newType);
-    setNewName("");
+  async function handleAdd() {
+    if (!newName.trim() || busy) return;
+    setBusy(true);
+    try {
+      if (isGuest()) {
+        addGroupMember(group!.id, newName, newType);
+      } else {
+        await groupsApi.addMember(group!.id, newName, newType);
+        await refresh();
+      }
+      setNewName("");
+    } catch (e: any) {
+      alert(`Couldn't add member: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    if (isGuest()) { removeGroupMember(group!.id, memberId); return; }
+    try {
+      await groupsApi.removeMember(memberId);
+      await refresh();
+    } catch (e: any) {
+      alert(`Couldn't remove member: ${e?.message ?? "unknown error"}`);
+    }
+  }
+
+  async function handleDeleteGroup() {
+    if (!confirm(`Delete "${group!.name}"? This can't be undone.`)) return;
+    if (isGuest()) { deleteGroup(group!.id); navigate("/groups"); return; }
+    try {
+      await groupsApi.remove(group!.id);
+      setGroups(useGroupStore.getState().groups.filter((g) => g.id !== group!.id));
+      navigate("/groups");
+    } catch (e: any) {
+      alert(`Couldn't delete group: ${e?.message ?? "unknown error"}`);
+    }
   }
 
   function handleStartSession() {
@@ -95,7 +159,7 @@ export default function GroupDetailView() {
           </p>
         </div>
         <button
-          onClick={() => { if (confirm(`Delete "${group.name}"? This can't be undone.`)) { deleteGroup(group.id); navigate("/groups"); } }}
+          onClick={handleDeleteGroup}
           className="p-2 rounded-xl bg-white/10 border border-white/20 text-white/70"
           title="Delete group"
         >
@@ -165,7 +229,7 @@ export default function GroupDetailView() {
                     {m.name.charAt(0).toUpperCase()}
                   </span>
                   <span className="flex-1 font-display font-bold text-gray-800 text-sm truncate">{m.name}</span>
-                  <button onClick={() => removeGroupMember(group.id, m.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                  <button onClick={() => handleRemoveMember(m.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                     <Trash2 size={15} />
                   </button>
                 </div>

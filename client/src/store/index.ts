@@ -308,6 +308,8 @@ interface GroupStore {
   appMode: AppMode;
   groups: Group[];
   setAppMode: (m: AppMode) => void;
+  setGroups: (groups: Group[]) => void;
+  upsertGroup: (group: Group) => void;
   createGroup: (name: string, opts?: Partial<Pick<Group, "venue" | "num_courts" | "themeKey">>) => Group;
   updateGroup: (id: string, patch: Partial<Omit<Group, "id" | "members">>) => void;
   deleteGroup: (id: string) => void;
@@ -323,6 +325,15 @@ export const useGroupStore = create<GroupStore>()(
       groups: [],
 
       setAppMode: (appMode) => set({ appMode }),
+
+      setGroups: (groups) => set({ groups }),
+
+      upsertGroup: (group) =>
+        set((s) => ({
+          groups: s.groups.some((g) => g.id === group.id)
+            ? s.groups.map((g) => (g.id === group.id ? group : g))
+            : [...s.groups, group],
+        })),
 
       createGroup: (name, opts) => {
         const group: Group = {

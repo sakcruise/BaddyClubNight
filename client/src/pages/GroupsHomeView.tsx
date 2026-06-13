@@ -1,16 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Users, ChevronRight, X, Building2, LogOut } from "lucide-react";
 import { useGroupStore } from "../store";
 import { authApi } from "../services/api";
+import { groupsApi } from "../services/groups";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 
 /** Splitwise-style home: the list of friends-groups this person belongs to. */
 export default function GroupsHomeView() {
   const navigate = useNavigate();
-  const { groups, createGroup, setAppMode } = useGroupStore();
+  const { groups, createGroup, setGroups, setAppMode } = useGroupStore();
   const isGuest = localStorage.getItem("friends-guest") === "true";
+  const [loading, setLoading] = useState(!isGuest);
+
+  // Account users: load groups from Supabase. Guests stay on the local store.
+  useEffect(() => {
+    if (isGuest) return;
+    groupsApi.list()
+      .then(setGroups)
+      .catch((e) => console.error("Failed to load groups:", e))
+      .finally(() => setLoading(false));
+  }, [isGuest]);
 
   // Leaving friends mode: a guest (no club account) goes back to the login screen;
   // a logged-in club user just switches their stored mode.
@@ -39,12 +50,26 @@ export default function GroupsHomeView() {
   const [name, setName] = useState("");
   const [courts, setCourts] = useState(1);
 
-  function handleCreate() {
-    if (!name.trim()) return;
-    const g = createGroup(name, { num_courts: courts });
-    setName("");
-    setCreating(false);
-    navigate(`/groups/${g.id}`);
+  const [saving, setSaving] = useState(false);
+
+  async function handleCreate() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const g = isGuest
+        ? createGroup(name, { num_courts: courts })
+        : await groupsApi.create(name, { num_courts: courts }).then((created) => {
+            useGroupStore.getState().upsertGroup(created);
+            return created;
+          });
+      setName("");
+      setCreating(false);
+      navigate(`/groups/${g.id}`);
+    } catch (e: any) {
+      alert(`Couldn't create group: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -84,7 +109,11 @@ export default function GroupsHomeView() {
 
       {/* Group list */}
       <main className="flex-1 overflow-y-auto px-5 pb-28 max-w-xl w-full mx-auto">
-        {groups.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center mt-24">
+            <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          </div>
+        ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center mt-20 gap-3">
             <div className="w-16 h-16 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center">
               <Users size={30} className="text-white" />
@@ -170,10 +199,10 @@ export default function GroupsHomeView() {
 
               <button
                 onClick={handleCreate}
-                disabled={!name.trim()}
+                disabled={!name.trim() || saving}
                 className="w-full py-3 rounded-xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-purple-500/20"
               >
-                Create Group
+                {saving ? "Creating…" : "Create Group"}
               </button>
             </motion.div>
           </>

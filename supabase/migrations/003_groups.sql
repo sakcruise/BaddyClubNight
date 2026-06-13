@@ -1,13 +1,9 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Migration 003: Friends Groups (Splitwise-style casual play)
 --
--- STATUS: NOT YET APPLIED. The current prototype runs friends-groups entirely on
--- the local engine (Zustand, same path as offline mode), so no backend changes
--- are required to click through the flow. Apply this when groups graduate from
--- prototype to multi-device / shared persistence.
---
 -- HOW TO RUN:
 --   Paste this entire file into Supabase Dashboard → SQL Editor → Run
+--   (Idempotent: safe to re-run — uses IF NOT EXISTS / CREATE OR REPLACE.)
 --
 -- MODEL: one person (auth.users) owns many groups. A group has its own members,
 -- ad-hoc sessions, expenses, and RSVPs. A group_member is a name by default and
@@ -98,8 +94,17 @@ ALTER TABLE expense_shares ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settlements    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE session_rsvps  ENABLE ROW LEVEL SECURITY;
 
--- Owner-scoped policies. (A future revision can widen reads to members who have
--- joined via invite, using a membership lookup.)
+-- Drop first so the whole file is safe to re-run.
+DROP POLICY IF EXISTS "Owner manages own groups"        ON groups;
+DROP POLICY IF EXISTS "Owner manages own group members" ON group_members;
+DROP POLICY IF EXISTS "Owner manages own expenses"      ON expenses;
+DROP POLICY IF EXISTS "Owner manages own expense shares" ON expense_shares;
+DROP POLICY IF EXISTS "Owner manages own settlements"   ON settlements;
+DROP POLICY IF EXISTS "Owner manages own rsvps"         ON session_rsvps;
+DROP POLICY IF EXISTS "Member reads joined groups"      ON groups;
+DROP POLICY IF EXISTS "Member reads co-members"         ON group_members;
+
+-- Owner-scoped policies.
 CREATE POLICY "Owner manages own groups"
   ON groups FOR ALL
   USING (owner_id = auth.uid())
@@ -129,3 +134,53 @@ CREATE POLICY "Owner manages own rsvps"
   ON session_rsvps FOR ALL
   USING (EXISTS (SELECT 1 FROM sessions s JOIN groups g ON g.id = s.group_id WHERE s.id = session_rsvps.session_id AND g.owner_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM sessions s JOIN groups g ON g.id = s.group_id WHERE s.id = session_rsvps.session_id AND g.owner_id = auth.uid()));
+
+-- ── Membership reads: a joined member can see their group and its members ──────
+CREATE POLICY "Member reads joined groups"
+  ON groups FOR SELECT
+  USING (EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = groups.id AND gm.member_user_id = auth.uid()));
+
+CREATE POLICY "Member reads co-members"
+  ON group_members FOR SELECT
+  USING (EXISTS (SELECT 1 FROM group_members me WHERE me.group_id = group_members.group_id AND me.member_user_id = auth.uid()));
+
+-- ── Invite / join by link ─────────────────────────────────────────────────────
+-- SECURITY DEFINER so a friend who isn't (yet) a member can look up a group by its
+-- invite token and add themselves — without exposing a blanket read policy on groups.
+
+CREATE OR REPLACE FUNCTION public.get_group_by_invite(p_token TEXT)
+RETURNS TABLE (id UUID, name TEXT, member_count BIGINT)
+LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT g.id, g.name, (SELECT count(*) FROM group_members gm WHERE gm.group_id = g.id)
+  FROM groups g
+  WHERE g.invite_token = p_token;
+$$;
+
+CREATE OR REPLACE FUNCTION public.join_group(p_token TEXT, p_display_name TEXT, p_member_type TEXT DEFAULT 'male')
+RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_group UUID;
+BEGIN
+  SELECT id INTO v_group FROM groups WHERE invite_token = p_token;
+  IF v_group IS NULL THEN
+    RAISE EXCEPTION 'Invalid invite link';
+  END IF;
+  IF NULLIF(trim(coalesce(p_display_name, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'A name is required to join';
+  END IF;
+  -- A logged-in user who already joined just gets the group id back (idempotent).
+  IF auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM group_members WHERE group_id = v_group AND member_user_id = auth.uid()
+  ) THEN
+    RETURN v_group;
+  END IF;
+  INSERT INTO group_members (group_id, member_user_id, display_name, member_type, role)
+  VALUES (v_group, auth.uid(), trim(p_display_name), COALESCE(NULLIF(p_member_type,''), 'male'), 'member');
+  RETURN v_group;
+END;
+$$;
+
+-- Anyone with the link can preview the group; both anon and signed-in can join
+-- (anon joins are name-only, member_user_id stays NULL).
+GRANT EXECUTE ON FUNCTION public.get_group_by_invite(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.join_group(TEXT, TEXT, TEXT) TO anon, authenticated;
