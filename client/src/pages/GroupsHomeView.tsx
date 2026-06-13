@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Users, ChevronRight, X, LogOut } from "lucide-react";
-import { useGroupStore } from "../store";
+import { useGroupStore, useAuthStore } from "../store";
 import { authApi } from "../services/api";
 import { groupsApi } from "../services/groups";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
@@ -11,6 +11,7 @@ import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 export default function GroupsHomeView() {
   const navigate = useNavigate();
   const { groups, createGroup, setGroups, setAppMode } = useGroupStore();
+  const displayName = useAuthStore((s) => s.displayName);
   const isGuest = localStorage.getItem("friends-guest") === "true";
   const [loading, setLoading] = useState(!isGuest);
 
@@ -43,15 +44,25 @@ export default function GroupsHomeView() {
     if (!name.trim() || saving) return;
     setSaving(true);
     try {
-      const g = isGuest
-        ? createGroup(name, { num_courts: courts })
-        : await groupsApi.create(name, { num_courts: courts }).then((created) => {
-            useGroupStore.getState().upsertGroup(created);
-            return created;
-          });
-      setName("");
-      setCreating(false);
-      navigate(`/groups/${g.id}`);
+      const ownerName = displayName?.trim() || "Me";
+      if (isGuest) {
+        const g = createGroup(name, { num_courts: courts });
+        useGroupStore.getState().addGroupMember(g.id, ownerName);
+        setName("");
+        setCreating(false);
+        navigate(`/groups/${g.id}`);
+      } else {
+        const created = await groupsApi.create(name, { num_courts: courts });
+        // Add owner as the first member so they appear in the group by default
+        try {
+          const member = await groupsApi.addMember(created.id, ownerName);
+          created.members = [member];
+        } catch { /* non-fatal */ }
+        useGroupStore.getState().upsertGroup(created);
+        setName("");
+        setCreating(false);
+        navigate(`/groups/${created.id}`);
+      }
     } catch (e: any) {
       alert(`Couldn't create group: ${e?.message ?? "unknown error"}`);
     } finally {
