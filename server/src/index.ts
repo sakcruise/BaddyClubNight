@@ -10,6 +10,7 @@ import { matchesRouter } from "./routes/matches.js";
 import { queueRouter } from "./routes/queue.js";
 import { syncRouter } from "./routes/sync.js";
 import { aiRouter } from "./routes/ai.js";
+import { adminRouter } from "./routes/admin.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 // Ensure DB is initialised on startup
@@ -33,6 +34,7 @@ app.use("/api/matches", matchesRouter);    // /:matchId/score
 app.use("/api/sessions", queueRouter);
 app.use("/api/sync", syncRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/admin", adminRouter);
 
 app.use(errorHandler);
 
