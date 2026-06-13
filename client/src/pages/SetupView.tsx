@@ -52,9 +52,15 @@ export default function SetupView({ onBack, accountType = "club" }: { onBack?: (
       const taken = await clubsApi.isUsernameTaken(u);
       if (taken) { setError(`That ${idLabel} is already taken — choose another`); return; }
 
+      // Personal/group accounts use a synthetic Supabase auth email so the same
+      // real email can be used across a club account and a personal account.
+      // Login resolves username → clubs.email (synthetic) → signInWithPassword.
+      // Password reset goes through /api/auth/forgot-personal (server-side).
+      const authEmail = isGroup ? `${u}@baddyapp.internal` : email.trim();
+
       // Create Supabase auth user — store all profile info in user_metadata
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: authEmail,
         password,
         options: {
           data: {
@@ -70,8 +76,9 @@ export default function SetupView({ onBack, accountType = "club" }: { onBack?: (
       const userId = data.user?.id;
       if (!userId) throw new Error("Signup succeeded but no user ID returned");
 
-      // Create lookup row for username → email login resolution
-      await clubsApi.create(userId, u, display, email.trim());
+      // Create lookup row for username → authEmail login resolution.
+      // For personal accounts, also store the real email for password recovery.
+      await clubsApi.create(userId, u, display, authEmail, isGroup ? email.trim() : undefined);
 
       // Remember which mode this account is for, so we land in the right place.
       useGroupStore.getState().setAppMode(isGroup ? "friends" : "club");
@@ -157,13 +164,15 @@ export default function SetupView({ onBack, accountType = "club" }: { onBack?: (
               placeholder="e.g. Sakthi" required className={inputCls} />
           </div>
 
-          {/* Email — for password reset only */}
+          {/* Email — for password reset */}
           <div>
             <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
-              Email <span className="text-gray-400 font-normal">(for password reset only)</span>
+              Email <span className="text-gray-400 font-normal">(for password reset)</span>
             </label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder={isGroup ? "you@email.com" : "admin@yourclub.com"} required className={inputCls} />
+              placeholder={isGroup ? "you@email.com" : "admin@yourclub.com"}
+              required
+              className={inputCls} />
           </div>
 
           {/* Password */}

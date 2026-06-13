@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { useAuthStore, useGroupStore } from "../store";
 import { supabase } from "../lib/supabase";
 
-/** Land each account in the right mode based on how it was created. */
+/**
+ * Set the starting mode for a fresh login. If the user already has a persisted
+ * appMode we respect it — one account can freely switch between club and friends.
+ */
 function applyAccountMode(meta: Record<string, any>) {
+  const current = useGroupStore.getState().appMode;
+  if (current !== null) return; // user already chose — don't override
   if (meta?.account_type === "group") useGroupStore.getState().setAppMode("friends");
   else if (meta?.account_type === "club") useGroupStore.getState().setAppMode("club");
 }

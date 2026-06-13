@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
-import { clubsApi } from "../services/api";
+import { clubsApi, authApi } from "../services/api";
 import { useGroupStore } from "../store";
 import { Building2, Users } from "lucide-react";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
@@ -18,6 +18,8 @@ export default function LoginView() {
   const [setupType, setSetupType] = useState<"club" | "group">("club");
   const [chooseType, setChooseType] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [personalResetLink, setPersonalResetLink] = useState<string | null>(null);
 
   const bg = "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)";
   const inputCls = "w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm focus:outline-none focus:border-orange-400 transition-colors";
@@ -43,6 +45,7 @@ export default function LoginView() {
           </div>
           <h1 className="font-display font-black text-white text-2xl tracking-tight">Get started</h1>
           <p className="text-orange-200 font-display font-semibold text-sm">What are you setting up?</p>
+          <p className="text-white/50 font-display text-xs text-center max-w-xs">One account works for both — you can switch modes any time after signing in.</p>
         </div>
 
         <div className="w-full max-w-sm flex flex-col gap-3">
@@ -105,13 +108,27 @@ export default function LoginView() {
     setError("");
     setLoading(true);
     try {
-      const email = await clubsApi.findEmail(username);
-      if (!email) throw new Error("No account found with that username");
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
-      });
-      if (resetError) throw resetError;
-      setResetSent(true);
+      const authEmail = await clubsApi.findEmail(username);
+      if (!authEmail) throw new Error("No account found with that username");
+
+      if (clubsApi.isPersonalAccount(authEmail)) {
+        // Personal account: synthetic auth email — use server-side reset flow.
+        // recoveryEmail must be supplied by the user (second form field).
+        if (!recoveryEmail.trim()) {
+          setError("Enter the recovery email you registered with");
+          return;
+        }
+        const link = await authApi.forgotPersonal(username, recoveryEmail);
+        setPersonalResetLink(link);
+        setResetSent(true);
+      } else {
+        // Club account: real Supabase auth email — standard reset flow.
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(authEmail, {
+          redirectTo: window.location.origin,
+        });
+        if (resetError) throw resetError;
+        setResetSent(true);
+      }
     } catch (err: any) {
       setError(err.message ?? "Could not send reset email");
     } finally {
@@ -124,6 +141,8 @@ export default function LoginView() {
     setError("");
     setResetSent(false);
     setPassword("");
+    setRecoveryEmail("");
+    setPersonalResetLink(null);
   }
 
   return (
@@ -197,12 +216,28 @@ export default function LoginView() {
         <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
           {resetSent ? (
             <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center text-2xl">✉️</div>
-              <h2 className="font-display font-black text-gray-900 text-xl">Check your email</h2>
-              <p className="text-gray-500 text-sm font-display">
-                We sent a password reset link to the email address on your account.<br />
-                Click it to set a new password.
-              </p>
+              {personalResetLink ? (
+                <>
+                  <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center text-2xl">🔑</div>
+                  <h2 className="font-display font-black text-gray-900 text-xl">Reset your password</h2>
+                  <p className="text-gray-500 text-sm font-display">
+                    Click the button below to set a new password. This link is single-use and expires soon.
+                  </p>
+                  <a href={personalResetLink}
+                    className="w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 text-center block active:scale-95 transition-all shadow-lg shadow-purple-500/20 mt-1">
+                    Set new password →
+                  </a>
+                </>
+              ) : (
+                <>
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center text-2xl">✉️</div>
+                  <h2 className="font-display font-black text-gray-900 text-xl">Check your email</h2>
+                  <p className="text-gray-500 text-sm font-display">
+                    We sent a password reset link to the email address on your account.<br />
+                    Click it to set a new password.
+                  </p>
+                </>
+              )}
               <button type="button" onClick={() => switchMode("login")}
                 className="text-xs font-display font-bold text-orange-500 hover:text-orange-600 transition-colors mt-2">
                 ← Back to sign in
@@ -213,7 +248,7 @@ export default function LoginView() {
               <div>
                 <h2 className="font-display font-black text-gray-900 text-xl">Reset password 🔑</h2>
                 <p className="text-gray-500 text-sm font-display mt-0.5">
-                  Enter your username and we'll email you a reset link.
+                  Enter your username and we'll send a reset link.
                 </p>
               </div>
 
@@ -222,6 +257,18 @@ export default function LoginView() {
                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
                   placeholder="your username" autoFocus required autoCapitalize="none"
                   className={inputCls} />
+              </div>
+
+              <div>
+                <label className="text-xs font-display font-bold text-gray-600 mb-1 block">
+                  Recovery email <span className="text-gray-400 font-normal">(personal accounts only)</span>
+                </label>
+                <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)}
+                  placeholder="the email you registered with"
+                  className={inputCls} />
+                <p className="text-[10px] text-gray-400 font-display mt-1">
+                  Club accounts: leave blank — reset link goes to your registered email.
+                </p>
               </div>
 
               {error && (

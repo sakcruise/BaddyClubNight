@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Plus, Trash2, Link2, Check, Play, Users } from "lucide-react";
 import { useGroupStore, useSessionStore, useMemberStore } from "../store";
 import { groupsApi } from "../services/groups";
+import { supabase } from "../lib/supabase";
 import type { MemberType, Member, Session } from "../types";
 import { v4 as uuid } from "uuid";
 
@@ -29,10 +30,15 @@ export default function GroupDetailView() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(!isGuest() && !group);
   const [busy, setBusy] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Account users: pull the latest group + members from Supabase.
+  // Guests own all their local groups; signed-in users own groups where owner_id matches.
+  const isOwner = isGuest() || (!!currentUserId && group?.owner_id === currentUserId);
+
+  // Account users: pull current user ID + latest group + members from Supabase.
   useEffect(() => {
     if (isGuest() || !id) return;
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
     groupsApi.get(id)
       .then((g) => { if (g) upsertGroup(g); })
       .catch((e) => console.error("Failed to load group:", e))
@@ -158,30 +164,34 @@ export default function GroupDetailView() {
             {group.members.length} members · {group.num_courts} court{group.num_courts > 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={handleDeleteGroup}
-          className="p-2 rounded-xl bg-white/10 border border-white/20 text-white/70"
-          title="Delete group"
-        >
-          <Trash2 size={16} />
-        </button>
+        {isOwner && (
+          <button
+            onClick={handleDeleteGroup}
+            className="p-2 rounded-xl bg-white/10 border border-white/20 text-white/70"
+            title="Delete group"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </header>
 
       <main className="flex-1 overflow-y-auto px-5 pb-28 max-w-xl w-full mx-auto flex flex-col gap-4">
-        {/* Invite link */}
-        <div className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Link2 size={15} className="text-white" />
-            <span className="text-white font-display font-bold text-sm">Invite link</span>
+        {/* Invite link — only the group owner can share it */}
+        {isOwner && (
+          <div className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Link2 size={15} className="text-white" />
+              <span className="text-white font-display font-bold text-sm">Invite link</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-black/20 rounded-xl px-3 py-2 text-orange-100 text-xs font-mono truncate">{inviteLink}</div>
+              <button onClick={copyInvite}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-purple-600 font-display font-bold text-xs active:scale-95 transition-all">
+                {copied ? <><Check size={14} /> Copied</> : <>Copy</>}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-black/20 rounded-xl px-3 py-2 text-orange-100 text-xs font-mono truncate">{inviteLink}</div>
-            <button onClick={copyInvite}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-purple-600 font-display font-bold text-xs active:scale-95 transition-all">
-              {copied ? <><Check size={14} /> Copied</> : <>Copy</>}
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Members */}
         <div className="bg-white rounded-2xl p-4 shadow-lg shadow-black/10">

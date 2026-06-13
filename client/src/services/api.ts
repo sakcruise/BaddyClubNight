@@ -81,15 +81,19 @@ export const clubsApi = {
   },
 
   /** Create a clubs row after successful signup. */
-  create: async (userId: string, username: string, displayName: string, email: string) => {
+  create: async (userId: string, username: string, displayName: string, email: string, recoveryEmail?: string) => {
     const { error } = await supabase.from("clubs").insert({
       username: username.toLowerCase().trim(),
       display_name: displayName.trim(),
       email: email.trim(),
       user_id: userId,
+      ...(recoveryEmail ? { recovery_email: recoveryEmail.trim() } : {}),
     });
     if (error) throw new Error(error.message);
   },
+
+  /** Check if the auth email for a username is a synthetic personal-account address. */
+  isPersonalAccount: (email: string) => email.endsWith("@baddyapp.internal"),
 
   /** Fetch club profile for the currently logged-in user. */
   getOwn: async (): Promise<{ username: string; display_name: string; email: string } | null> => {
@@ -141,6 +145,22 @@ export const authApi = {
     await supabase.auth.signOut();
     localStorage.removeItem("offline-mode");
     localStorage.removeItem("offline-cached-at");
+  },
+
+  /**
+   * Password reset for personal/group accounts (which use a synthetic Supabase
+   * auth email). Verifies username + recovery email match, then returns a
+   * single-use reset link generated server-side via the Supabase admin API.
+   */
+  forgotPersonal: async (username: string, recoveryEmail: string): Promise<string> => {
+    const res = await fetch("/api/auth/forgot-personal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username.trim(), recovery_email: recoveryEmail.trim() }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message ?? "Could not generate reset link");
+    return json.reset_link as string;
   },
 };
 

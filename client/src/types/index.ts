@@ -70,6 +70,7 @@ export interface Group {
   num_courts: number;        // default 1 — small groups usually share one court
   themeKey: string;
   invite_token: string;      // basis for the shareable join link
+  owner_id?: string;         // Supabase auth user id of the organiser (undefined for local/guest groups)
   members: GroupMember[];
   created_at: string;
 }
