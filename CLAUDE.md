@@ -115,9 +115,11 @@ A second mode alongside clubs, for friends who organise ad-hoc games.
 - **Entry**: `ModeChooser` (shown when `useGroupStore.appMode === null`) → "Run a Club" or "Play with Friends".
 - **Model**: one logged-in person → many groups → each group has its own `GroupMember[]`. Persisted in `useGroupStore` ("group-store"). No fixed night; sessions are ad-hoc.
 - **Pages**: `pages/GroupsHomeView.tsx` (group list + create), `pages/GroupDetailView.tsx` (members, invite link, Start Session). Routes `/groups`, `/groups/:id`.
-- **Session re-scoping**: a group session is a normal `Session` carrying `group_id`. `api.ts isOffline()` returns true whenever the active session has a `group_id`, so the *entire* queue/court/match engine runs on local Zustand for groups — **no Supabase tables needed yet**. Start Session hydrates `useMemberStore` from the group's members, then opens the session.
-- **Future backend**: `supabase/migrations/003_groups.sql` documents the real schema (groups, group_members, expenses/shares/settlements, session_rsvps, + `group_id` on sessions/queue/matches). NOT YET APPLIED.
-- **v1 roadmap** (agreed): Core loop ✅ → Splitwise expenses → RSVP + reminders.
+- **Persistence (dual path)**: a signed-in **group account** (`account_type: 'group'` in Supabase user metadata) persists groups/members to Supabase via `services/groups.ts` (`groupsApi`). A **guest** (`localStorage 'friends-guest' === 'true'`, no account) stays on the local `useGroupStore`. Pages branch on `isGuest()`.
+- **Session re-scoping**: a group session is a normal `Session` carrying `group_id`. `api.ts isOffline()` returns true whenever the active session has a `group_id`, so the *entire* queue/court/match engine runs on local Zustand for groups. Start Session hydrates `useMemberStore` from the group's members, then opens the session.
+- **Invite / join**: `GroupDetailView` shows an invite link → `/groups/join/:token` (`JoinView`, a **public** route mounted outside `AuthGuard` in `App.tsx`). Join uses the `get_group_by_invite` / `join_group` SECURITY DEFINER RPCs; anon name-only joins are allowed.
+- **Backend**: migrations **003_groups.sql** (tables + RLS + RPCs) and **004_fix_group_rls.sql** (fixes 42P17 recursion via `is_group_owner`/`is_group_member` SECURITY DEFINER helpers) are **APPLIED**. Group RLS is owner-scoped + member-read.
+- **v1 roadmap** (agreed): Core loop ✅ → Supabase + invite/join ✅ → Splitwise expenses (next) → RSVP + reminders.
 
 ## Preview Server
 - Preview server ID: `bd895075-0b59-409b-b439-2a42c3139835` (port 5173)
