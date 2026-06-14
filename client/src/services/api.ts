@@ -612,6 +612,16 @@ export const matchesApi = {
       .single();
     return { match: rowToMatch(check(data, error)) };
   },
+
+  delete: async (matchId: string): Promise<void> => {
+    if (isOffline()) {
+      useMatchStore.getState().deleteMatch(matchId);
+      return;
+    }
+    const { error } = await supabase.from("matches").delete().eq("id", matchId);
+    if (error) throw new Error(error.message);
+    useMatchStore.getState().deleteMatch(matchId);
+  },
 };
 
 // ─── Sync (Pi only — pushes local SQLite data to Supabase after offline night) ─

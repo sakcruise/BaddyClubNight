@@ -267,6 +267,7 @@ interface MatchStore {
   setMatches: (m: Match[]) => void;
   addMatch: (m: Match) => void;
   updateMatch: (id: string, patch: Partial<Match>) => void;
+  deleteMatch: (id: string) => void;
 }
 
 export const useMatchStore = create<MatchStore>()(
@@ -279,6 +280,8 @@ export const useMatchStore = create<MatchStore>()(
         set((s) => ({
           matches: s.matches.map((m) => (m.id === id ? { ...m, ...patch } : m)),
         })),
+      deleteMatch: (id) =>
+        set((s) => ({ matches: s.matches.filter((m) => m.id !== id) })),
     }),
     { name: "match-store" }
   )

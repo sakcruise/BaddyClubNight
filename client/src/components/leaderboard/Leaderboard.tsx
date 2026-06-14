@@ -3,7 +3,7 @@ import { useMatchStore, useMemberStore } from "../../store";
 import { computeLeaderboard } from "../../utils/scoring";
 import { matchesApi } from "../../services/api";
 import Avatar from "../shared/Avatar";
-import { Trophy, List, Pencil, Check, X } from "lucide-react";
+import { Trophy, List, Pencil, Check, X, Trash2 } from "lucide-react";
 import ScoreInput from "../shared/ScoreInput";
 import type { Match } from "../../types";
 
@@ -148,14 +148,16 @@ function PairsEditor({ match, members, onSave, onCancel }: {
   );
 }
 
-function MatchRow({ match, members, onUpdated, matchNumber }: {
+function MatchRow({ match, members, onUpdated, onDeleted, matchNumber }: {
   match: Match;
   members: Record<string, import("../../types").Member>;
   onUpdated: (m: Match) => void;
+  onDeleted: () => void;
   matchNumber: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [editingPairs, setEditingPairs] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const hasScore = match.score_a != null && match.score_b != null;
   const rawTeamA = match.team_a.map((id) => members[id]).filter(Boolean);
@@ -182,6 +184,19 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
     const { match: updated } = await matchesApi.updateTeams(match.id, teamA, teamB);
     onUpdated(updated);
     setEditingPairs(false);
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Delete match #${matchNumber}? This can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      await matchesApi.delete(match.id);
+      onDeleted();
+    } catch (e: any) {
+      alert(`Couldn't delete match: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -224,6 +239,14 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
               ${editing ? "bg-orange-100 text-orange-600" : "hover:bg-gray-100 text-gray-400"}`}
           >
             <Pencil size={13} />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Delete match"
+            className="p-1.5 rounded-lg transition-colors flex-shrink-0 hover:bg-red-50 text-gray-300 hover:text-red-500 disabled:opacity-40"
+          >
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
@@ -280,7 +303,7 @@ function MatchRow({ match, members, onUpdated, matchNumber }: {
 }
 
 export default function Leaderboard() {
-  const { matches, updateMatch } = useMatchStore();
+  const { matches, updateMatch, deleteMatch } = useMatchStore();
   const { members } = useMemberStore();
   const [tab, setTab] = useState<Tab>("standings");
 
@@ -399,6 +422,7 @@ export default function Leaderboard() {
                 members={members}
                 matchNumber={completedMatches.length - idx}
                 onUpdated={(updated) => updateMatch(match.id, updated)}
+                onDeleted={() => deleteMatch(match.id)}
               />
             ))}
           </div>
