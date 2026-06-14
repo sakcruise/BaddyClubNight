@@ -77,9 +77,10 @@ export default function MainView() {
   useEffect(() => {
     if (!session) return;
 
-    // In offline mode, trust the persisted Zustand stores — skip all Supabase calls.
+    // In offline mode OR for group sessions (which run entirely on local Zustand),
+    // trust the persisted stores — skip all Supabase calls.
     // Courts may not be in store after a hard refresh, so rebuild them from persisted matches.
-    const offline = localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
+    const offline = localStorage.getItem("offline-mode") === "true" || !navigator.onLine || !!session.group_id;
     if (offline) {
       const pendingByCourt = Object.fromEntries(
         matches.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
