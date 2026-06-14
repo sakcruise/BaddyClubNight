@@ -27,6 +27,7 @@ export default function GroupsHomeView() {
   const navigate = useNavigate();
   const { groups, createGroup, setGroups, setAppMode } = useGroupStore();
   const displayName = useAuthStore((s) => s.displayName);
+  const adminName = useAuthStore((s) => s.adminName);
   const isGuest = localStorage.getItem("friends-guest") === "true";
   const [loading, setLoading] = useState(!isGuest);
 
@@ -94,7 +95,8 @@ export default function GroupsHomeView() {
     if (!name.trim() || saving) return;
     setSaving(true);
     try {
-      const ownerName = displayName?.trim() || "Me";
+      // Prefer adminName (personal name) over displayName which may be a club name
+      const ownerName = adminName?.trim() || displayName?.trim() || "Me";
       if (isGuest) {
         const g = createGroup(name, { num_courts: courts });
         useGroupStore.getState().addGroupMember(g.id, ownerName);
