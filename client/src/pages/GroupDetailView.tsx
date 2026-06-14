@@ -409,6 +409,12 @@ export default function GroupDetailView() {
                     className="flex items-center gap-1.5 text-xs font-display font-bold text-purple-500 py-1">
                     {copiedSession === nextSession.id ? <><Check size={12} />Copied!</> : <><Share2 size={12} />Share RSVP link</>}
                   </button>
+                  {nextSession.status === "active" && (
+                    <button onClick={() => navigate("/")}
+                      className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-500 text-white font-display font-black text-sm active:scale-95 transition-all shadow-md shadow-green-500/30">
+                      <Play size={14} /> Enter session
+                    </button>
+                  )}
                   {isOwner && nextSession.status === "upcoming" && (
                     <button onClick={() => handleActivateSession(nextSession)}
                       className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 text-white font-display font-black text-sm active:scale-95 transition-all shadow-md shadow-purple-500/30">
