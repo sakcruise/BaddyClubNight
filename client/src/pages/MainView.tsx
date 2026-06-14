@@ -14,6 +14,7 @@ import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
+import { groupsApi } from "../services/groups";
 import { X, Users, Cog, LogOut, History, LayoutGrid, ListOrdered, Trophy, Menu, Maximize2, Minimize2 } from "lucide-react";
 
 type Drawer = "members" | "settings" | "menu" | null;
@@ -161,17 +162,27 @@ export default function MainView() {
   async function confirmEndNight() {
     if (!session) return;
     setEnding(true);
+    const isGroupSession = !!session.group_id;
+    const sessionId = session.id;
     try {
       // Archive locally BEFORE clearing state.
       // Offline: this is the only copy. Online: belt-and-braces so History works immediately.
       archiveSession({ ...session, status: "ended" }, matches);
 
-      await sessionsApi.end(session.id);
+      await sessionsApi.end(sessionId);
       setShowCheers(false);
       endSession();                                                // session + courts → empty
       setMatches([]);                                             // clear persisted match history
       setQueue([]);                                               // clear queue
       useQueueStore.getState().setActiveMemberIds(new Set());     // clear on-court players
+
+      // For group sessions, sessionsApi.end() skips Supabase (offline guard).
+      // Update the DB status so the session drops off the upcoming/active list.
+      if (isGroupSession) {
+        groupsApi.endSession(sessionId).catch((e) =>
+          console.warn("Could not mark group session as completed in Supabase:", e)
+        );
+      }
     } catch (err: any) {
       console.error("End night failed:", err);
       setShowCheers(false);

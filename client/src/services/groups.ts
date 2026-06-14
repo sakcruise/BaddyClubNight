@@ -207,6 +207,15 @@ export const groupsApi = {
     if (error) throw new Error(error.message);
   },
 
+  /** Mark a group session as completed so it drops off the upcoming list. */
+  endSession: async (sessionId: string): Promise<void> => {
+    const { error } = await supabase
+      .from("sessions")
+      .update({ status: "completed" })
+      .eq("id", sessionId);
+    if (error) throw new Error(error.message);
+  },
+
   /** Set RSVP for the current user's group member record. */
   rsvp: async (sessionId: string, memberId: string, status: "yes" | "no" | "maybe"): Promise<void> => {
     const { error } = await supabase
