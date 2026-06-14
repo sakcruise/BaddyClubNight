@@ -541,7 +541,7 @@ export const matchesApi = {
         result: "pending",
         started_at: new Date().toISOString(),
       };
-      useMatchStore.getState().addMatch(match);
+      // Do NOT call addMatch here — callers (PlayerPicker, CheckInPanel) do it after receiving the match.
       return { match };
     }
     const clubId = await getClubId();

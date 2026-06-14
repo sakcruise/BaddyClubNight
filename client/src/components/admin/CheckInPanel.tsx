@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
 import { membersApi, queueApi, matchesApi } from "../../services/api";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../../store";
@@ -244,8 +244,6 @@ export default function CheckInPanel() {
 
   const [shoutPhase, setShoutPhase] = useState(0);
   const [muted, setMuted] = useState(false);
-  const mutedRef = useRef(false);
-  mutedRef.current = muted;
 
   const firstName = firstMember?.name.split(" ")[0] ?? "";
   const courtId   = freeCourt?.id ?? 0;
@@ -278,20 +276,20 @@ export default function CheckInPanel() {
     return () => clearInterval(iv);
   }, [readyToGo, firstMember?.id, freeCourt?.id, isPicking]);
 
-  // Speech — debounced 120ms to absorb React StrictMode double-invoke
-  // Uses mutedRef so the timeout callback always sees the latest muted value
+  // Speech — debounced 120ms to absorb React StrictMode double-invoke.
+  // `muted` is a dep so toggling it re-runs the effect: cleanup cancels any
+  // in-flight timer and current speech before the new effect runs.
   useEffect(() => {
-    if (!readyToGo || !firstMember || isPicking || !("speechSynthesis" in window)) return;
+    if (!readyToGo || !firstMember || isPicking || muted || !("speechSynthesis" in window)) return;
     const text = SPEECHES[shoutPhase];
     const t = setTimeout(() => {
-      if (mutedRef.current) return;
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
       utt.rate = 0.78; utt.pitch = 1.2; utt.volume = 1;
       window.speechSynthesis.speak(utt);
     }, 120);
     return () => { clearTimeout(t); window.speechSynthesis.cancel(); };
-  }, [shoutPhase, readyToGo, firstMember?.id, isPicking]);
+  }, [shoutPhase, readyToGo, firstMember?.id, isPicking, muted]);
 
   function handleReorder(newOrder: QueuePosition[]) {
     reorderQueue(newOrder);
@@ -591,8 +589,7 @@ export default function CheckInPanel() {
               <ShoutingAvatar memberType={firstMember.member_type as any} name={firstMember.name} phase={shoutPhase} />
               <button
                 onClick={() => {
-                  const next = !mutedRef.current;
-                  mutedRef.current = next;
+                  const next = !muted;
                   setMuted(next);
                   if (next) window.speechSynthesis?.cancel();
                 }}
