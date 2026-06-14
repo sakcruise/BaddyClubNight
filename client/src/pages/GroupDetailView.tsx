@@ -53,7 +53,7 @@ export default function GroupDetailView() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { groups, addGroupMember, removeGroupMember, deleteGroup, upsertGroup, setGroups } = useGroupStore();
-  const { setSession, setCourts } = useSessionStore();
+  const { setSession, setCourts, session: activeSession } = useSessionStore();
   const { setMembers } = useMemberStore();
 
   const group = groups.find((g) => g.id === id);
@@ -306,6 +306,20 @@ export default function GroupDetailView() {
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 pb-28 max-w-xl w-full mx-auto flex flex-col gap-3">
+
+        {/* Resume active session banner */}
+        {activeSession?.group_id === id && activeSession?.status === "active" && (
+          <button
+            onClick={() => navigate("/")}
+            className="w-full flex items-center gap-3 bg-green-500 text-white rounded-2xl px-4 py-3 shadow-lg shadow-green-500/30 active:scale-95 transition-all"
+          >
+            <Play size={18} className="flex-shrink-0" />
+            <div className="flex-1 text-left">
+              <p className="font-display font-black text-sm leading-tight">Session in progress</p>
+              <p className="text-green-100 text-xs font-display">Tap to resume courts &amp; scores →</p>
+            </div>
+          </button>
+        )}
 
         {/* ── SESSION HERO ── */}
         {nextSession ? (() => {

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Users, ChevronRight, X, LogOut, Calendar, Clock, Zap } from "lucide-react";
-import { useGroupStore, useAuthStore } from "../store";
+import { Plus, Users, ChevronRight, X, LogOut, Calendar, Clock, Zap, Play } from "lucide-react";
+import { useGroupStore, useAuthStore, useSessionStore } from "../store";
 import { authApi } from "../services/api";
 import { groupsApi } from "../services/groups";
 import { supabase } from "../lib/supabase";
@@ -28,6 +28,7 @@ export default function GroupsHomeView() {
   const { groups, createGroup, setGroups, setAppMode } = useGroupStore();
   const displayName = useAuthStore((s) => s.displayName);
   const adminName = useAuthStore((s) => s.adminName);
+  const activeSession = useSessionStore((s) => s.session);
   const isGuest = localStorage.getItem("friends-guest") === "true";
   const [loading, setLoading] = useState(!isGuest);
 
@@ -149,6 +150,22 @@ export default function GroupsHomeView() {
           </button>
         </div>
       </header>
+
+      {/* Resume active session banner */}
+      {activeSession?.group_id && activeSession.status === "active" && (
+        <div className="px-5 max-w-xl w-full mx-auto pt-1">
+          <button
+            onClick={() => navigate("/")}
+            className="w-full flex items-center gap-3 bg-green-500 text-white rounded-2xl px-4 py-3 shadow-lg shadow-green-500/30 active:scale-95 transition-all"
+          >
+            <Play size={18} className="flex-shrink-0" />
+            <div className="flex-1 text-left">
+              <p className="font-display font-black text-sm leading-tight">Session in progress</p>
+              <p className="text-green-100 text-xs font-display">Tap to resume courts &amp; scores →</p>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Group list */}
       <main className="flex-1 overflow-y-auto px-5 pb-28 max-w-xl w-full mx-auto">
