@@ -121,3 +121,8 @@
 .score-pop {
   animation: scorePopIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
 }
+
+/* Respect the iOS/Android home-bar inset on the bottom tab nav */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

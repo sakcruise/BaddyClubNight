@@ -67,13 +67,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Friends-group "guest" mode runs entirely locally (no Supabase) — let them in
-    // without a club login.
-    if (localStorage.getItem("friends-guest") === "true") {
-      setStatus("ok");
-      return;
-    }
-
     // If offline flag is set and we have a cached token, let them in
     const offlineMode = localStorage.getItem("offline-mode") === "true";
     if (offlineMode && token) {

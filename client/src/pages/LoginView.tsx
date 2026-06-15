@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { clubsApi, authApi } from "../services/api";
-import { useGroupStore } from "../store";
 import { Building2, Users } from "lucide-react";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import SetupView from "./SetupView";
@@ -37,14 +36,6 @@ export default function LoginView() {
   const btnCls   = "w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30";
 
   if (showSetup) return <SetupView accountType={setupType} onBack={() => { setShowSetup(false); setChooseType(true); }} />;
-
-  // ── Play with friends (no account) ─────────────────────────────────────────
-  // Friends-group mode is fully local, so it needs no Supabase login.
-  function enterFriends() {
-    localStorage.setItem("friends-guest", "true");
-    useGroupStore.getState().setAppMode("friends");
-    window.location.href = window.location.origin + "/groups";
-  }
 
   // ── Account type chooser (shown before account creation) ───────────────────
   if (chooseType) {
@@ -203,11 +194,6 @@ export default function LoginView() {
               New here? Create a free account →
             </button>
           </div>
-
-          <button type="button" onClick={enterFriends}
-            className="w-full py-3 rounded-2xl font-display font-black text-purple-700 text-sm bg-purple-50 border-2 border-purple-200 hover:bg-purple-100 active:scale-95 transition-all">
-            🏸 Just exploring? Continue as guest →
-          </button>
         </form>
       )}
 

@@ -1,13 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Plus, Trash2, Link2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, UserPlus } from "lucide-react";
+import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck } from "lucide-react";
 import { useGroupStore, useSessionStore, useMemberStore, useAuthStore } from "../store";
 import { groupsApi } from "../services/groups";
 import { supabase } from "../lib/supabase";
-import type { MemberType, Member, Session, GroupSession } from "../types";
+import type { MemberType, Member, Session, GroupSession, Match } from "../types";
 import { v4 as uuid } from "uuid";
+import { computeLeaderboard } from "../utils/scoring";
 import SessionScheduleModal from "../components/groups/SessionScheduleModal";
+import InviteMembers from "../components/groups/InviteMembers";
+
+/** Map a Supabase matches row → Match (mirrors the api.ts mapper, used for group stats). */
+function rowToMatch(m: any): Match {
+  return {
+    id: m.id,
+    session_id: m.session_id,
+    court_id: m.court_id,
+    team_a: [m.team_a_1, m.team_a_2],
+    team_b: [m.team_b_1, m.team_b_2],
+    score_a: m.score_a ?? undefined,
+    score_b: m.score_b ?? undefined,
+    shuttles_used: m.shuttles_used ?? undefined,
+    result: m.result,
+    started_at: m.started_at,
+    ended_at: m.ended_at ?? undefined,
+  };
+}
 
 const TYPE_DOT: Record<MemberType, string> = {
   male: "bg-blue-500",
@@ -15,7 +34,6 @@ const TYPE_DOT: Record<MemberType, string> = {
   guest: "bg-purple-500",
 };
 
-const isGuest = () => localStorage.getItem("friends-guest") === "true";
 
 function getCountdown(iso: string): string {
   const diff = new Date(iso).getTime() - Date.now();
@@ -52,17 +70,13 @@ function formatScheduled(iso: string) {
 export default function GroupDetailView() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { groups, addGroupMember, removeGroupMember, deleteGroup, upsertGroup, setGroups } = useGroupStore();
+  const { groups, upsertGroup, setGroups } = useGroupStore();
   const { setSession, setCourts, session: activeSession } = useSessionStore();
   const { setMembers } = useMemberStore();
 
   const group = groups.find((g) => g.id === id);
 
-  const [newName, setNewName]           = useState("");
-  const [newType, setNewType]           = useState<MemberType>("male");
-  const [copied, setCopied]             = useState(false);
-  const [loading, setLoading]           = useState(!isGuest() && !group);
-  const [busy, setBusy]                 = useState(false);
+  const [loading, setLoading]           = useState(!group);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showModal, setShowModal]       = useState(false);
   const [modalBusy, setModalBusy]       = useState(false);
@@ -71,22 +85,19 @@ export default function GroupDetailView() {
   const [copiedSession, setCopiedSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<GroupSession | null>(null);
   const [editBusy, setEditBusy] = useState(false);
-  const [authLoaded, setAuthLoaded] = useState(isGuest()); // guests skip auth check
+  const [groupMatches, setGroupMatches] = useState<Match[]>([]);
+  const [sessionsPlayed, setSessionsPlayed] = useState(0);
 
   useCountdownTick(); // re-renders every second to keep countdowns live
 
-  // For Supabase-backed groups (have owner_id), only the UUID owner sees controls.
-  // For local guest groups (no owner_id), the guest user is the owner.
-  const isOwner = group?.owner_id
-    ? (!!currentUserId && group.owner_id === currentUserId)
-    : isGuest();
+  // Only the group's owner (the signed-in UUID matching owner_id) sees controls.
+  const isOwner = !!currentUserId && group?.owner_id === currentUserId;
   const displayName = useAuthStore((s) => s.displayName);
 
   useEffect(() => {
-    if (isGuest() || !id) return;
+    if (!id) return;
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id ?? null);
-      setAuthLoaded(true);
     });
     groupsApi.get(id)
       .then((g) => { if (g) upsertGroup(g); })
@@ -95,10 +106,29 @@ export default function GroupDetailView() {
     // Load upcoming sessions and my member id
     groupsApi.listSessions(id).then(setUpcomingSessions).catch((e) => console.error("listSessions failed:", e));
     groupsApi.myMemberId(id).then(setMyMemberId).catch((e) => console.error("myMemberId failed:", e));
+    // Lifetime stats: all matches + how many sessions have been played
+    supabase.from("matches").select("*").eq("group_id", id)
+      .then(({ data }) => setGroupMatches((data ?? []).map(rowToMatch)))
+      .then(undefined, (e) => console.error("group matches failed:", e));
+    supabase.from("sessions").select("id", { count: "exact", head: true })
+      .eq("group_id", id).in("status", ["completed", "ended"])
+      .then(({ count }) => setSessionsPlayed(count ?? 0))
+      .then(undefined, (e) => console.error("sessions count failed:", e));
   }, [id]);
 
+  // Mini leaderboard from completed group matches (names resolved from the roster).
+  const completedMatches = useMemo(() => groupMatches.filter((m) => m.result === "complete"), [groupMatches]);
+  const topPlayers = useMemo(() => {
+    if (!group || completedMatches.length === 0) return [];
+    const roster: Record<string, Member> = {};
+    group.members.forEach((m) => {
+      roster[m.id] = { id: m.id, name: m.name, member_type: m.member_type, email: "", created_at: m.created_at };
+    });
+    return computeLeaderboard(completedMatches, roster).slice(0, 3);
+  }, [completedMatches, group]);
+
   async function refresh() {
-    if (isGuest() || !id) return;
+    if (!id) return;
     const g = await groupsApi.get(id);
     if (g) upsertGroup(g);
   }
@@ -131,33 +161,7 @@ export default function GroupDetailView() {
 
   const inviteLink = `${window.location.origin}/groups/join/${group.invite_token}`;
 
-  function copyInvite() {
-    navigator.clipboard?.writeText(inviteLink).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    });
-  }
-
-  async function handleAdd() {
-    if (!newName.trim() || busy) return;
-    setBusy(true);
-    try {
-      if (isGuest()) {
-        addGroupMember(group!.id, newName, newType);
-      } else {
-        await groupsApi.addMember(group!.id, newName, newType);
-        await refresh();
-      }
-      setNewName("");
-    } catch (e: any) {
-      alert(`Couldn't add member: ${e?.message ?? "unknown error"}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleRemoveMember(memberId: string) {
-    if (isGuest()) { removeGroupMember(group!.id, memberId); return; }
     try {
       await groupsApi.removeMember(memberId);
       await refresh();
@@ -168,7 +172,6 @@ export default function GroupDetailView() {
 
   async function handleDeleteGroup() {
     if (!confirm(`Delete "${group!.name}"? This can't be undone.`)) return;
-    if (isGuest()) { deleteGroup(group!.id); navigate("/groups"); return; }
     try {
       await groupsApi.remove(group!.id);
       setGroups(useGroupStore.getState().groups.filter((g) => g.id !== group!.id));
@@ -209,11 +212,6 @@ export default function GroupDetailView() {
   }) {
     setModalBusy(true);
     try {
-      if (isGuest()) {
-        setShowModal(false);
-        launchSession(undefined, num_courts, venue, scheduled_at);
-        return;
-      }
       if (startNow) {
         // Create active session directly
         const s = await groupsApi.createSession(group!.id, group!.name, {
@@ -320,6 +318,21 @@ export default function GroupDetailView() {
             </div>
           </button>
         )}
+
+        {/* ── STATS STRIP ── */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { icon: <Users size={16} />, value: group.members.length, label: group.members.length === 1 ? "Member" : "Members", grad: "from-purple-500 to-purple-400" },
+            { icon: <CalendarCheck size={16} />, value: sessionsPlayed, label: sessionsPlayed === 1 ? "Session" : "Sessions", grad: "from-blue-500 to-blue-400" },
+            { icon: <Swords size={16} />, value: completedMatches.length, label: completedMatches.length === 1 ? "Game" : "Games", grad: "from-orange-500 to-orange-400" },
+          ].map((s, i) => (
+            <div key={i} className={`rounded-2xl bg-gradient-to-br ${s.grad} p-3 text-white shadow-lg shadow-black/10 flex flex-col gap-1`}>
+              <div className="opacity-80">{s.icon}</div>
+              <div className="font-display font-black text-2xl leading-none tabular-nums">{s.value}</div>
+              <div className="text-[10px] font-display font-bold uppercase tracking-wider opacity-80">{s.label}</div>
+            </div>
+          ))}
+        </div>
 
         {/* ── SESSION HERO ── */}
         {nextSession ? (() => {
@@ -460,6 +473,33 @@ export default function GroupDetailView() {
           </div>
         )}
 
+        {/* ── TOP PLAYERS ── */}
+        {topPlayers.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-lg shadow-black/10 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+              <Trophy size={15} className="text-amber-500" />
+              <span className="font-display font-black text-gray-900 text-sm">Top Players</span>
+              <span className="ml-auto text-[10px] font-display font-bold text-gray-400 uppercase tracking-wider">all time</span>
+            </div>
+            <div className="px-3 pb-3 flex flex-col gap-1.5">
+              {topPlayers.map((p, idx) => {
+                const medal = ["🥇", "🥈", "🥉"][idx];
+                return (
+                  <div key={p.member_id} className="flex items-center gap-3 px-2 py-2 rounded-xl bg-gray-50">
+                    <span className="text-lg w-6 text-center">{medal}</span>
+                    <span className={`w-8 h-8 rounded-full ${TYPE_DOT[p.member?.member_type ?? "male"]} flex items-center justify-center text-white font-display font-black text-xs flex-shrink-0`}>
+                      {(p.member?.name ?? "?").charAt(0).toUpperCase()}
+                    </span>
+                    <span className="flex-1 font-display font-bold text-gray-800 text-sm truncate">{p.member?.name ?? "Unknown"}</span>
+                    <span className="badge bg-green-100 text-green-700 text-xs px-2 py-0.5 font-black">{p.wins}W</span>
+                    <span className="badge bg-gray-200 text-gray-500 text-xs px-2 py-0.5 font-black">{p.matches_played} GP</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── MEMBERS ── */}
         <div className="bg-white rounded-3xl shadow-lg shadow-black/10 overflow-hidden">
           <div className="flex items-center gap-2 px-4 pt-4 pb-3">
@@ -497,62 +537,16 @@ export default function GroupDetailView() {
               </div>
             ))}
             {group.members.length === 0 && (
-              <p className="text-gray-400 text-sm font-display text-center py-6">No members yet.</p>
+              <p className="text-gray-400 text-sm font-display text-center py-6">
+                Just you so far — invite friends below.
+              </p>
             )}
           </div>
-
-          {/* Add member (owner only) */}
-          {isOwner && (
-            <div className="border-t border-gray-100 px-4 py-3 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                  placeholder="Add a member…"
-                  className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 font-display font-bold text-gray-900 text-sm focus:outline-none focus:border-purple-400 transition-colors" />
-                <button onClick={handleAdd} disabled={!newName.trim()}
-                  className="px-3 rounded-xl bg-purple-600 text-white disabled:opacity-40 active:scale-95 transition-all">
-                  <Plus size={18} />
-                </button>
-              </div>
-              <div className="flex gap-1.5">
-                {(["male", "female", "guest"] as MemberType[]).map((t) => (
-                  <button key={t} onClick={() => setNewType(t)}
-                    className={`flex-1 h-8 rounded-lg font-display font-bold text-xs capitalize transition-all border-2 flex items-center justify-center gap-1.5
-                      ${newType === t ? "border-purple-400 bg-purple-50 text-purple-700" : "border-gray-200 text-gray-500"}`}>
-                    <span className={`w-2 h-2 rounded-full ${TYPE_DOT[t]}`} /> {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* ── INVITE LINK (owner) ── */}
-        {isOwner && (
-          <div className="bg-white/10 border border-white/20 rounded-2xl px-4 py-3 flex items-center gap-3">
-            <Link2 size={15} className="text-white/70 flex-shrink-0" />
-            <span className="flex-1 text-white/60 text-xs font-mono truncate">{inviteLink}</span>
-            <button onClick={copyInvite}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-purple-600 font-display font-bold text-xs active:scale-95 transition-all flex-shrink-0">
-              {copied ? <><Check size={12} />Copied</> : <>Copy</>}
-            </button>
-          </div>
-        )}
+        {/* ── INVITE MEMBERS (owner) ── */}
+        {isOwner && <InviteMembers inviteLink={inviteLink} groupName={group.name} variant="dark" />}
 
-        {/* ── CREATE ACCOUNT NUDGE ── */}
-        {authLoaded && !currentUserId && !isOwner && (
-          <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-start gap-3">
-            <UserPlus size={18} className="text-white/70 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-display font-black text-white text-sm">Track your games</p>
-              <p className="text-white/50 text-xs font-display mt-0.5">Create a free account to RSVP and see match history.</p>
-              <button onClick={() => { localStorage.removeItem("friends-guest"); window.location.href = "/"; }}
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-purple-700 font-display font-black text-xs active:scale-95 transition-all">
-                <UserPlus size={12} /> Create account
-              </button>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* Bottom button — owner only */}

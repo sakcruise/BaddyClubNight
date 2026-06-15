@@ -58,21 +58,25 @@ export default function OfflineMode() {
     setCaching(true);
     setMsg("");
     try {
-      // Pull members from Supabase into Zustand (already persisted to localStorage)
-      const { data: members, error } = await supabase
-        .from("members")
-        .select("*")
-        .neq("member_type", "guest");
-      if (error) throw error;
+      // For a group session the roster is already hydrated in the member store
+      // (loaded from group_members at session start), so there's nothing to pull
+      // from the club `members` table — doing so would WIPE the group roster.
+      if (!session?.group_id) {
+        const { data: members, error } = await supabase
+          .from("members")
+          .select("*")
+          .neq("member_type", "guest");
+        if (error) throw error;
 
-      setMembers((members ?? []).map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        email: m.email ?? "",
-        avatar_url: m.avatar_url ?? undefined,
-        member_type: m.member_type ?? "male",
-        created_at: m.created_at,
-      })));
+        setMembers((members ?? []).map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          email: m.email ?? "",
+          avatar_url: m.avatar_url ?? undefined,
+          member_type: m.member_type ?? "male",
+          created_at: m.created_at,
+        })));
+      }
 
       localStorage.setItem("offline-mode", "true");
       localStorage.setItem("offline-cached-at", new Date().toISOString());
@@ -117,10 +121,15 @@ export default function OfflineMode() {
       for (const entry of toSync) {
         if (!entry.session) continue;
 
+        // Scope each row by group_id for group sessions, club_id for club sessions.
+        const scope = entry.session.group_id
+          ? { group_id: entry.session.group_id }
+          : { club_id: clubId };
+
         // Upsert session row
         await supabase.from("sessions").upsert([{
           id: entry.session.id,
-          club_id: clubId,
+          ...scope,
           club_name: entry.session.club_name,
           date: entry.session.date,
           num_courts: entry.session.num_courts,
@@ -133,7 +142,7 @@ export default function OfflineMode() {
           await supabase.from("matches").upsert(
             entry.matches.map((m) => ({
               id: m.id,
-              club_id: clubId,
+              ...scope,
               session_id: m.session_id,
               court_id: m.court_id,
               team_a_1: m.team_a[0],

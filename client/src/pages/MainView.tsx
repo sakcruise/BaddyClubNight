@@ -12,6 +12,8 @@ import OnboardingTour from "../components/shared/OnboardingTour";
 import EndNightCheers from "../components/shared/EndNightCheers";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
+import GroupSettings from "../components/groups/GroupSettings";
+import GroupMemberManager from "../components/groups/GroupMemberManager";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
 import { groupsApi } from "../services/groups";
@@ -77,30 +79,57 @@ export default function MainView() {
 
   useEffect(() => {
     if (!session) return;
+    const groupId = session.group_id;
+    const numCourts = session.num_courts;
+    const sid = session.id;
 
-    // In offline mode OR for group sessions (which run entirely on local Zustand),
-    // trust the persisted stores — skip all Supabase calls.
-    // Courts may not be in store after a hard refresh, so rebuild them from persisted matches.
-    const offline = localStorage.getItem("offline-mode") === "true" || !navigator.onLine || !!session.group_id;
-    if (offline) {
+    // Rebuild courts + on-court players from a set of matches.
+    function applyMatches(ms: typeof matches) {
       const pendingByCourt = Object.fromEntries(
-        matches.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
+        ms.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
       );
-      setCourts(Array.from({ length: session.num_courts }, (_, i) => {
+      setCourts(Array.from({ length: numCourts }, (_, i) => {
         const id = i + 1;
         return pendingByCourt[id]
           ? { id, status: "playing" as const, current_match_id: pendingByCourt[id] }
           : { id, status: "idle" as const };
       }));
-      const activePlayers = new Set<string>(
-        matches.filter((m) => m.result === "pending").flatMap((m) => [...m.team_a, ...m.team_b])
+      useQueueStore.getState().setActiveMemberIds(
+        new Set(ms.filter((m) => m.result === "pending").flatMap((m) => [...m.team_a, ...m.team_b]))
       );
-      useQueueStore.getState().setActiveMemberIds(activePlayers);
+    }
+
+    // Local engine: explicit offline or no network. Trust persisted stores, rebuild locally.
+    if (localStorage.getItem("offline-mode") === "true" || !navigator.onLine) {
+      applyMatches(matches);
       return;
     }
 
     async function load() {
       try {
+        if (groupId) {
+          // ── Group session (online) ──
+          // Roster comes from the group, not the club members table. Trust the
+          // active Zustand session — never call the club-scoped current(), which
+          // would return null for a group and wipe the live session.
+          const g = await groupsApi.get(groupId);
+          if (g) {
+            useGroupStore.getState().upsertGroup(g); // keep Settings/Members drawers in sync
+            setMembers(g.members.map((m) => ({
+              id: m.id, name: m.name, member_type: m.member_type, email: "", created_at: m.created_at,
+            })));
+          }
+          const [queueRes, matchesRes] = await Promise.all([
+            queueApi.get(sid),
+            matchesApi.list(sid),
+          ]);
+          setQueue(queueRes.queue);
+          setMatches(matchesRes.matches);
+          applyMatches(matchesRes.matches);
+          return;
+        }
+
+        // ── Club session (online) ──
         const [membersRes, sessionRes] = await Promise.all([
           membersApi.list(),
           sessionsApi.current(),
@@ -123,20 +152,7 @@ export default function MainView() {
         ]);
         setQueue(queueRes.queue);
         setMatches(matchesRes.matches);
-        const pendingByCourt = Object.fromEntries(
-          matchesRes.matches.filter((m) => m.result === "pending").map((m) => [m.court_id, m.id])
-        );
-        const numCourts = sessionRes.session.num_courts;
-        setCourts(Array.from({ length: numCourts }, (_, i) => {
-          const id = i + 1;
-          return pendingByCourt[id]
-            ? { id, status: "playing" as const, current_match_id: pendingByCourt[id] }
-            : { id, status: "idle" as const };
-        }));
-        const activePlayers = new Set(
-          matchesRes.matches.filter((m) => m.result === "pending").flatMap((m) => [...m.team_a, ...m.team_b])
-        );
-        useQueueStore.getState().setActiveMemberIds(activePlayers);
+        applyMatches(matchesRes.matches);
       } catch (err) {
         console.error("Failed to restore session state:", err);
         // Don't clear state on transient errors (network blip etc.)
@@ -176,8 +192,9 @@ export default function MainView() {
       setQueue([]);                                               // clear queue
       useQueueStore.getState().setActiveMemberIds(new Set());     // clear on-court players
 
-      // For group sessions, sessionsApi.end() skips Supabase (offline guard).
-      // Update the DB status so the session drops off the upcoming/active list.
+      // Belt-and-braces for the offline-group case: if Work Offline was on,
+      // sessionsApi.end() only touched Zustand, so make sure the DB session is
+      // marked done (no-op when online, since end() already set status there).
       if (isGroupSession) {
         groupsApi.endSession(sessionId).catch((e) =>
           console.warn("Could not mark group session as completed in Supabase:", e)
@@ -200,7 +217,7 @@ export default function MainView() {
   ];
 
   return (
-    <div className="h-screen flex flex-col relative overflow-hidden"
+    <div className="h-screen h-[100dvh] flex flex-col relative overflow-hidden"
       style={{ background: "linear-gradient(160deg, rgb(var(--p-50)) 0%, rgb(var(--p-100)) 50%, rgb(var(--p-100)) 100%)" }}>
 
       {/* ── Header ── */}
@@ -253,20 +270,16 @@ export default function MainView() {
                 bg-white/15 text-white hover:bg-white/25 border border-white/20 transition-all">
               <History size={13} /> History
             </button>
-            {!session.group_id && (
-              <>
-                <button onClick={() => setDrawer(drawer === "members" ? null : "members")}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
-                    ${drawer === "members" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
-                  <Users size={13} /> Members
-                </button>
-                <button onClick={() => setDrawer(drawer === "settings" ? null : "settings")}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
-                    ${drawer === "settings" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
-                  <Cog size={13} /> Settings
-                </button>
-              </>
-            )}
+            <button onClick={() => setDrawer(drawer === "members" ? null : "members")}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
+                ${drawer === "members" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
+              <Users size={13} /> Members
+            </button>
+            <button onClick={() => setDrawer(drawer === "settings" ? null : "settings")}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
+                ${drawer === "settings" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
+              <Cog size={13} /> Settings
+            </button>
             <button onClick={toggleFullscreen}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/15 border border-white/20
                 text-white text-xs font-display font-bold hover:bg-white/25 active:scale-95 transition-all"
@@ -387,14 +400,18 @@ export default function MainView() {
 
       {/* ── Mobile bottom tab bar ── */}
       <nav className="md:hidden flex-shrink-0 flex border-t border-gray-200 bg-white safe-area-pb">
-        {mobileTabs.map((tab) => (
-          <button key={tab.id} onClick={() => setMobileTab(tab.id)}
-            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors
-              ${mobileTab === tab.id ? "text-orange-600" : "text-gray-400"}`}>
-            {tab.icon}
-            <span className="text-[10px] font-display font-bold">{tab.label}</span>
-          </button>
-        ))}
+        {mobileTabs.map((tab) => {
+          const active = mobileTab === tab.id;
+          return (
+            <button key={tab.id} onClick={() => setMobileTab(tab.id)}
+              className={`relative flex-1 flex flex-col items-center justify-center pt-2.5 pb-2 gap-1 transition-colors
+                ${active ? "text-orange-600" : "text-gray-400"}`}>
+              {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-orange-500" />}
+              {tab.icon}
+              <span className="text-[11px] font-display font-bold leading-none">{tab.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* ── Onboarding Tour (club only — its copy is club-specific) ── */}
@@ -445,18 +462,14 @@ export default function MainView() {
                     className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
                     <History size={18} className="text-orange-500" /> Session History
                   </button>
-                  {!session.group_id && (
-                    <>
-                      <button onClick={() => setDrawer("members")}
-                        className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
-                        <Users size={18} className="text-orange-500" /> Club Roster
-                      </button>
-                      <button onClick={() => setDrawer("settings")}
-                        className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
-                        <Cog size={18} className="text-orange-500" /> Settings
-                      </button>
-                    </>
-                  )}
+                  <button onClick={() => setDrawer("members")}
+                    className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                    <Users size={18} className="text-orange-500" /> {session.group_id ? "Members" : "Club Roster"}
+                  </button>
+                  <button onClick={() => setDrawer("settings")}
+                    className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                    <Cog size={18} className="text-orange-500" /> Settings
+                  </button>
                   <button onClick={handleEndNight} disabled={ending}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-display font-bold text-sm">
                     <LogOut size={18} /> {ending ? "Ending…" : session.group_id ? "End Session" : "End Night"}
@@ -469,8 +482,12 @@ export default function MainView() {
               )}
 
               <div className="flex-1 overflow-y-auto p-4">
-                {drawer === "members" && <MemberManagement />}
-                {drawer === "settings" && <ClubSettings />}
+                {drawer === "members" && (session.group_id
+                  ? <GroupMemberManager groupId={session.group_id} />
+                  : <MemberManagement />)}
+                {drawer === "settings" && (session.group_id
+                  ? <GroupSettings groupId={session.group_id} />
+                  : <ClubSettings />)}
               </div>
             </motion.div>
           </>

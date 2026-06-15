@@ -13,13 +13,11 @@ import { v4 as uuid } from "uuid";
 import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessionArchiveStore } from "../store";
 
 // ─── Offline detection ────────────────────────────────────────────────────────
-// True when the user explicitly chose offline mode OR the browser reports no network.
-// Friends-group sessions also route here: they run entirely on the local engine
-// (no Supabase tables yet), so any active session carrying a group_id is "local".
+// True ONLY when the user explicitly chose offline mode or the browser reports no
+// network. Group sessions run on the same online Supabase engine as clubs
+// (migration 014 made the play tables group-aware).
 function isOffline(): boolean {
-  if (localStorage.getItem("offline-mode") === "true" || !navigator.onLine) return true;
-  if (useSessionStore.getState().session?.group_id) return true;
-  return false;
+  return localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
 }
 
 // ─── Helper: get current club's user id ───────────────────────────────────────
@@ -27,6 +25,18 @@ async function getClubId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   return user.id;
+}
+
+// ─── Helper: the active session's group id, if it's a group session ───────────
+function activeGroupId(): string | null {
+  return useSessionStore.getState().session?.group_id ?? null;
+}
+
+// ─── Helper: owner-scope columns for an insert ────────────────────────────────
+// Group rows are scoped by group_id (club_id stays null); club rows by club_id.
+async function ownerScope(): Promise<{ group_id: string } | { club_id: string }> {
+  const gid = activeGroupId();
+  return gid ? { group_id: gid } : { club_id: await getClubId() };
 }
 
 // ─── Helper: throw on Supabase error ─────────────────────────────────────────
@@ -146,8 +156,9 @@ export const authApi = {
     await supabase.auth.signOut();
     localStorage.removeItem("offline-mode");
     localStorage.removeItem("offline-cached-at");
+    localStorage.removeItem("friends-guest"); // clear any legacy guest-mode flag
     // Reset app mode so the next user starts fresh (avoids stale "friends" mode
-    // when a club account logs in after a group/guest session)
+    // when a club account logs in after a group session)
     try {
       const { useGroupStore } = await import("../store");
       useGroupStore.getState().setAppMode(null);
@@ -312,11 +323,32 @@ export const sessionsApi = {
       all.sort((a, b) => b.created_at.localeCompare(a.created_at));
       return { sessions: all };
     }
-    const clubId = await getClubId();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    // For group accounts, list completed sessions for all owned groups
+    const { useGroupStore } = await import("../store");
+    if (useGroupStore.getState().appMode === "friends") {
+      const { data: ownedGroups } = await supabase
+        .from("groups")
+        .select("id")
+        .eq("owner_id", user.id);
+      const groupIds = (ownedGroups ?? []).map((g: any) => g.id);
+      if (groupIds.length === 0) return { sessions: [] };
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("*")
+        .in("group_id", groupIds)
+        .in("status", ["completed", "ended"])
+        .order("created_at", { ascending: false });
+      return { sessions: (check(data, error) ?? []) as Session[] };
+    }
+
+    // Club account: filter by club_id (= user.id)
     const { data, error } = await supabase
       .from("sessions")
       .select("*")
-      .eq("club_id", clubId)
+      .eq("club_id", user.id)
       .order("created_at", { ascending: false });
     return { sessions: check(data, error) as Session[] };
   },
@@ -380,16 +412,37 @@ export const sessionsApi = {
       supabase.from("queue_entries").select("*, members(id,name,member_type)").eq("session_id", sessionId).order("position"),
     ]);
     if (sessionRes.error) throw new Error(sessionRes.error.message);
-    return {
-      session: sessionRes.data as Session,
-      matches: (matchesRes.data ?? []).map(rowToMatch),
-      queue: (queueRes.data ?? []).map((q: any) => ({
+    const session = sessionRes.data as Session;
+
+    // For group sessions, queue_entries don't exist in Supabase (queue is local only).
+    // Populate the queue-shaped array from group_members instead so names resolve in match rows.
+    let queue: Array<{ member_id: string; name: string; member_type: string; position: number; checked_in_at: string }>;
+    if (session.group_id) {
+      const { data: gm } = await supabase
+        .from("group_members")
+        .select("id, display_name, member_type, joined_at")
+        .eq("group_id", session.group_id);
+      queue = (gm ?? []).map((m: any, i: number) => ({
+        member_id: m.id,
+        name: m.display_name,
+        member_type: m.member_type ?? "male",
+        position: i,
+        checked_in_at: m.joined_at,
+      }));
+    } else {
+      queue = (queueRes.data ?? []).map((q: any) => ({
         member_id: q.member_id,
         position: q.position,
         checked_in_at: q.checked_in_at,
         name: q.members?.name ?? "Unknown",
         member_type: q.members?.member_type ?? "male",
-      })),
+      }));
+    }
+
+    return {
+      session,
+      matches: (matchesRes.data ?? []).map(rowToMatch),
+      queue,
     };
   },
 };
@@ -400,6 +453,25 @@ export const queueApi = {
   get: async (sessionId: string) => {
     if (isOffline()) {
       return { queue: useQueueStore.getState().queue };
+    }
+    // Group sessions: queue_entries.member_id points at group_members, not members,
+    // so we can't join the members table. Resolve player objects from the roster
+    // already loaded into the member store at session start.
+    if (activeGroupId()) {
+      const { data, error } = await supabase
+        .from("queue_entries")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("position");
+      const rows = check(data, error);
+      const roster = useMemberStore.getState().members;
+      const queue: QueuePosition[] = rows.map((r: any) => ({
+        member_id: r.member_id,
+        position: r.position,
+        checked_in_at: r.checked_in_at,
+        member: roster[r.member_id],
+      }));
+      return { queue };
     }
     const { data, error } = await supabase
       .from("queue_entries")
@@ -427,7 +499,7 @@ export const queueApi = {
       return { queue: useQueueStore.getState().queue };
     }
 
-    const clubId = await getClubId();
+    const scope = await ownerScope();
     const { data: existing } = await supabase
       .from("queue_entries")
       .select("position")
@@ -441,7 +513,7 @@ export const queueApi = {
     const { error } = await supabase
       .from("queue_entries")
       .upsert(
-        { id: uuid(), club_id: clubId, session_id: sessionId, member_id: memberId, position },
+        { id: uuid(), ...scope, session_id: sessionId, member_id: memberId, position },
         { onConflict: "session_id,member_id", ignoreDuplicates: true }
       );
     if (error) throw new Error(error.message);
@@ -458,7 +530,7 @@ export const queueApi = {
       store.addToQueue({ member_id: memberId, position: nextPos, checked_in_at: new Date().toISOString(), member });
       return;
     }
-    const clubId = await getClubId();
+    const scope = await ownerScope();
     const { data: existing } = await supabase
       .from("queue_entries")
       .select("position")
@@ -469,7 +541,7 @@ export const queueApi = {
     const position = (existing?.position ?? 0) + 1;
     const { error } = await supabase
       .from("queue_entries")
-      .insert({ id: uuid(), club_id: clubId, session_id: sessionId, member_id: memberId, position });
+      .insert({ id: uuid(), ...scope, session_id: sessionId, member_id: memberId, position });
     if (error) throw new Error(error.message);
   },
 
@@ -544,12 +616,12 @@ export const matchesApi = {
       // Do NOT call addMatch here — callers (PlayerPicker, CheckInPanel) do it after receiving the match.
       return { match };
     }
-    const clubId = await getClubId();
+    const scope = await ownerScope();
     const { data, error } = await supabase
       .from("matches")
       .insert({
         id: uuid(),
-        club_id: clubId,
+        ...scope,
         session_id: sessionId,
         court_id: payload.court_id,
         team_a_1: payload.team_a[0],
