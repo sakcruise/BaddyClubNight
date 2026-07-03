@@ -475,15 +475,16 @@ export const queueApi = {
     }
     const { data, error } = await supabase
       .from("queue_entries")
-      .select("*, members(id, name, member_type, avatar_url, email, created_at)")
+      .select("*")
       .eq("session_id", sessionId)
       .order("position");
     const rows = check(data, error);
+    const roster = useMemberStore.getState().members;
     const queue: QueuePosition[] = rows.map((r: any) => ({
       member_id: r.member_id,
       position: r.position,
       checked_in_at: r.checked_in_at,
-      member: rowToMember(r.members),
+      member: roster[r.member_id],
     }));
     return { queue };
   },
