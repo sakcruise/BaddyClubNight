@@ -6,12 +6,13 @@ import Button from "../shared/Button";
 import ShuttlecockIcon from "../shared/ShuttlecockIcon";
 
 export default function SessionSetup() {
-  const { setSession, setCourts, clubName, setClubName, clubConfig } = useSessionStore();
+  const { setSession, setCourts, clubConfig } = useSessionStore();
   const [numCourts, setNumCourts] = useState(4);
   const [starting, setStarting] = useState(false);
 
+  const clubName = clubConfig.name || "My Club";
+
   async function handleStart() {
-    if (!clubName.trim()) return;
     setStarting(true);
     try {
       const { session } = await sessionsApi.start({ club_name: clubName.trim(), num_courts: numCourts });
@@ -69,18 +70,14 @@ export default function SessionSetup() {
         {/* Card */}
         <div className="glass-card p-8 flex flex-col gap-6">
 
-          {/* Club name */}
+          {/* Club name — read-only from settings */}
           <div className="flex flex-col gap-2">
             <label className="font-display font-bold text-gray-700 text-xs tracking-widest uppercase">
               Club Name
             </label>
-            <input
-              type="text"
-              value={clubName}
-              onChange={(e) => setClubName(e.target.value)}
-              placeholder="e.g. Smash Club"
-              className="input-field text-xl font-display font-bold"
-            />
+            <div className="input-field text-xl font-display font-bold text-gray-800 bg-gray-50 cursor-default select-none">
+              {clubName}
+            </div>
           </div>
 
           {/* Courts */}
