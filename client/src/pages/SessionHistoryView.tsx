@@ -36,6 +36,7 @@ function SessionDetailPanel({ summary, members }: { summary: SessionSummary; mem
           id: q.member_id,
           name: q.name,
           member_type: (q.member_type as any) ?? "guest",
+          level: 2,
           email: "",
           avatar_url: undefined,
           created_at: q.checked_in_at,

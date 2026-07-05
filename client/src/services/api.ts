@@ -71,6 +71,7 @@ function rowToMember(m: any): Member {
     email: m.email ?? "",
     avatar_url: m.avatar_url ?? undefined,
     member_type: m.member_type ?? "male",
+    level: m.level ?? 2,
     created_at: m.created_at,
   };
 }
@@ -202,12 +203,13 @@ export const membersApi = {
     return { members: check(data, error).map(rowToMember) };
   },
 
-  create: async (name: string, member_type: MemberType = "male", email?: string) => {
+  create: async (name: string, member_type: MemberType = "male", email?: string, level: number = 2) => {
     if (isOffline()) {
       const member: Member = {
         id: uuid(),
         name,
         member_type,
+        level,
         email: email ?? "",
         created_at: new Date().toISOString(),
       };
@@ -217,13 +219,13 @@ export const membersApi = {
     const clubId = await getClubId();
     const { data, error } = await supabase
       .from("members")
-      .insert({ id: uuid(), club_id: clubId, name, member_type, email: email ?? null })
+      .insert({ id: uuid(), club_id: clubId, name, member_type, level, email: email ?? null })
       .select()
       .single();
     return { member: rowToMember(check(data, error)) };
   },
 
-  update: async (id: string, patch: { name?: string; member_type?: MemberType }) => {
+  update: async (id: string, patch: { name?: string; member_type?: MemberType; level?: number }) => {
     if (isOffline()) {
       useMemberStore.getState().updateMember(id, patch);
       const member = useMemberStore.getState().members[id];

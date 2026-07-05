@@ -74,6 +74,7 @@ export default function OfflineMode() {
           email: m.email ?? "",
           avatar_url: m.avatar_url ?? undefined,
           member_type: m.member_type ?? "male",
+          level: m.level ?? 2,
           created_at: m.created_at,
         })));
       }

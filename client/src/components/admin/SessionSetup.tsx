@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { sessionsApi } from "../../services/api";
-import { useSessionStore } from "../../store";
+import { useSessionStore, useQueueStore } from "../../store";
 import Button from "../shared/Button";
 import ShuttlecockIcon from "../shared/ShuttlecockIcon";
 
@@ -16,6 +16,7 @@ export default function SessionSetup() {
     setStarting(true);
     try {
       const { session } = await sessionsApi.start({ club_name: clubName.trim(), num_courts: numCourts });
+      useQueueStore.getState().clearPitstops();
       setSession(session);
       setCourts(
         Array.from({ length: numCourts }, (_, i) => ({

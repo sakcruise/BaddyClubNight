@@ -122,7 +122,7 @@ export default function GroupDetailView() {
     if (!group || completedMatches.length === 0) return [];
     const roster: Record<string, Member> = {};
     group.members.forEach((m) => {
-      roster[m.id] = { id: m.id, name: m.name, member_type: m.member_type, email: "", created_at: m.created_at };
+      roster[m.id] = { id: m.id, name: m.name, member_type: m.member_type, level: 2, email: "", created_at: m.created_at };
     });
     return computeLeaderboard(completedMatches, roster).slice(0, 3);
   }, [completedMatches, group]);
@@ -187,6 +187,7 @@ export default function GroupDetailView() {
       id: m.id,
       name: m.name,
       member_type: m.member_type,
+      level: 2,
       email: "",
       created_at: m.created_at,
     }));

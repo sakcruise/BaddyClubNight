@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS members (
   email       TEXT,
   avatar_url  TEXT,
   member_type TEXT NOT NULL DEFAULT 'male',  -- male | female | guest
+  level       INTEGER NOT NULL DEFAULT 2,    -- 1=Beginner 2=Improver 3=Intermediate 4=Advanced 5=Elite
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

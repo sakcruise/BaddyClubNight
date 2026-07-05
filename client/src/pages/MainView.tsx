@@ -9,6 +9,7 @@ import CourtsView from "../components/courts/CourtsView";
 import Leaderboard from "../components/leaderboard/Leaderboard";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import OnboardingTour from "../components/shared/OnboardingTour";
+import LiveCommentary from "../components/shared/LiveCommentary";
 import EndNightCheers from "../components/shared/EndNightCheers";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
@@ -54,6 +55,16 @@ export default function MainView() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("courts");
   const [courtsPct, setCourtsPct] = useState(55);
   const centreRef = useRef<HTMLDivElement>(null);
+  const [showCheckIn, setShowCheckIn] = useState(true);
+  const checkInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-hide check-in panel after 90s of no queue changes; auto-show on new check-in
+  useEffect(() => {
+    setShowCheckIn(true);
+    if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
+    checkInTimerRef.current = setTimeout(() => setShowCheckIn(false), 90_000);
+    return () => { if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current); };
+  }, [queue.length]);
 
   const startResize = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -116,7 +127,7 @@ export default function MainView() {
           if (g) {
             useGroupStore.getState().upsertGroup(g); // keep Settings/Members drawers in sync
             setMembers(g.members.map((m) => ({
-              id: m.id, name: m.name, member_type: m.member_type, email: "", created_at: m.created_at,
+              id: m.id, name: m.name, member_type: m.member_type, level: 2, email: "", created_at: m.created_at,
             })));
           }
           const [queueRes, matchesRes] = await Promise.all([
@@ -345,25 +356,72 @@ export default function MainView() {
           </div>
 
           <div ref={centreRef} className="flex flex-col min-h-0 overflow-hidden gap-0">
-            <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0" style={{ height: `${courtsPct}%` }}>
+            <div
+              className="glass-card overflow-hidden flex flex-col p-4 min-h-0 transition-all duration-500"
+              style={{ height: showCheckIn ? `${courtsPct}%` : "calc(100% - 104px)" }}
+            >
               <CourtsView />
             </div>
-            <div onMouseDown={startResize} onTouchStart={startResize}
-              className="flex-shrink-0 h-4 flex items-center justify-center cursor-row-resize group select-none">
-              <div className="w-12 h-1.5 rounded-full bg-gray-300 group-hover:bg-orange-400 transition-colors" />
-            </div>
-            <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0" style={{ height: `${100 - courtsPct}%` }}>
-              <div className="section-header flex-shrink-0 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sky-600 text-sm font-black">✓</span>
-                </div>
-                <span className="section-title text-sm">Check-ins</span>
-                <span className="ml-auto text-[10px] font-display font-bold text-gray-400">
-                  tap to check in · 🔵 male 🩷 female 🟣 guest
-                </span>
-              </div>
-              <div className="overflow-y-auto min-h-0 flex-1"><CheckInGrid /></div>
-            </div>
+            {/* Live commentary + check-in toggle — shown when check-ins are hidden */}
+            <AnimatePresence>
+              {!showCheckIn && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex flex-col gap-1.5 pt-1.5 flex-shrink-0"
+                >
+                  <LiveCommentary />
+                  <button
+                    onClick={() => {
+                      setShowCheckIn(true);
+                      if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
+                      checkInTimerRef.current = setTimeout(() => setShowCheckIn(false), 90_000);
+                    }}
+                    className="self-center flex items-center gap-1.5 px-3 py-1 rounded-full
+                               bg-sky-50 border border-sky-200 text-sky-600 text-xs font-display font-bold
+                               hover:bg-sky-100 active:scale-95 transition-all"
+                  >
+                    <span className="font-black">✓</span> Show Check-ins
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {showCheckIn && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="contents"
+                >
+                  <div onMouseDown={startResize} onTouchStart={startResize}
+                    className="flex-shrink-0 h-4 flex items-center justify-center cursor-row-resize group select-none">
+                    <div className="w-12 h-1.5 rounded-full bg-gray-300 group-hover:bg-orange-400 transition-colors" />
+                  </div>
+                  <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0" style={{ height: `${100 - courtsPct}%` }}>
+                    <div className="section-header flex-shrink-0 mb-2">
+                      <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sky-600 text-sm font-black">✓</span>
+                      </div>
+                      <span className="section-title text-sm">Check-ins</span>
+                      <span className="ml-auto text-[10px] font-display font-bold text-gray-400">
+                        tap to check in · 🔵 male 🩷 female 🟣 guest
+                      </span>
+                      <button
+                        onClick={() => setShowCheckIn(false)}
+                        className="ml-2 p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Hide check-ins"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto min-h-0 flex-1"><CheckInGrid /></div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0">

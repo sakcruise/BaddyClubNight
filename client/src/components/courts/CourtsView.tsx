@@ -1,31 +1,117 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSessionStore, useMatchStore, useQueueStore, useMemberStore } from "../../store";
 import CourtCard from "./CourtCard";
+import { Toast } from "../shared/Toast";
 import { LayoutGrid } from "lucide-react";
 import { matchesApi, queueApi } from "../../services/api";
+import { autoPick, recentTeamPairs } from "../../utils/autoPick";
 
 export default function CourtsView() {
-  const { courts, updateCourtStatus, session } = useSessionStore();
+  const { courts, updateCourtStatus, session, clubConfig } = useSessionStore();
   const { matches, updateMatch } = useMatchStore();
-  const { queue, activeMemberIds, setActiveMemberIds, openPicker, setQueue } = useQueueStore();
+  const { queue, activeMemberIds, setActiveMemberIds, openPicker, setQueue, pitstops, removeFirstPitstop } = useQueueStore();
   const { members } = useMemberStore();
   const [completing, setCompleting] = useState<string | null>(null);
-  const [editingPairs, setEditingPairs] = useState<string | null>(null); // matchId
+  const [editingPairs, setEditingPairs] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  function handleGo(courtId: number) {
+  // Auto-fill pitstops proactively whenever queue/courts change (auto-pick mode)
+  useEffect(() => {
+    if (!clubConfig.autoPickEnabled) return;
+
+    // Fill up to 2 pitstop slots — run in a loop so both can be filled in one effect fire
+    const memberMap = { ...members };
+    queue.forEach((q) => { if (!memberMap[q.member_id] && q.member) memberMap[q.member_id] = q.member; });
+    const completedMatches = useMatchStore.getState().matches;
+    const teamHistPairs = recentTeamPairs(
+      completedMatches.filter((m) => m.result === "complete").map((m) => ({
+        team_a: m.team_a, team_b: m.team_b, result: m.result,
+      }))
+    );
+
+    for (let i = 0; i < 2; i++) {
+      // Always read fresh from store so second iteration sees pitstop added in first
+      const currentPitstops = useQueueStore.getState().pitstops;
+      if (currentPitstops.length >= 2) break;
+      const pitstopPlayers = new Set(currentPitstops.flatMap((p) => p.players));
+      const eligible = useQueueStore.getState().queue
+        .filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayers.has(q.member_id))
+        .sort((a, b) => a.position - b.position)
+        .map((q) => q.member_id);
+      if (eligible.length < 4) break;
+      const picked = autoPick(eligible, memberMap, clubConfig.autoPickMode, teamHistPairs);
+      if (picked) useQueueStore.getState().addPitstop(picked);
+      else break;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue.length, activeMemberIds.size, pitstops.length, clubConfig.autoPickEnabled]);
+
+  // Speak announcements via state so the effect has a stable dep and only fires once per message
+  useEffect(() => {
+    if (!announcement || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(announcement);
+    utt.rate = 0.82; utt.pitch = 1.1; utt.volume = 1;
+    window.speechSynthesis.speak(utt);
+    setAnnouncement(null);
+  }, [announcement]);
+
+  async function handleGo(courtId: number) {
     const candidates = queue
       .filter((q) => !activeMemberIds.has(q.member_id) && members[q.member_id])
       .map((q) => ({ ...q, member: members[q.member_id] }))
       .sort((a, b) => a.position - b.position);
 
     if (candidates.length < 4) {
-      alert(`Need at least 4 players in the queue (have ${candidates.length}).`);
+      setToast(`Need at least 4 players in the queue (have ${candidates.length})`);
       return;
     }
 
-    // Auto-pick the first player in queue as picker
+    // Auto-pick mode: skip the picker, pick best 4 and start match immediately
+    if (clubConfig.autoPickEnabled && session) {
+      const eligible = candidates.map((q) => q.member_id);
+      const completedMatches = useMatchStore.getState().matches;
+      const teamHistPairs = recentTeamPairs(
+        completedMatches.filter((m) => m.result === "complete").map((m) => ({
+          team_a: m.team_a, team_b: m.team_b, result: m.result,
+        }))
+      );
+      const picked = autoPick(eligible, members, clubConfig.autoPickMode, teamHistPairs);
+      if (picked) {
+        const { players, pairs } = picked;
+        const teamA = players.filter((id) => pairs[id] === "A") as [string, string];
+        const teamB = players.filter((id) => pairs[id] === "B") as [string, string];
+        const { match } = await matchesApi.start(session.id, { court_id: courtId, team_a: teamA, team_b: teamB });
+        useMatchStore.getState().addMatch(match);
+        updateCourtStatus(courtId, "playing", match.id);
+        players.forEach(useQueueStore.getState().removeFromQueue);
+        setActiveMemberIds(new Set([...activeMemberIds, ...players]));
+        const names = players.map((id) => members[id]?.name.split(" ")[0]).filter(Boolean).join(", ");
+        setAnnouncement(`Court ${courtId} is live! ${names}, you're on!`);
+        return;
+      }
+    }
+
+    // Manual pick: open picker as before
     const firstPicker = candidates[0];
     openPicker(firstPicker.member_id, candidates.slice(1), courtId);
+  }
+
+  async function handleLaunchPitstop(courtId: number) {
+    const ps = pitstops[0];
+    if (!ps || !session) return;
+    const { players, pairs } = ps;
+    const teamA = players.filter((id) => pairs[id] === "A") as [string, string];
+    const teamB = players.filter((id) => pairs[id] === "B") as [string, string];
+    if (teamA.length !== 2 || teamB.length !== 2) return;
+
+    const { match } = await matchesApi.start(session.id, { court_id: courtId, team_a: teamA, team_b: teamB });
+    useMatchStore.getState().addMatch(match);
+    updateCourtStatus(courtId, "playing", match.id);
+    players.forEach(useQueueStore.getState().removeFromQueue);
+    setActiveMemberIds(new Set([...activeMemberIds, ...players]));
+    removeFirstPitstop();
   }
 
   async function handleComplete(matchId: string, scoreA?: number, scoreB?: number, shuttles?: number) {
@@ -78,6 +164,14 @@ export default function CourtsView() {
         const { queue: refreshed } = await queueApi.get(session.id);
         setQueue(refreshed);
       }
+
+      // Step 6: announce court free — pitstop launches when admin taps court card
+      const hasPitstop = useQueueStore.getState().pitstops.length > 0;
+      setAnnouncement(
+        hasPitstop
+          ? `Court ${match.court_id} is free! Pitstop team, get ready!`
+          : `Court ${match.court_id} is free! Next players, get ready!`
+      );
     } catch (e) {
       console.error("handleComplete failed:", e);
       // Even if complete() fails, reset UI so court isn't stuck
@@ -106,6 +200,8 @@ export default function CourtsView() {
   const cols = courts.length <= 2 ? courts.length : courts.length <= 4 ? 2 : 3;
 
   return (
+    <>
+    <Toast message={toast} onDone={() => setToast(null)} type="error" />
     <div className="flex flex-col h-full gap-3 min-h-0">
 
       {/* Section header */}
@@ -124,26 +220,34 @@ export default function CourtsView() {
         className="flex-1 grid gap-3 content-start overflow-y-auto min-h-0"
         style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
       >
-        {courts.map((court) => (
-          <CourtCard
-            key={court.id}
-            court={court}
-            match={activeMatches[court.id]}
-            onComplete={court.status === "playing" && activeMatches[court.id]
-              ? (id, a, b, s) => handleComplete(id, a, b, s)
-              : undefined}
-            onGo={court.status !== "playing" ? () => handleGo(court.id) : undefined}
-            completing={completing === activeMatches[court.id]?.id}
-            onEditPairs={activeMatches[court.id]
-              ? () => setEditingPairs(activeMatches[court.id].id)
-              : undefined}
-            editingPairs={editingPairs === activeMatches[court.id]?.id}
-            onSavePairs={handleSavePairs}
-            onCancelEditPairs={() => setEditingPairs(null)}
-          />
-        ))}
+        {(() => {
+          // Only the first idle court gets the pitstop launch button (avoids ambiguity)
+          const firstIdleCourtId = courts.find((c) => c.status !== "playing")?.id ?? null;
+          const showPitstopOn = firstIdleCourtId;
+          return courts.map((court) => (
+            <CourtCard
+              key={court.id}
+              court={court}
+              match={activeMatches[court.id]}
+              onComplete={court.status === "playing" && activeMatches[court.id]
+                ? (id, a, b, s) => handleComplete(id, a, b, s)
+                : undefined}
+              // In auto-pick mode, "Go!" is replaced by pitstop launch — no manual picker
+              onGo={court.status !== "playing" && !clubConfig.autoPickEnabled ? () => handleGo(court.id) : undefined}
+              autoPickEnabled={clubConfig.autoPickEnabled}
+              completing={completing === activeMatches[court.id]?.id}
+              onEditPairs={activeMatches[court.id]
+                ? () => setEditingPairs(activeMatches[court.id].id)
+                : undefined}
+              editingPairs={editingPairs === activeMatches[court.id]?.id}
+              onSavePairs={handleSavePairs}
+              onCancelEditPairs={() => setEditingPairs(null)}
+            />
+          ));
+        })()}
       </div>
 
     </div>
+    </>
   );
 }

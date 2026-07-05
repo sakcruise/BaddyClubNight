@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
   Session, Court, QueuePosition, Match, Member, PickerState, SyncState,
-  Group, GroupMember, MemberType,
+  Group, GroupMember, MemberType, PitstopState,
 } from "../types";
 import { normalisePositions } from "../utils/queueLogic";
 import { v4 as uuid } from "uuid";
@@ -50,6 +50,8 @@ export interface ClubConfig {
   themeKey: string;       // e.g. "orange" | "blue" | "green" etc.
   shuttleTubePrice: number;    // £ per tube, e.g. 2.50
   shuttleBudgetTubes: number;  // tubes budgeted per night, e.g. 10
+  autoPickEnabled: boolean;    // auto-pick players when court is free
+  autoPickMode: "balanced" | "competitive"; // balanced = mix levels, competitive = group levels
 }
 
 interface SessionStore {
@@ -75,6 +77,8 @@ const defaultClubConfig: ClubConfig = {
   themeKey: "orange",
   shuttleTubePrice: 2.50,
   shuttleBudgetTubes: 10,
+  autoPickEnabled: false,
+  autoPickMode: "balanced",
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -97,6 +101,7 @@ export const useSessionStore = create<SessionStore>()(
         // Also wipe queue and matches so stale data never leaks into the next session
         useQueueStore.getState().setQueue([]);
         useQueueStore.getState().setActiveMemberIds(new Set());
+        useQueueStore.getState().clearPitstops();
         useMatchStore.getState().setMatches([]);
       },
       setClubName: (clubName) =>
@@ -162,6 +167,7 @@ interface QueueStore {
   queue: QueuePosition[];
   activeMemberIds: Set<string>;
   picker: PickerState;
+  pitstops: PitstopState[];
   setQueue: (q: QueuePosition[]) => void;
   addToQueue: (pos: QueuePosition) => void;
   removeFromQueue: (memberId: string) => void;
@@ -171,6 +177,11 @@ interface QueueStore {
   setPickerId: (id: string | null) => void;
   togglePick: (memberId: string) => void;
   closePicker: () => void;
+  addPitstop: (ps: PitstopState) => void;
+  removeFirstPitstop: () => void;
+  removePitstopAt: (index: number) => void;
+  updatePitstopAt: (index: number, ps: PitstopState) => void;
+  clearPitstops: () => void;
 }
 
 const defaultPicker: PickerState = {
@@ -187,6 +198,7 @@ export const useQueueStore = create<QueueStore>()(
       queue: [],
       activeMemberIds: new Set(),
       picker: defaultPicker,
+      pitstops: [],
 
       setQueue: (queue) => set({ queue: normalisePositions(queue) }),
 
@@ -240,6 +252,12 @@ export const useQueueStore = create<QueueStore>()(
         }),
 
       closePicker: () => set({ picker: defaultPicker }),
+
+      addPitstop: (ps) => set((s) => ({ pitstops: [...s.pitstops, ps] })),
+      removeFirstPitstop: () => set((s) => ({ pitstops: s.pitstops.slice(1) })),
+      removePitstopAt: (index) => set((s) => ({ pitstops: s.pitstops.filter((_, i) => i !== index) })),
+      updatePitstopAt: (index, ps) => set((s) => ({ pitstops: s.pitstops.map((p, i) => i === index ? ps : p) })),
+      clearPitstops: () => set({ pitstops: [] }),
     }),
     {
       name: "queue-store",

@@ -8,8 +8,19 @@ export interface Member {
   avatar_url?: string;
   email?: string;
   member_type: MemberType;
+  level: number;          // 1=Beginner 2=Improver 3=Intermediate 4=Advanced 5=Elite
   created_at: string;
 }
+
+export type AutoPickMode = "balanced" | "competitive";
+
+export const LEVEL_LABELS: Record<number, string> = {
+  1: "Beginner",
+  2: "Improver",
+  3: "Intermediate",
+  4: "Advanced",
+  5: "Elite",
+};
 
 export type CourtStatus = "idle" | "playing" | "reserved";
 
@@ -116,6 +127,11 @@ export interface PickerState {
   candidates: QueuePosition[];    // top 8 available to pick from
   picked: string[];               // IDs chosen so far (need 3)
   target_court: number | null;
+}
+
+export interface PitstopState {
+  players: string[]; // 4 player IDs [picker, p2, p3, p4]
+  pairs: Record<string, "A" | "B">;
 }
 
 // ─── UI / Store ───────────────────────────────────────────────────────────────

@@ -4,21 +4,33 @@ import { useMemberStore } from "../../store";
 import Avatar from "../shared/Avatar";
 import { UserPlus, Trash2, Check, X, Pencil, CloudDownload } from "lucide-react";
 import type { MemberType } from "../../types";
+import { LEVEL_LABELS } from "../../types";
 
 const TYPE_OPTIONS: { value: MemberType; label: string; color: string }[] = [
   { value: "male",   label: "♂ Male",   color: "bg-blue-100 text-blue-700 border-blue-300" },
   { value: "female", label: "♀ Female", color: "bg-pink-100 text-pink-700 border-pink-300" },
 ];
 
+const LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
+const LEVEL_COLORS: Record<number, string> = {
+  1: "bg-gray-100 text-gray-600 border-gray-300",
+  2: "bg-green-100 text-green-700 border-green-300",
+  3: "bg-blue-100 text-blue-700 border-blue-300",
+  4: "bg-purple-100 text-purple-700 border-purple-300",
+  5: "bg-orange-100 text-orange-700 border-orange-300",
+};
+
 export default function MemberManagement() {
   const { members, setMembers, addMember, updateMember, deleteMember } = useMemberStore();
 
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<MemberType>("male");
+  const [newLevel, setNewLevel] = useState(2);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState<MemberType>("male");
+  const [editLevel, setEditLevel] = useState(2);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
@@ -51,24 +63,26 @@ export default function MemberManagement() {
     if (!newName.trim()) return;
     setAdding(true);
     try {
-      const { member } = await membersApi.create(newName.trim(), newType);
+      const { member } = await membersApi.create(newName.trim(), newType, undefined, newLevel);
       addMember(member);
       setNewName("");
+      setNewLevel(2);
     } finally {
       setAdding(false);
     }
   }
 
-  function startEdit(id: string, name: string, type: MemberType) {
+  function startEdit(id: string, name: string, type: MemberType, level: number) {
     setEditingId(id);
     setEditName(name);
     setEditType(type);
+    setEditLevel(level);
   }
 
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
-    await membersApi.update(id, { name: editName.trim(), member_type: editType });
-    updateMember(id, { name: editName.trim(), member_type: editType });
+    await membersApi.update(id, { name: editName.trim(), member_type: editType, level: editLevel });
+    updateMember(id, { name: editName.trim(), member_type: editType, level: editLevel });
     setEditingId(null);
   }
 
@@ -149,6 +163,24 @@ export default function MemberManagement() {
             </button>
           ))}
         </div>
+        {/* Level selector */}
+        <div>
+          <p className="text-[10px] font-display font-bold text-orange-600 uppercase tracking-wider mb-1.5">Skill Level</p>
+          <div className="flex gap-1.5">
+            {LEVEL_OPTIONS.map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => setNewLevel(lvl)}
+                title={LEVEL_LABELS[lvl]}
+                className={`flex-1 py-1.5 rounded-xl border-2 text-xs font-display font-bold transition-all
+                  ${newLevel === lvl ? LEVEL_COLORS[lvl] + " border-current" : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"}`}
+              >
+                L{lvl}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 font-display mt-1 text-center">{LEVEL_LABELS[newLevel]}</p>
+        </div>
       </div>
 
       {/* Member list */}
@@ -185,11 +217,31 @@ export default function MemberManagement() {
                         {opt.label}
                       </button>
                     ))}
+                  </div>
+                  {/* Level selector in edit mode */}
+                  <div>
+                    <p className="text-[10px] font-display font-bold text-gray-500 uppercase tracking-wider mb-1">Skill Level</p>
+                    <div className="flex gap-1">
+                      {LEVEL_OPTIONS.map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => setEditLevel(lvl)}
+                          title={LEVEL_LABELS[lvl]}
+                          className={`flex-1 py-1 rounded-lg border-2 text-xs font-display font-bold transition-all
+                            ${editLevel === lvl ? LEVEL_COLORS[lvl] + " border-current" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                        >
+                          L{lvl}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-display mt-0.5 text-center">{LEVEL_LABELS[editLevel]}</p>
+                  </div>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => saveEdit(member.id)}
-                      className="px-3 py-1.5 rounded-xl bg-green-500 text-white text-xs font-bold hover:bg-green-600 active:scale-95"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-green-500 text-white text-xs font-bold hover:bg-green-600 active:scale-95 flex items-center justify-center gap-1"
                     >
-                      <Check size={14} />
+                      <Check size={14} /> Save
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
@@ -207,13 +259,19 @@ export default function MemberManagement() {
                     <div className="font-display font-bold text-sm text-gray-900 truncate">
                       {member.name}
                     </div>
-                    <div className={`text-xs font-display font-semibold
-                      ${member.member_type === "female" ? "text-pink-500" : "text-blue-500"}`}>
-                      {member.member_type === "female" ? "♀ Female" : "♂ Male"}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-xs font-display font-semibold
+                        ${member.member_type === "female" ? "text-pink-500" : "text-blue-500"}`}>
+                        {member.member_type === "female" ? "♀ Female" : "♂ Male"}
+                      </span>
+                      <span className={`text-[10px] font-display font-bold px-1.5 py-0.5 rounded-md border
+                        ${LEVEL_COLORS[member.level ?? 2]}`}>
+                        L{member.level ?? 2}
+                      </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => startEdit(member.id, member.name, member.member_type)}
+                    onClick={() => startEdit(member.id, member.name, member.member_type, member.level ?? 2)}
                     className="p-2 rounded-xl text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors"
                   >
                     <Pencil size={14} />

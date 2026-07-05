@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSessionStore } from "../../store";
-import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag } from "lucide-react";
+import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag, Zap } from "lucide-react";
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
 import OfflineMode from "../shared/OfflineMode";
@@ -228,6 +228,77 @@ export default function ClubSettings() {
         {(form as any).shuttleTubePrice && (form as any).shuttleBudgetTubes && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 font-display font-bold">
             🏸 Budget: {(form as any).shuttleBudgetTubes} tubes × £{parseFloat((form as any).shuttleTubePrice).toFixed(2)} = £{(parseFloat((form as any).shuttleTubePrice) * parseInt((form as any).shuttleBudgetTubes)).toFixed(2)}/night
+          </div>
+        )}
+      </div>
+
+      {/* Auto-Pick */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-violet-600">
+          <Zap size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Auto-Pick Players</span>
+        </div>
+
+        {/* Toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-display font-bold text-gray-800">Enable Auto-Pick</p>
+            <p className="text-xs text-gray-400 font-body mt-0.5">
+              System picks the best 4 from the queue when a court is free
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const next = !((form as any).autoPickEnabled ?? false);
+              setForm((f) => ({ ...f, autoPickEnabled: next } as any));
+              setClubConfig({ autoPickEnabled: next });
+              setSaved(false);
+            }}
+            className={`relative w-12 h-6 rounded-full transition-colors
+              ${(form as any).autoPickEnabled ? "bg-violet-500" : "bg-gray-200"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform
+              ${(form as any).autoPickEnabled ? "translate-x-6" : "translate-x-0"}`} />
+          </button>
+        </div>
+
+        {/* Mode selector — only show when enabled */}
+        {(form as any).autoPickEnabled && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">Pick Mode</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setForm((f) => ({ ...f, autoPickMode: "balanced" } as any));
+                  setClubConfig({ autoPickMode: "balanced" });
+                  setSaved(false);
+                }}
+                className={`py-3 px-4 rounded-2xl border-2 text-left transition-all
+                  ${(form as any).autoPickMode === "balanced" || !(form as any).autoPickMode
+                    ? "border-violet-400 bg-violet-50"
+                    : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}
+              >
+                <p className="font-display font-bold text-sm text-gray-900">⚖️ Balanced</p>
+                <p className="text-[11px] text-gray-500 font-body mt-0.5">Mixes strong &amp; weak players — great for social play</p>
+              </button>
+              <button
+                onClick={() => {
+                  setForm((f) => ({ ...f, autoPickMode: "competitive" } as any));
+                  setClubConfig({ autoPickMode: "competitive" });
+                  setSaved(false);
+                }}
+                className={`py-3 px-4 rounded-2xl border-2 text-left transition-all
+                  ${(form as any).autoPickMode === "competitive"
+                    ? "border-violet-400 bg-violet-50"
+                    : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}
+              >
+                <p className="font-display font-bold text-sm text-gray-900">🏆 Competitive</p>
+                <p className="text-[11px] text-gray-500 font-body mt-0.5">Groups similar levels — tighter, more even matches</p>
+              </button>
+            </div>
+            <p className="text-[11px] text-violet-600 font-display font-bold bg-violet-50 rounded-xl px-3 py-2">
+              ✨ Auto-pick chooses from the top 8 waiters, avoids recent pairings & rewards gender mix
+            </p>
           </div>
         )}
       </div>

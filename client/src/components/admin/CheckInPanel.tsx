@@ -6,6 +6,7 @@ import Avatar from "../shared/Avatar";
 import ShoutingAvatar from "../shared/ShoutingAvatar";
 import { UserPlus, UserMinus, Search, UserCheck, X, Play, GripVertical } from "lucide-react";
 import type { QueuePosition } from "../../types";
+import PitstopCard from "./PitstopCard";
 
 function ReorderQueueItem({
   q, idx, member, loadingId, onRemove, formatTime,
@@ -49,7 +50,7 @@ function ReorderQueueItem({
       </div>
       <Avatar name={member.name} memberType={member.member_type as any} size="sm" />
       <div className="flex-1 min-w-0">
-        <div className="font-display font-bold text-sm text-gray-900 truncate leading-tight">{member.name}</div>
+        <div className="font-display font-bold text-base text-gray-900 truncate leading-tight">{member.name}</div>
         <div className="text-[10px] text-gray-400 font-display">
           {formatTime(q.checked_in_at)}
           {member.member_type === "guest" && <span className="ml-1 text-purple-400 font-black">GUEST</span>}
@@ -69,7 +70,7 @@ function ReorderQueueItem({
 
 export default function CheckInPanel() {
   const { members, addMember } = useMemberStore();
-  const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, reorderQueue, activeMemberIds, setActiveMemberIds, openPicker } = useQueueStore();
+  const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, reorderQueue, activeMemberIds, setActiveMemberIds, openPicker, pitstops, addPitstop, removePitstopAt, updatePitstopAt } = useQueueStore();
   const { session, updateCourtStatus, courts } = useSessionStore();
   const { addMatch } = useMatchStore();
 
@@ -95,13 +96,15 @@ export default function CheckInPanel() {
   const sortedQueue = [...queue].sort((a, b) => a.position - b.position);
 
   // Queue visible in normal mode — exclude players currently on court
-  const visibleQueue = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id));
+  const pitstopPlayerIds = new Set(pitstops.flatMap((ps) => ps.players));
+  const visibleQueue = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id));
 
   // First eligible player (not on court) — auto-picker
   const firstInQueue = sortedQueue.find((q) => !activeMemberIds.has(q.member_id) && members[q.member_id]);
   const firstMember = firstInQueue ? members[firstInQueue.member_id] : null;
   const freeCourt = courts.find((c) => c.status === "idle");
-  const readyToGo = !!firstMember && !!freeCourt &&
+  const { autoPickEnabled } = useSessionStore((s) => s.clubConfig);
+  const readyToGo = !autoPickEnabled && !!firstMember && !!freeCourt &&
     sortedQueue.filter((q) => !activeMemberIds.has(q.member_id)).length >= 4;
 
   const allMembers = Object.values(members)
@@ -177,11 +180,21 @@ export default function CheckInPanel() {
   }
 
   async function handleStartMatch() {
-    if (!picker.picker_id || !picker.target_court || !session) return;
+    if (!picker.picker_id || picker.target_court === null || !session) return;
     const allFour = [picker.picker_id, ...picker.picked];
     const teamA = allFour.filter((id) => pairs[id] === "A");
     const teamB = allFour.filter((id) => pairs[id] === "B");
     if (teamA.length !== 2 || teamB.length !== 2) return;
+
+    // Pitstop mode: court 0 means "hold for next free court"
+    if (picker.target_court === 0) {
+      addPitstop({ players: allFour, pairs: { ...pairs } });
+      setPairsStep(false);
+      setPairs({});
+      closePicker();
+      return;
+    }
+
     setConfirming(true);
     try {
       const { match } = await matchesApi.start(session.id, {
@@ -231,7 +244,108 @@ export default function CheckInPanel() {
     }
 
     openPicker(pickerId, candidates.filter((q) => q.member_id !== pickerId), freeCourt.id);
+  }
 
+  function handleSetupPitstop() {
+    // Use court 0 as pitstop sentinel — no real court yet
+    const eligible = [...queue]
+      .filter((q) => {
+        if (!members[q.member_id]) return false;
+        if (activeMemberIds.has(q.member_id)) return false;
+        if (pitstops.some((ps) => ps.players.includes(q.member_id))) return false;
+        return true;
+      })
+      .sort((a, b) => a.position - b.position);
+
+    if (eligible.length < 4) {
+      alert(`Need at least 4 players available (have ${eligible.length}).`);
+      return;
+    }
+
+    openPicker(eligible[0].member_id, eligible.slice(1), 0);
+  }
+
+  function handleSelectPitstopPlayer(pitstopIdx: number, playerId: string) {
+    if (swapping?.playerId === playerId && swapping?.pitstopIdx === pitstopIdx) {
+      // Tap same player again → deselect
+      setSwapping(null);
+      return;
+    }
+    if (swapping) {
+      // Already have a selection — swap the two players
+      const srcIdx = swapping.pitstopIdx;
+      const srcId  = swapping.playerId;
+      const dstIdx = pitstopIdx;
+      const dstId  = playerId;
+
+      if (srcIdx === dstIdx) {
+        // Same pitstop — just swap their teams
+        const ps = pitstops[srcIdx];
+        const newPairs = {
+          ...ps.pairs,
+          [srcId]: ps.pairs[dstId],
+          [dstId]: ps.pairs[srcId],
+        };
+        updatePitstopAt(srcIdx, { ...ps, pairs: newPairs });
+      } else {
+        // Different pitstops — exchange the two players
+        const src = pitstops[srcIdx];
+        const dst = pitstops[dstIdx];
+        const srcTeam = src.pairs[srcId];
+        const dstTeam = dst.pairs[dstId];
+        // Remove srcId from src, add dstId in same slot
+        const newSrcPlayers = src.players.map((id) => id === srcId ? dstId : id);
+        const newSrcPairs   = Object.fromEntries(
+          newSrcPlayers.map((id) => [id, id === dstId ? srcTeam : src.pairs[id]])
+        ) as Record<string, "A" | "B">;
+        // Remove dstId from dst, add srcId in same slot
+        const newDstPlayers = dst.players.map((id) => id === dstId ? srcId : id);
+        const newDstPairs   = Object.fromEntries(
+          newDstPlayers.map((id) => [id, id === srcId ? dstTeam : dst.pairs[id]])
+        ) as Record<string, "A" | "B">;
+        updatePitstopAt(srcIdx, { players: newSrcPlayers, pairs: newSrcPairs });
+        updatePitstopAt(dstIdx, { players: newDstPlayers, pairs: newDstPairs });
+      }
+      setSwapping(null);
+      return;
+    }
+    // No existing selection — select this player
+    setSwapping({ pitstopIdx, playerId });
+  }
+
+  function handleSwapWithQueuePlayer(queueMemberId: string) {
+    if (!swapping) return;
+    const { pitstopIdx, playerId: pitstopPlayerId } = swapping;
+    const ps = pitstops[pitstopIdx];
+    const team = ps.pairs[pitstopPlayerId];
+    // Replace pitstop player with queue player (keep same team slot)
+    const newPlayers = ps.players.map((id) => id === pitstopPlayerId ? queueMemberId : id);
+    const newPairs: Record<string, "A" | "B"> = {};
+    newPlayers.forEach((id) => {
+      newPairs[id] = id === queueMemberId ? team : ps.pairs[id];
+    });
+    updatePitstopAt(pitstopIdx, { players: newPlayers, pairs: newPairs });
+    setSwapping(null);
+  }
+
+  async function launchPitstop(idx: number) {
+    const ps = pitstops[idx];
+    const court = courts.find((c) => c.status === "idle");
+    if (!ps || !court || !session) return;
+    const teamA = ps.players.filter((id) => ps.pairs[id] === "A") as [string, string];
+    const teamB = ps.players.filter((id) => ps.pairs[id] === "B") as [string, string];
+    if (teamA.length !== 2 || teamB.length !== 2) return;
+    setLaunchingIdx(idx);
+    try {
+      const { match } = await matchesApi.start(session.id, { court_id: court.id, team_a: teamA, team_b: teamB });
+      useMatchStore.getState().addMatch(match);
+      updateCourtStatus(court.id, "playing", match.id);
+      ps.players.forEach((id) => removeFromQueue(id));
+      setActiveMemberIds(new Set([...activeMemberIds, ...ps.players]));
+      removePitstopAt(idx);
+    } finally {
+      setLaunchingIdx(null);
+    }
   }
 
   function queuePos(memberId: string) {
@@ -244,6 +358,8 @@ export default function CheckInPanel() {
 
   const [shoutPhase, setShoutPhase] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [launchingIdx, setLaunchingIdx] = useState<number | null>(null);
+  const [swapping, setSwapping] = useState<{ pitstopIdx: number; playerId: string } | null>(null);
 
   const firstName = firstMember?.name.split(" ")[0] ?? "";
   const courtId   = freeCourt?.id ?? 0;
@@ -254,10 +370,10 @@ export default function CheckInPanel() {
     `Don't leave them hanging! 🫣`,
   ];
   const SPEECHES = [
-    `${firstName}! ... It's, your, pick!`,
+    `${firstName}, it's... your... pick!`,
     `${firstName}, are you there? Hello?`,
-    `Come on ${firstName}! Court ${courtId} is getting lonely!`,
-    `${firstName}! Pick your legends, before the shuttlecock falls asleep!`,
+    `Come on, ${firstName}! Court ${courtId} is getting lonely!`,
+    `${firstName}, pick your legends, before the shuttlecock falls asleep!`,
   ];
 
   // Stop speech immediately when picker opens
@@ -268,7 +384,7 @@ export default function CheckInPanel() {
     }
   }, [isPicking]);
 
-  // Phase cycling — resets when player or court changes, stops when picking
+  // Phase cycling
   useEffect(() => {
     if (!readyToGo || !firstMember || !freeCourt || isPicking) { setShoutPhase(0); return; }
     setShoutPhase(0);
@@ -276,19 +392,16 @@ export default function CheckInPanel() {
     return () => clearInterval(iv);
   }, [readyToGo, firstMember?.id, freeCourt?.id, isPicking]);
 
-  // Speech — debounced 120ms to absorb React StrictMode double-invoke.
-  // `muted` is a dep so toggling it re-runs the effect: cleanup cancels any
-  // in-flight timer and current speech before the new effect runs.
+  // Speech — simplest possible: speak whenever readyToGo/player/phase changes
   useEffect(() => {
     if (!readyToGo || !firstMember || isPicking || muted || !("speechSynthesis" in window)) return;
     const text = SPEECHES[shoutPhase];
     const t = setTimeout(() => {
-      window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
       utt.rate = 0.78; utt.pitch = 1.2; utt.volume = 1;
       window.speechSynthesis.speak(utt);
-    }, 120);
-    return () => { clearTimeout(t); window.speechSynthesis.cancel(); };
+    }, 500);
+    return () => clearTimeout(t);
   }, [shoutPhase, readyToGo, firstMember?.id, isPicking, muted]);
 
   function handleReorder(newOrder: QueuePosition[]) {
@@ -381,7 +494,7 @@ export default function CheckInPanel() {
                 ? "bg-gradient-to-r from-green-500 to-green-400 text-white shadow-lg shadow-green-500/30"
                 : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
           >
-            {confirming ? "Starting…" : "Start Match 🏸"}
+            {confirming ? "Saving…" : picker.target_court === 0 ? "🏎️ Send to Pitstop" : "Start Match 🏸"}
           </button>
         </div>
       </div>
@@ -402,7 +515,7 @@ export default function CheckInPanel() {
         <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-orange-500">
           <div>
             <div className="text-white font-display font-black text-sm">
-              Court {picker.target_court} — Pick 3 Players
+              {picker.target_court === 0 ? "🏎️ Pitstop" : `Court ${picker.target_court}`} — Pick 3 Players
             </div>
             <div className="text-white/80 text-xs font-display font-semibold mt-0.5">
               {pickerMember ? `${pickerMember.name.split(" ")[0]} is picking · ${picked.length}/3 selected` : `${picked.length}/3 selected`}
@@ -624,6 +737,67 @@ export default function CheckInPanel() {
         </motion.div>
       )}
 
+      {/* Pitstop ready cards — one per queued pitstop */}
+      {pitstops.map((ps, idx) => (
+        <PitstopCard
+          key={idx}
+          ps={ps}
+          idx={idx}
+          members={members}
+          freeCourt={courts.find((c) => c.status === "idle")?.id ?? null}
+          launching={launchingIdx === idx}
+          selectedPlayerId={swapping?.pitstopIdx === idx ? swapping.playerId : undefined}
+          isSwapTarget={!!swapping && swapping.pitstopIdx !== idx}
+          onSelectPlayer={(id) => handleSelectPitstopPlayer(idx, id)}
+          onSwapTeam={(id) => {
+            const newPairs = { ...ps.pairs, [id]: ps.pairs[id] === "A" ? "B" as const : "A" as const };
+            updatePitstopAt(idx, { ...ps, pairs: newPairs });
+          }}
+          onRemove={() => { removePitstopAt(idx); if (swapping?.pitstopIdx === idx) setSwapping(null); }}
+          onLaunch={() => launchPitstop(idx)}
+        />
+      ))}
+
+      {/* Set up Pitstop — shown when enough free players exist and under the cap of 2 */}
+      {pitstops.length < 2 && (() => {
+        const pitstopPlayerIds = new Set(pitstops.flatMap((ps) => ps.players));
+        const eligible = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id));
+        if (eligible.length < 4) return null;
+        return (
+          <motion.div
+            initial={{ scale: 0.97, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="rounded-2xl border-2 border-dashed border-yellow-300 bg-yellow-50 px-4 py-3 flex items-center gap-3 flex-shrink-0"
+          >
+            <span className="text-2xl">🏎️</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-display font-black text-sm text-yellow-900">
+                {pitstops.length === 0 ? "Courts are full!" : "Room for one more pitstop!"}
+              </div>
+              <div className="text-[11px] text-yellow-600 font-display">Pre-select the next 4 so they're ready to launch</div>
+            </div>
+            <button
+              onClick={handleSetupPitstop}
+              className="flex-shrink-0 py-2 px-3 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-display font-black text-xs active:scale-95 transition-all"
+            >
+              🏎️ {pitstops.length === 0 ? "Add Pitstop" : "Add Pitstop 2"}
+            </button>
+          </motion.div>
+        );
+      })()}
+
+      {/* Swap mode banner */}
+      {swapping && (
+        <div className="flex items-center justify-between bg-violet-100 border border-violet-300 rounded-xl px-3 py-2 flex-shrink-0">
+          <span className="text-xs font-display font-bold text-violet-700">
+            👆 Tap a queue player or pitstop player to swap
+          </span>
+          <button onClick={() => setSwapping(null)} className="text-violet-500 hover:text-violet-700">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Queue list — scrollable, shows who's next to play (excludes on-court players) */}
       <motion.div layoutScroll className="flex-1 overflow-y-auto min-h-0 pr-1">
         {visibleQueue.length === 0 ? (
@@ -643,15 +817,26 @@ export default function CheckInPanel() {
               const member = members[q.member_id];
               if (!member) return null;
               return (
-                <ReorderQueueItem
-                  key={q.member_id}
-                  q={q}
-                  idx={idx}
-                  member={member}
-                  loadingId={loadingId}
-                  onRemove={toggleCheckIn}
-                  formatTime={formatTime}
-                />
+                <div key={q.member_id} className="relative">
+                  <ReorderQueueItem
+                    q={q}
+                    idx={idx}
+                    member={member}
+                    loadingId={loadingId}
+                    onRemove={toggleCheckIn}
+                    formatTime={formatTime}
+                  />
+                  {swapping && (
+                    <button
+                      onClick={() => handleSwapWithQueuePlayer(q.member_id)}
+                      className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-1
+                        px-2 py-1 rounded-lg bg-violet-500 text-white text-[10px] font-display font-black
+                        active:scale-95 transition-all shadow-sm z-10"
+                    >
+                      ↕ Swap
+                    </button>
+                  )}
+                </div>
               );
             })}
           </Reorder.Group>

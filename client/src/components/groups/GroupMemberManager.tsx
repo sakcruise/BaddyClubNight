@@ -26,7 +26,7 @@ export default function GroupMemberManager({ groupId }: { groupId: string }) {
     if (!g) return;
     upsertGroup(g);
     setMembers(g.members.map((m) => ({
-      id: m.id, name: m.name, member_type: m.member_type, email: "", created_at: m.created_at,
+      id: m.id, name: m.name, member_type: m.member_type, level: 2, email: "", created_at: m.created_at,
     })));
   }
 

@@ -2,11 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "client",
-      "runtimeExecutable": "npm",
+      "name": "server",
+      "runtimeExecutable": "/Users/sakcruise/.nvm/versions/node/v22.22.3/bin/npm",
       "runtimeArgs": ["run", "dev"],
-      "cwd": "/Users/sakcruise/Downloads/sakthi/projects/BaddyClubNight/client",
-      "port": 5173
+      "port": 3000,
+      "cwd": "server"
+    },
+    {
+      "name": "client",
+      "runtimeExecutable": "/Users/sakcruise/.nvm/versions/node/v22.22.3/bin/npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "cwd": "client"
     }
   ]
 }

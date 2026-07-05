@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import type { Court, Match } from "../../types";
+import type { Court, Match, PitstopState } from "../../types";
 import { useMemberStore } from "../../store";
 import Avatar from "../shared/Avatar";
 import ScoreInput from "../shared/ScoreInput";
@@ -25,6 +25,9 @@ interface Props {
   match?: Match;
   onComplete?: (matchId: string, scoreA?: number, scoreB?: number, shuttles?: number) => void;
   onGo?: () => void;
+  pitstop?: PitstopState;
+  onLaunchPitstop?: () => void;
+  autoPickEnabled?: boolean;   // show "waiting" state instead of Go when no pitstop yet
   completing?: boolean;
   onEditPairs?: () => void;
   editingPairs?: boolean;
@@ -32,7 +35,7 @@ interface Props {
   onCancelEditPairs?: () => void;
 }
 
-export default function CourtCard({ court, match, onComplete, onGo, completing, onEditPairs, editingPairs, onSavePairs, onCancelEditPairs }: Props) {
+export default function CourtCard({ court, match, onComplete, onGo, pitstop, onLaunchPitstop, autoPickEnabled, completing, onEditPairs, editingPairs, onSavePairs, onCancelEditPairs }: Props) {
   const { members } = useMemberStore();
   const [showScore, setShowScore] = useState(false);
   const [scoreA, setScoreA] = useState(0);
@@ -128,7 +131,7 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
               </div>
               <div className="w-full text-center">
                 {teamA.map((m) => (
-                  <div key={m.id} className="text-[10px] font-display font-bold text-gray-700 leading-tight w-full break-words">
+                  <div key={m.id} className="text-xs font-display font-bold text-gray-700 leading-tight w-full break-words">
                     {m.name.split(" ")[0]}
                   </div>
                 ))}
@@ -163,7 +166,7 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
               </div>
               <div className="w-full text-center">
                 {teamB.map((m) => (
-                  <div key={m.id} className="text-[10px] font-display font-bold text-gray-700 leading-tight w-full break-words">
+                  <div key={m.id} className="text-xs font-display font-bold text-gray-700 leading-tight w-full break-words">
                     {m.name.split(" ")[0]}
                   </div>
                 ))}
@@ -251,7 +254,7 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
                             ${team === "A" ? "border-blue-200 hover:border-blue-400" : "border-orange-200 hover:border-orange-400"}`}
                         >
                           <Avatar name={m?.name ?? ""} memberType={m?.member_type} size="sm" />
-                          <span className="font-display font-bold text-[10px] text-gray-800 flex-1 truncate">{m?.name}</span>
+                          <span className="font-display font-bold text-sm text-gray-800 flex-1 truncate">{m?.name}</span>
                           <span className="text-[9px] text-gray-400">switch</span>
                         </button>
                       );
@@ -303,9 +306,20 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
           )}
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center py-4 gap-3">
+        <div className="flex flex-col items-center justify-center py-4 gap-2">
           <span className="text-3xl opacity-20">🏸</span>
-          {onGo ? (
+          {onLaunchPitstop && (
+            <button
+              onClick={onLaunchPitstop}
+              className="w-full py-2.5 rounded-xl font-display font-black text-sm
+                         bg-gradient-to-r from-yellow-400 to-yellow-300 text-yellow-900
+                         hover:from-yellow-500 hover:to-yellow-400
+                         active:scale-95 transition-all duration-150 shadow-md shadow-yellow-400/30"
+            >
+              🏎️ Launch Pitstop!
+            </button>
+          )}
+          {onGo && (
             <button
               onClick={onGo}
               className="w-full py-2.5 rounded-xl font-display font-black text-sm
@@ -315,7 +329,13 @@ export default function CourtCard({ court, match, onComplete, onGo, completing, 
             >
               🏸 Go!
             </button>
-          ) : (
+          )}
+          {!onGo && !onLaunchPitstop && autoPickEnabled && (
+            <span className="text-xs font-display font-bold text-yellow-600 animate-pulse">
+              ⏳ Waiting for players…
+            </span>
+          )}
+          {!onGo && !onLaunchPitstop && !autoPickEnabled && (
             <span className="text-xs font-display font-bold text-gray-400">Available</span>
           )}
         </div>
