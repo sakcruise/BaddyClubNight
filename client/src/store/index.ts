@@ -178,6 +178,7 @@ interface QueueStore {
   togglePick: (memberId: string) => void;
   closePicker: () => void;
   addPitstop: (ps: PitstopState) => void;
+  addPitstops: (ps1: PitstopState, ps2: PitstopState | null) => void; // atomic — adds both at once
   removeFirstPitstop: () => void;
   removePitstopAt: (index: number) => void;
   updatePitstopAt: (index: number, ps: PitstopState) => void;
@@ -253,7 +254,13 @@ export const useQueueStore = create<QueueStore>()(
 
       closePicker: () => set({ picker: defaultPicker }),
 
+      // NOTE: pitstop players stay in `queue` — that array also represents "checked in"
+      // status for the roster. They're only removed from queue when they leave the
+      // session or start playing. Display/candidate lists filter them out separately.
       addPitstop: (ps) => set((s) => ({ pitstops: [...s.pitstops, ps] })),
+      addPitstops: (ps1, ps2) => set((s) => ({
+        pitstops: [...s.pitstops, ps1, ...(ps2 ? [ps2] : [])],
+      })),
       removeFirstPitstop: () => set((s) => ({ pitstops: s.pitstops.slice(1) })),
       removePitstopAt: (index) => set((s) => ({ pitstops: s.pitstops.filter((_, i) => i !== index) })),
       updatePitstopAt: (index, ps) => set((s) => ({ pitstops: s.pitstops.map((p, i) => i === index ? ps : p) })),

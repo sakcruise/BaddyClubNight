@@ -199,7 +199,8 @@ export default function LiveCommentary() {
   };
   const { frames } = CHAR[mood];
 
-  const charVariants: Record<Mood, object> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const charVariants: Record<Mood, any> = {
     celebrate: { y: [0, -10, 0, -6, 0], rotate: [-5, 5, -5, 3, 0], transition: { duration: 0.8, repeat: Infinity } },
     run:       { x: [-6, 6, -6], y: [0, -5, 0], transition: { duration: 0.5, repeat: Infinity, ease: "easeInOut" } },
     sleep:     { rotate: [0, 8, 0, -4, 0], y: [0, 3, 0], transition: { duration: 2.5, repeat: Infinity, ease: "easeInOut" } },

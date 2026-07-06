@@ -4,18 +4,19 @@ import { membersApi, queueApi, matchesApi } from "../../services/api";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../../store";
 import Avatar from "../shared/Avatar";
 import ShoutingAvatar from "../shared/ShoutingAvatar";
+import ConfirmDialog from "../shared/ConfirmDialog";
 import { UserPlus, UserMinus, Search, UserCheck, X, Play, GripVertical } from "lucide-react";
 import type { QueuePosition } from "../../types";
 import PitstopCard from "./PitstopCard";
 
 function ReorderQueueItem({
-  q, idx, member, loadingId, onRemove, formatTime,
+  q, idx, member, loadingId, onRequestRemove, formatTime,
 }: {
   q: QueuePosition;
   idx: number;
   member: { id: string; name: string; member_type: string; avatar_url?: string };
   loadingId: string | null;
-  onRemove: (id: string) => void;
+  onRequestRemove: (id: string, name: string) => void;
   formatTime: (iso: string) => string;
 }) {
   const controls = useDragControls();
@@ -57,7 +58,7 @@ function ReorderQueueItem({
         </div>
       </div>
       <button
-        onClick={() => onRemove(member.id)}
+        onClick={() => onRequestRemove(member.id, member.name)}
         disabled={loadingId === member.id}
         className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500 transition-colors disabled:opacity-40"
         title="Remove from queue"
@@ -70,7 +71,9 @@ function ReorderQueueItem({
 
 export default function CheckInPanel() {
   const { members, addMember } = useMemberStore();
-  const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, reorderQueue, activeMemberIds, setActiveMemberIds, openPicker, pitstops, addPitstop, removePitstopAt, updatePitstopAt } = useQueueStore();
+  const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, reorderQueue, activeMemberIds, setActiveMemberIds, openPicker, addPitstop, removePitstopAt, updatePitstopAt } = useQueueStore();
+  // Explicit selector so CheckInPanel re-renders whenever pitstops array changes
+  const pitstops = useQueueStore((s) => s.pitstops);
   const { session, updateCourtStatus, courts } = useSessionStore();
   const { addMatch } = useMatchStore();
 
@@ -83,6 +86,7 @@ export default function CheckInPanel() {
   const [pairsStep, setPairsStep] = useState(false);
   const [pairs, setPairs] = useState<Record<string, "A" | "B">>({});
   const [showAllCandidates, setShowAllCandidates] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null);
 
   const isPicking = picker.isOpen;
   const queuedIds = new Set(queue.map((q) => q.member_id));
@@ -95,17 +99,19 @@ export default function CheckInPanel() {
   // Full sorted queue (all queued players, including on-court — used in picking mode)
   const sortedQueue = [...queue].sort((a, b) => a.position - b.position);
 
-  // Queue visible in normal mode — exclude players currently on court
+  // Players earmarked for a pitstop stay checked in (still in `queue`) but shouldn't
+  // show twice — they already have their own pitstop card above the queue list.
   const pitstopPlayerIds = new Set(pitstops.flatMap((ps) => ps.players));
+
+  // Queue visible in normal mode — exclude on-court players and pitstop-earmarked players
   const visibleQueue = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id));
 
-  // First eligible player (not on court) — auto-picker
-  const firstInQueue = sortedQueue.find((q) => !activeMemberIds.has(q.member_id) && members[q.member_id]);
+  // First eligible player (not on court, not already earmarked for a pitstop) — auto-picker
+  const firstInQueue = sortedQueue.find((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id) && members[q.member_id]);
   const firstMember = firstInQueue ? members[firstInQueue.member_id] : null;
   const freeCourt = courts.find((c) => c.status === "idle");
   const { autoPickEnabled } = useSessionStore((s) => s.clubConfig);
-  const readyToGo = !autoPickEnabled && !!firstMember && !!freeCourt &&
-    sortedQueue.filter((q) => !activeMemberIds.has(q.member_id)).length >= 4;
+  const readyToGo = !autoPickEnabled && !!firstMember && !!freeCourt && visibleQueue.length >= 4;
 
   const allMembers = Object.values(members)
     .filter((m) => !activeMemberIds.has(m.id))
@@ -186,7 +192,9 @@ export default function CheckInPanel() {
     const teamB = allFour.filter((id) => pairs[id] === "B");
     if (teamA.length !== 2 || teamB.length !== 2) return;
 
-    // Pitstop mode: court 0 means "hold for next free court"
+    // Pitstop mode: court 0 means "hold for next free court".
+    // Players stay checked in (still in `queue`) — they're just earmarked for this
+    // pitstop and hidden from the queue display / picker candidates until launched.
     if (picker.target_court === 0) {
       addPitstop({ players: allFour, pairs: { ...pairs } });
       setPairsStep(false);
@@ -217,7 +225,7 @@ export default function CheckInPanel() {
 
   function handlePass() {
     const currentIdx = sortedQueue.findIndex((q) => q.member_id === picker.picker_id);
-    const eligible = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id) && members[q.member_id]);
+    const eligible = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id) && members[q.member_id]);
     // Find the next eligible player after the current picker
     const next =
       eligible.find((q, _, arr) => {
@@ -234,8 +242,9 @@ export default function CheckInPanel() {
     const freeCourt = courts.find((c) => c.status === "idle");
     if (!freeCourt) { alert("No free courts right now!"); return; }
 
+    // Exclude on-court players and anyone already earmarked for a pitstop
     const candidates = [...queue]
-      .filter((q) => !activeMemberIds.has(q.member_id) && members[q.member_id])
+      .filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id) && members[q.member_id])
       .sort((a, b) => a.position - b.position);
 
     if (candidates.length < 4) {
@@ -572,11 +581,13 @@ export default function CheckInPanel() {
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 scroll-smooth">
           {(() => {
             const TOP = 7; // picker is #1, so candidates #2–8 = 7 slots
-            // Pre-filter: exclude the picker and anyone already on court
+            // Pre-filter: exclude the picker, anyone already on court, and anyone
+            // already earmarked for a pitstop (they're committed to that group already)
             const allCandidates = sortedQueue.filter((q) => {
               if (!members[q.member_id]) return false;
               if (q.member_id === picker.picker_id) return false;
               if (activeMemberIds.has(q.member_id)) return false;
+              if (pitstopPlayerIds.has(q.member_id)) return false;
               return true;
             });
             const visible = showAllCandidates ? allCandidates : allCandidates.slice(0, TOP);
@@ -823,7 +834,7 @@ export default function CheckInPanel() {
                     idx={idx}
                     member={member}
                     loadingId={loadingId}
-                    onRemove={toggleCheckIn}
+                    onRequestRemove={(id, name) => setPendingRemove({ id, name })}
                     formatTime={formatTime}
                   />
                   {swapping && (
@@ -842,6 +853,20 @@ export default function CheckInPanel() {
           </Reorder.Group>
         )}
       </motion.div>
+
+      <ConfirmDialog
+        open={!!pendingRemove}
+        title="Remove from queue?"
+        message={pendingRemove ? `${pendingRemove.name} will need to check in again to rejoin.` : ""}
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={() => {
+          if (pendingRemove) toggleCheckIn(pendingRemove.id);
+          setPendingRemove(null);
+        }}
+        onCancel={() => setPendingRemove(null)}
+      />
     </div>
   );
 }

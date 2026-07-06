@@ -5,11 +5,12 @@ import { Toast } from "../shared/Toast";
 import { LayoutGrid } from "lucide-react";
 import { matchesApi, queueApi } from "../../services/api";
 import { autoPick, recentTeamPairs } from "../../utils/autoPick";
+import type { PitstopState } from "../../types";
 
 export default function CourtsView() {
   const { courts, updateCourtStatus, session, clubConfig } = useSessionStore();
   const { matches, updateMatch } = useMatchStore();
-  const { queue, activeMemberIds, setActiveMemberIds, openPicker, setQueue, pitstops, removeFirstPitstop } = useQueueStore();
+  const { queue, activeMemberIds, setActiveMemberIds, openPicker, setQueue, pitstops, removeFirstPitstop, addPitstops } = useQueueStore();
   const { members } = useMemberStore();
   const [completing, setCompleting] = useState<string | null>(null);
   const [editingPairs, setEditingPairs] = useState<string | null>(null);
@@ -30,20 +31,37 @@ export default function CourtsView() {
       }))
     );
 
-    for (let i = 0; i < 2; i++) {
-      // Always read fresh from store so second iteration sees pitstop added in first
-      const currentPitstops = useQueueStore.getState().pitstops;
-      if (currentPitstops.length >= 2) break;
-      const pitstopPlayers = new Set(currentPitstops.flatMap((p) => p.players));
-      const eligible = useQueueStore.getState().queue
-        .filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayers.has(q.member_id))
+    // Compute both pitstops fully before touching the store — avoids any
+    // race where a re-render between addPitstop calls resets the exclusion set
+    const currentPitstops = useQueueStore.getState().pitstops;
+    const slotsNeeded = 2 - currentPitstops.length;
+    if (slotsNeeded <= 0) return;
+
+    const freshActiveIds = useQueueStore.getState().activeMemberIds;
+    const freshQueue = useQueueStore.getState().queue;
+
+    // Seed excluded with players already in existing pitstops
+    const excludedIds = new Set<string>(currentPitstops.flatMap((p) => p.players));
+
+    const newPitstops: PitstopState[] = [];
+    for (let i = 0; i < slotsNeeded; i++) {
+      const eligible = freshQueue
+        .filter((q) => !freshActiveIds.has(q.member_id) && !excludedIds.has(q.member_id))
         .sort((a, b) => a.position - b.position)
         .map((q) => q.member_id);
       if (eligible.length < 4) break;
       const picked = autoPick(eligible, memberMap, clubConfig.autoPickMode, teamHistPairs);
-      if (picked) useQueueStore.getState().addPitstop(picked);
-      else break;
+      if (!picked) break;
+      newPitstops.push(picked);
+      // Immediately exclude these players so the next iteration can't pick them
+      picked.players.forEach((id) => excludedIds.add(id));
     }
+
+    // Write both pitstops in a single atomic store update.
+    // Players stay in `queue` (still checked in) — they're just earmarked and hidden
+    // from queue display / candidate lists until launched or the pitstop is cancelled.
+    if (newPitstops.length === 1) useQueueStore.getState().addPitstop(newPitstops[0]);
+    if (newPitstops.length === 2) addPitstops(newPitstops[0], newPitstops[1]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length, activeMemberIds.size, pitstops.length, clubConfig.autoPickEnabled]);
 
@@ -58,8 +76,10 @@ export default function CourtsView() {
   }, [announcement]);
 
   async function handleGo(courtId: number) {
+    // Exclude on-court players and anyone already earmarked for a pitstop
+    const pitstopPlayerIds = new Set(pitstops.flatMap((ps) => ps.players));
     const candidates = queue
-      .filter((q) => !activeMemberIds.has(q.member_id) && members[q.member_id])
+      .filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id) && members[q.member_id])
       .map((q) => ({ ...q, member: members[q.member_id] }))
       .sort((a, b) => a.position - b.position);
 
