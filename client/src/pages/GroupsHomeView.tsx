@@ -299,17 +299,17 @@ export default function GroupsHomeView() {
         <div className="px-5 max-w-xl w-full mx-auto mt-3">
           <div className="grid grid-cols-3 gap-2">
             {[
-              { icon: <Users size={13} />, value: totalMembers, label: "Players" },
-              { icon: <CalendarCheck size={13} />, value: globalStats.sessions, label: "Sessions" },
-              { icon: <Swords size={13} />, value: globalStats.games, label: "Games" },
+              { icon: <Users size={13} />, value: totalMembers, label: "Players", grad: "from-purple-500 to-purple-400" },
+              { icon: <CalendarCheck size={13} />, value: globalStats.sessions, label: "Sessions", grad: "from-blue-500 to-blue-400" },
+              { icon: <Swords size={13} />, value: globalStats.games, label: "Games", grad: "from-orange-500 to-orange-400" },
             ].map((s, i) => (
               <div
                 key={i}
-                className="bg-purple-50 border border-purple-100 rounded-xl px-3 py-2.5 flex items-center gap-2"
+                className={`rounded-xl bg-gradient-to-br ${s.grad} px-3 py-2.5 flex items-center gap-2 text-white shadow-sm shadow-black/10`}
               >
-                <span className="text-purple-400 flex-shrink-0">{s.icon}</span>
-                <span className="font-display font-black text-gray-900 text-sm tabular-nums">{s.value}</span>
-                <span className="text-gray-400 text-xs font-display truncate">{s.label}</span>
+                <span className="opacity-80 flex-shrink-0">{s.icon}</span>
+                <span className="font-display font-black text-sm tabular-nums">{s.value}</span>
+                <span className="text-xs font-display truncate opacity-80">{s.label}</span>
               </div>
             ))}
           </div>
@@ -383,10 +383,11 @@ export default function GroupsHomeView() {
                       className="flex-1 min-w-0 flex items-center gap-4 text-left"
                     >
                       <div className="flex-1 min-w-0">
-                        {/* Name + session label — one line; min-w-0 on the name lets it truncate
-                            properly instead of being squeezed to almost nothing by the badge */}
-                        <div className="flex items-center gap-2">
-                          <span className="font-display font-black text-gray-900 text-base truncate min-w-0">{g.name}</span>
+                        {/* Name + session label — one line; the name is flex-1 min-w-0 so it
+                            greedily claims all space the badge doesn't need, instead of
+                            truncating early while room is left unused to its right */}
+                        <div className="flex items-center gap-2 w-full">
+                          <span className="font-display font-black text-gray-900 text-base truncate flex-1 min-w-0">{g.name}</span>
                           {label && (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-display font-bold flex-shrink-0 ${label.color}`}>
                               {label.icon} {label.text}
