@@ -383,9 +383,10 @@ export default function GroupsHomeView() {
                       className="flex-1 min-w-0 flex items-center gap-4 text-left"
                     >
                       <div className="flex-1 min-w-0">
-                        {/* Name + session label */}
+                        {/* Name + session label — one line; min-w-0 on the name lets it truncate
+                            properly instead of being squeezed to almost nothing by the badge */}
                         <div className="flex items-center gap-2">
-                          <span className="font-display font-black text-gray-900 text-base truncate">{g.name}</span>
+                          <span className="font-display font-black text-gray-900 text-base truncate min-w-0">{g.name}</span>
                           {label && (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-display font-bold flex-shrink-0 ${label.color}`}>
                               {label.icon} {label.text}
