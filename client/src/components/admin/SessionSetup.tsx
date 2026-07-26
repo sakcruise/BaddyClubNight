@@ -35,7 +35,7 @@ export default function SessionSetup() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
+      className="min-h-screen min-h-[100dvh] flex items-center justify-center relative overflow-hidden"
       style={{
         background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 35%, rgb(var(--p-600)) 60%, rgb(var(--p-500)) 100%)",
       }}

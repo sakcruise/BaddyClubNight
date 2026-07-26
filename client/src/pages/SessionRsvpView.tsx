@@ -100,7 +100,7 @@ export default function SessionRsvpView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center"
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center"
         style={{ background: "linear-gradient(135deg, #581c87 0%, #7c3aed 60%, #a855f7 100%)" }}>
         <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
       </div>
@@ -109,7 +109,7 @@ export default function SessionRsvpView() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6"
+      <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center gap-3 p-6"
         style={{ background: "linear-gradient(135deg, #581c87 0%, #7c3aed 60%, #a855f7 100%)" }}>
         <p className="text-white font-display font-black text-xl text-center">{error || "Session not found"}</p>
       </div>
@@ -119,7 +119,7 @@ export default function SessionRsvpView() {
   const { date, time } = formatDate(data.scheduled_at);
 
   return (
-    <div className="min-h-screen flex flex-col"
+    <div className="min-h-screen min-h-[100dvh] flex flex-col"
       style={{ background: "linear-gradient(135deg, #581c87 0%, #7c3aed 60%, #a855f7 100%)" }}>
 
       {/* Header */}

@@ -81,7 +81,7 @@ export default function JoinView() {
 
   if (loading || !authChecked) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: bg }}>
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center" style={{ background: bg }}>
         <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
       </div>
     );
@@ -90,7 +90,7 @@ export default function JoinView() {
   // Unauthenticated — must sign in or create an account first
   if (!isAuthed) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-6" style={{ background: bg }}>
+      <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 gap-6" style={{ background: bg }}>
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={48} />
         </div>
@@ -130,7 +130,7 @@ export default function JoinView() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-6" style={{ background: bg }}>
+    <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 gap-6" style={{ background: bg }}>
       <div className="flex flex-col items-center gap-3">
         <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
           <ShuttlecockIcon size={48} />

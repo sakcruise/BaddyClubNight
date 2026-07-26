@@ -45,7 +45,7 @@ export default function HomeView() {
 
   return (
     <div
-      className="min-h-screen flex flex-col relative overflow-hidden"
+      className="min-h-screen min-h-[100dvh] flex flex-col relative overflow-hidden"
       style={{ background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 35%, rgb(var(--p-600)) 60%, rgb(var(--p-500)) 100%)" }}
     >
       {/* Background decoration */}

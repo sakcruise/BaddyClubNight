@@ -29,7 +29,7 @@ export default function ResetPasswordView() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-6"
+      className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6"
       style={{ background: "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)" }}
     >
       <div className="flex flex-col items-center gap-3 mb-8">

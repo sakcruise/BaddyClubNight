@@ -39,7 +39,7 @@ export default function LoginView() {
   // ── Account type chooser (shown before account creation) ───────────────────
   if (chooseType) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-8 bg-gray-50">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 gap-8 bg-gray-50">
         <div className="flex flex-col items-center gap-3">
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">
             <ShuttlecockIcon size={48} />
@@ -130,7 +130,7 @@ export default function LoginView() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-gray-50">
 
       {/* Logo */}
       <div className="flex flex-col items-center gap-3 mb-8">

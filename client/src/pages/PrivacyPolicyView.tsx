@@ -10,7 +10,7 @@ export default function PrivacyPolicyView() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen min-h-[100dvh] bg-white">
       <header className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 max-w-2xl mx-auto">
         <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
           <ArrowLeft size={18} />

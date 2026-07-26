@@ -67,7 +67,7 @@ export default function MasterAdminView() {
 
   if (isForbidden) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6"
+      <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center gap-4 p-6"
         style={{ background: "linear-gradient(160deg, #1e1e2e 0%, #2d1b69 100%)" }}>
         <ShieldAlert size={48} className="text-red-400" />
         <p className="text-white font-display font-black text-xl">Access denied</p>
@@ -81,7 +81,7 @@ export default function MasterAdminView() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col"
+    <div className="min-h-screen min-h-[100dvh] flex flex-col"
       style={{ background: "linear-gradient(160deg, #1e1e2e 0%, #2d1b69 100%)" }}>
 
       {/* Header */}

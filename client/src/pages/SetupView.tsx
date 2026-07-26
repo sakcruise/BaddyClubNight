@@ -84,7 +84,7 @@ export default function SetupView({ onBack, accountType = "club" }: { onBack?: (
   const btnCls   = "w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-gray-50">
 
       <div className="flex flex-col items-center gap-3 mb-8">
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">

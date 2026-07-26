@@ -210,7 +210,7 @@ export default function GroupsHomeView() {
   const hasStats = !loading && (globalStats.games > 0 || globalStats.sessions > 0);
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden bg-gray-50">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col relative overflow-hidden bg-gray-50">
       {/* ── Header — keeps the brand gradient; page below is white ──────────── */}
       <header
         className="flex items-center justify-between px-5 py-4 flex-shrink-0"

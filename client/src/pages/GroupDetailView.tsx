@@ -177,7 +177,7 @@ export default function GroupDetailView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-gray-50">
         <div className="w-9 h-9 border-4 border-gray-200 border-t-purple-500 rounded-full animate-spin" />
       </div>
     );
@@ -185,7 +185,7 @@ export default function GroupDetailView() {
 
   if (!group) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 bg-gray-50">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center gap-3 p-6 bg-gray-50">
         <p className="text-gray-900 font-display font-black text-xl">Group not found</p>
         <button onClick={() => navigate("/groups")} className="px-4 py-2 rounded-xl bg-purple-600 text-white font-display font-bold">
           Back to groups
@@ -319,7 +319,7 @@ export default function GroupDetailView() {
   const nextSession = upcomingSessions[0] ?? null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gray-50">
 
       {/* Header — keeps the brand gradient; page below is white */}
       <header className="flex items-center gap-3 px-4 pt-5 pb-3 flex-shrink-0"

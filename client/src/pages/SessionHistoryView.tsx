@@ -311,7 +311,7 @@ export default function SessionHistoryView() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, rgb(var(--p-50)) 0%, rgb(var(--p-100)) 50%, rgb(var(--p-100)) 100%)" }}>
+    <div className="min-h-screen min-h-[100dvh] flex flex-col" style={{ background: "linear-gradient(160deg, rgb(var(--p-50)) 0%, rgb(var(--p-100)) 50%, rgb(var(--p-100)) 100%)" }}>
       {/* Header */}
       <header
         className="flex items-center gap-4 px-6 py-0 flex-shrink-0"
