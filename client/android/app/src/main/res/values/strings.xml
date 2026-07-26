@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Badminton Club Night</string>
+    <string name="title_activity_main">Badminton Club Night</string>
+    <string name="package_name">com.clubnight.app</string>
+    <string name="custom_url_scheme">com.clubnight.app</string>
+</resources>
