@@ -1,0 +1,27 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="corkGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="100%" stop-color="#f97316" />
+    </radialGradient>
+    <linearGradient id="featherGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff7ed" />
+      <stop offset="100%" stop-color="#fed7aa" />
+    </linearGradient>
+  </defs>
+
+  <line x1="40" y1="62" x2="14" y2="10" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="40" y1="62" x2="22" y2="6" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="40" y1="62" x2="31" y2="4" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="40" y1="62" x2="40" y2="4" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="40" y1="62" x2="49" y2="4" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="40" y1="62" x2="58" y2="6" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="40" y1="62" x2="66" y2="10" stroke="url(#featherGrad)" stroke-width="2.5" stroke-linecap="round" />
+
+  <path d="M14 10 Q40 -4 66 10" stroke="#fb923c" stroke-width="2.5" fill="none" stroke-linecap="round" />
+  <path d="M14 10 Q40 -4 66 10" stroke="white" stroke-width="1" fill="none" stroke-linecap="round" stroke-dasharray="4 6" opacity="0.6" />
+
+  <ellipse cx="40" cy="66" rx="11" ry="8" fill="url(#corkGrad)" />
+  <ellipse cx="40" cy="64" rx="8" ry="5" fill="#fde68a" opacity="0.6" />
+  <ellipse cx="36" cy="63" rx="3" ry="2" fill="white" opacity="0.5" />
+</svg>
