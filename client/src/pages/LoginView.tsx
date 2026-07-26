@@ -31,7 +31,6 @@ export default function LoginView() {
     }
   }, []);
 
-  const bg = "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)";
   const inputCls = "w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-body text-sm focus:outline-none focus:border-orange-400 transition-colors";
   const btnCls   = "w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30";
 
@@ -40,19 +39,19 @@ export default function LoginView() {
   // ── Account type chooser (shown before account creation) ───────────────────
   if (chooseType) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-8" style={{ background: bg }}>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-8 bg-gray-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">
             <ShuttlecockIcon size={48} />
           </div>
-          <h1 className="font-display font-black text-white text-2xl tracking-tight">Get started</h1>
-          <p className="text-orange-200 font-display font-semibold text-sm">What are you setting up?</p>
-          <p className="text-white/50 font-display text-xs text-center max-w-xs">One account works for both — you can switch modes any time after signing in.</p>
+          <h1 className="font-display font-black text-gray-900 text-2xl tracking-tight">Get started</h1>
+          <p className="text-orange-500 font-display font-semibold text-sm">What are you setting up?</p>
+          <p className="text-gray-400 font-display text-xs text-center max-w-xs">One account works for both — you can switch modes any time after signing in.</p>
         </div>
 
         <div className="w-full max-w-sm flex flex-col gap-3">
           <button onClick={() => { setSetupType("club"); setChooseType(false); setShowSetup(true); }}
-            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left active:scale-95 transition-transform">
+            className="w-full bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 shadow-md shadow-black/5 text-left active:scale-95 transition-transform">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center flex-shrink-0">
               <Building2 size={26} className="text-white" />
             </div>
@@ -63,7 +62,7 @@ export default function LoginView() {
           </button>
 
           <button onClick={() => { setSetupType("group"); setChooseType(false); setShowSetup(true); }}
-            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left active:scale-95 transition-transform">
+            className="w-full bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 shadow-md shadow-black/5 text-left active:scale-95 transition-transform">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center flex-shrink-0">
               <Users size={26} className="text-white" />
             </div>
@@ -75,7 +74,7 @@ export default function LoginView() {
         </div>
 
         <button type="button" onClick={() => setChooseType(false)}
-          className="text-xs text-white/70 font-display font-bold hover:text-white transition-colors">
+          className="text-xs text-gray-400 font-display font-bold hover:text-orange-500 transition-colors">
           ← Back to sign in
         </button>
       </div>
@@ -131,21 +130,21 @@ export default function LoginView() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: bg }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50">
 
       {/* Logo */}
       <div className="flex flex-col items-center gap-3 mb-8">
-        <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">
           <ShuttlecockIcon size={56} />
         </div>
-        <h1 className="font-display font-black text-white text-3xl tracking-tight">Badminton</h1>
-        <p className="text-orange-200 font-display font-semibold text-sm">Game night, sorted</p>
+        <h1 className="font-display font-black text-gray-900 text-3xl tracking-tight">Badminton</h1>
+        <p className="text-orange-500 font-display font-semibold text-sm">Game night, sorted</p>
       </div>
 
       {/* ── Sign In ── */}
       {mode === "login" && (
         <form onSubmit={handleSignIn}
-          className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
+          className="w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 p-6 flex flex-col gap-4">
           <div>
             <h2 className="font-display font-black text-gray-900 text-xl">Sign In 👋</h2>
             <p className="text-gray-500 text-sm font-display mt-0.5">Enter your login details.</p>
@@ -199,7 +198,7 @@ export default function LoginView() {
 
       {/* ── Forgot Password ── */}
       {mode === "forgot" && (
-        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
+        <div className="w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 p-6 flex flex-col gap-4">
           {resetSent ? (
             <div className="flex flex-col items-center gap-3 py-4 text-center">
               {personalResetLink ? (

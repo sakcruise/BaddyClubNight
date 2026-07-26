@@ -84,23 +84,22 @@ export default function SetupView({ onBack, accountType = "club" }: { onBack?: (
   const btnCls   = "w-full py-3 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-orange-500/30";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ background: "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)" }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50">
 
       <div className="flex flex-col items-center gap-3 mb-8">
-        <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">
           <ShuttlecockIcon size={56} />
         </div>
-        <h1 className="font-display font-black text-white text-3xl tracking-tight">
+        <h1 className="font-display font-black text-gray-900 text-3xl tracking-tight">
           {isGroup ? "Badminton" : "Badminton Club"}
         </h1>
-        <p className="text-orange-200 font-display font-semibold text-sm">
+        <p className="text-orange-500 font-display font-semibold text-sm">
           {isGroup ? "Create your account" : "Create your club account"}
         </p>
       </div>
 
       <form onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4">
+        className="w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 p-6 flex flex-col gap-4">
         <div>
           <h2 className="font-display font-black text-gray-900 text-xl">Welcome! 🏸</h2>
           <p className="text-gray-500 text-sm font-display mt-0.5">
