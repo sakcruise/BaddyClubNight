@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Users, ChevronRight, X, LogOut, Calendar, Clock, Zap,
-  Play, MapPin, Activity, Swords, CalendarCheck,
+  Play, MapPin, Activity, Swords, CalendarCheck, Trash2, Pencil,
 } from "lucide-react";
 import { useGroupStore, useAuthStore, useSessionStore } from "../store";
 import { authApi } from "../services/api";
 import { groupsApi } from "../services/groups";
 import { supabase } from "../lib/supabase";
-import type { GroupSession, MemberType } from "../types";
+import type { Group, GroupSession, MemberType } from "../types";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 
 const TYPE_DOT: Record<MemberType, string> = {
@@ -75,6 +75,45 @@ export default function GroupsHomeView() {
   const [name, setName] = useState("");
   const [courts, setCourts] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [editName, setEditName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+  }, []);
+
+  async function handleDeleteGroup(g: Group, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm(`Delete "${g.name}"? This can't be undone.`)) return;
+    try {
+      await groupsApi.remove(g.id);
+      setGroups(useGroupStore.getState().groups.filter((x) => x.id !== g.id));
+    } catch (err: any) {
+      alert(`Couldn't delete group: ${err?.message ?? "unknown error"}`);
+    }
+  }
+
+  function openRename(g: Group, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditName(g.name);
+    setEditingGroup(g);
+  }
+
+  async function handleRename() {
+    if (!editingGroup || !editName.trim() || renaming) return;
+    setRenaming(true);
+    try {
+      await groupsApi.update(editingGroup.id, { name: editName.trim() });
+      useGroupStore.getState().upsertGroup({ ...editingGroup, name: editName.trim() });
+      setEditingGroup(null);
+    } catch (err: any) {
+      alert(`Couldn't rename group: ${err?.message ?? "unknown error"}`);
+    } finally {
+      setRenaming(false);
+    }
+  }
 
   useEffect(() => {
     groupsApi.list()
@@ -332,64 +371,87 @@ export default function GroupsHomeView() {
                 const featured = featuredSessions[g.id];
                 const label = featured ? sessionLabel(featured.session, featured.isPast) : null;
                 const stats = groupStats[g.id];
+                const isOwner = !!currentUserId && g.owner_id === currentUserId;
                 return (
-                  <motion.button
+                  <motion.div
                     key={g.id}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => navigate(`/groups/${g.id}`)}
-                    className="w-full bg-white border border-purple-200 rounded-2xl p-4 flex items-center gap-4 shadow-md shadow-black/5 text-left"
+                    className="w-full bg-white border border-purple-200 rounded-2xl p-4 flex items-center gap-2 shadow-md shadow-black/5"
                   >
-                    <div className="flex-1 min-w-0">
-                      {/* Name + session label */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-display font-black text-gray-900 text-base truncate">{g.name}</span>
-                        {label && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-display font-bold flex-shrink-0 ${label.color}`}>
-                            {label.icon} {label.text}
-                          </span>
-                        )}
-                      </div>
+                    <button
+                      onClick={() => navigate(`/groups/${g.id}`)}
+                      className="flex-1 min-w-0 flex items-center gap-4 text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        {/* Name + session label */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-display font-black text-gray-900 text-base truncate">{g.name}</span>
+                          {label && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-display font-bold flex-shrink-0 ${label.color}`}>
+                              {label.icon} {label.text}
+                            </span>
+                          )}
+                        </div>
 
-                      {/* Member avatars + per-group stats */}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        {g.members.length > 0 ? (
-                          <div className="flex -space-x-2 flex-shrink-0">
-                            {g.members.slice(0, 5).map((m) => (
-                              <span
-                                key={m.id}
-                                className={`w-6 h-6 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-[10px] border-2 border-white`}
-                                title={m.name}
-                              >
-                                {m.name.charAt(0).toUpperCase()}
-                              </span>
-                            ))}
-                            {g.members.length > 5 && (
-                              <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-display font-black text-[9px] border-2 border-white">
-                                +{g.members.length - 5}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs font-display">No members yet</span>
-                        )}
-                        <span className="text-gray-300 text-[10px]">·</span>
-                        <span className="text-gray-400 text-xs font-display">{g.num_courts} court{g.num_courts > 1 ? "s" : ""}</span>
-                        {stats?.sessions > 0 && (
-                          <>
-                            <span className="text-gray-300 text-[10px]">·</span>
-                            <span className="text-gray-400 text-xs font-display">{stats.sessions} session{stats.sessions !== 1 ? "s" : ""}</span>
-                          </>
-                        )}
-                        {stats?.games > 0 && (
-                          <>
-                            <span className="text-gray-300 text-[10px]">·</span>
-                            <span className="text-gray-400 text-xs font-display">{stats.games} game{stats.games !== 1 ? "s" : ""}</span>
-                          </>
-                        )}
+                        {/* Member avatars + per-group stats */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {g.members.length > 0 ? (
+                            <div className="flex -space-x-2 flex-shrink-0">
+                              {g.members.slice(0, 5).map((m) => (
+                                <span
+                                  key={m.id}
+                                  className={`w-6 h-6 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-[10px] border-2 border-white`}
+                                  title={m.name}
+                                >
+                                  {m.name.charAt(0).toUpperCase()}
+                                </span>
+                              ))}
+                              {g.members.length > 5 && (
+                                <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-display font-black text-[9px] border-2 border-white">
+                                  +{g.members.length - 5}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs font-display">No members yet</span>
+                          )}
+                          <span className="text-gray-300 text-[10px]">·</span>
+                          <span className="text-gray-400 text-xs font-display">{g.num_courts} court{g.num_courts > 1 ? "s" : ""}</span>
+                          {stats?.sessions > 0 && (
+                            <>
+                              <span className="text-gray-300 text-[10px]">·</span>
+                              <span className="text-gray-400 text-xs font-display">{stats.sessions} session{stats.sessions !== 1 ? "s" : ""}</span>
+                            </>
+                          )}
+                          {stats?.games > 0 && (
+                            <>
+                              <span className="text-gray-300 text-[10px]">·</span>
+                              <span className="text-gray-400 text-xs font-display">{stats.games} game{stats.games !== 1 ? "s" : ""}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
-                  </motion.button>
+                      <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
+                    </button>
+                    {isOwner && (
+                      <button
+                        onClick={(e) => openRename(g, e)}
+                        className="p-2 rounded-xl text-gray-300 hover:text-purple-500 hover:bg-purple-50 transition-colors flex-shrink-0"
+                        title="Rename group"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    )}
+                    {isOwner && (
+                      <button
+                        onClick={(e) => handleDeleteGroup(g, e)}
+                        className="p-2 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                        title="Delete group"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </motion.div>
                 );
               })}
             </div>
@@ -498,6 +560,48 @@ export default function GroupsHomeView() {
                 className="w-full py-3 rounded-xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-purple-500/20"
               >
                 {saving ? "Creating…" : "Create Group"}
+              </button>
+            </motion.div>
+          </>
+        )}
+
+        {/* Rename group sheet */}
+        {editingGroup && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/50 z-40"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setEditingGroup(null)}
+            />
+            <motion.div
+              className="fixed left-0 right-0 bottom-0 z-50 bg-white rounded-t-3xl p-5 pb-8 max-w-xl mx-auto"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-display font-black text-gray-900 text-lg">Rename Group</span>
+                <button onClick={() => setEditingGroup(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Group Name</label>
+              <input
+                autoFocus
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                placeholder="e.g. Saturday Smashers"
+                className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-display font-bold text-gray-900 focus:outline-none focus:border-purple-400 transition-colors mb-5"
+              />
+
+              <button
+                onClick={handleRename}
+                disabled={!editName.trim() || renaming}
+                className="w-full py-3 rounded-xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-purple-500/20"
+              >
+                {renaming ? "Saving…" : "Save"}
               </button>
             </motion.div>
           </>

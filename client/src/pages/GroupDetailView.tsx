@@ -71,7 +71,7 @@ function formatScheduled(iso: string) {
 export default function GroupDetailView() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { groups, upsertGroup, setGroups } = useGroupStore();
+  const { groups, upsertGroup } = useGroupStore();
   const { setSession, setCourts, session: activeSession } = useSessionStore();
   const { setMembers } = useMemberStore();
 
@@ -210,17 +210,6 @@ export default function GroupDetailView() {
     }
   }
 
-  async function handleDeleteGroup() {
-    if (!confirm(`Delete "${group!.name}"? This can't be undone.`)) return;
-    try {
-      await groupsApi.remove(group!.id);
-      setGroups(useGroupStore.getState().groups.filter((g) => g.id !== group!.id));
-      navigate("/groups");
-    } catch (e: any) {
-      alert(`Couldn't delete group: ${e?.message ?? "unknown error"}`);
-    }
-  }
-
   function launchSession(sessionId: string | undefined, numCourts: number, venue?: string, scheduledAt?: string) {
     const g = group!;
     const members: Member[] = g.members.map((m) => ({
@@ -340,11 +329,6 @@ export default function GroupDetailView() {
         {isOwner && (
           <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl bg-white/15 border border-white/20 text-white flex-shrink-0">
             <Cog size={15} />
-          </button>
-        )}
-        {isOwner && (
-          <button onClick={handleDeleteGroup} className="p-2 rounded-xl bg-white/10 border border-white/20 text-white/60 flex-shrink-0">
-            <Trash2 size={15} />
           </button>
         )}
       </header>

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { MapPin, Palette, ShoppingBag, Check } from "lucide-react";
+import { MapPin, Palette, ShoppingBag, Check, LogOut } from "lucide-react";
 import { useGroupStore, useSessionStore } from "../../store";
 import { groupsApi } from "../../services/groups";
+import { authApi } from "../../services/api";
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
 import OfflineMode from "../shared/OfflineMode";
@@ -171,6 +172,14 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
           })}
         </div>
       </div>
+
+      {/* Sign out — reachable from within a group too, not just the groups list */}
+      <button
+        onClick={() => authApi.logout()}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-red-50 text-red-500 font-display font-black text-sm active:scale-95 transition-all border border-red-100"
+      >
+        <LogOut size={15} /> Sign Out
+      </button>
     </div>
   );
 }
