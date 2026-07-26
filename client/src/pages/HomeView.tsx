@@ -14,7 +14,7 @@ export default function HomeView() {
   const navigate = useNavigate();
   const { adminName, displayName: authDisplayName } = useAuthStore();
   const logout = () => authApi.logout();
-  const { setSession, setCourts, clubName, setClubName, clubConfig } = useSessionStore();
+  const { setSession, setCourts, clubName, clubConfig } = useSessionStore();
   const { setMembers } = useMemberStore();
 
   const [panel, setPanel] = useState<Panel>(null);
@@ -28,11 +28,11 @@ export default function HomeView() {
   });
 
   async function handleStart() {
-    if (!clubName.trim()) return;
+    if (!clubConfig.name.trim()) return;
     setStarting(true);
     try {
       const [{ session }, membersRes] = await Promise.all([
-        sessionsApi.start({ club_name: clubName.trim(), num_courts: numCourts }),
+        sessionsApi.start({ club_name: clubConfig.name.trim(), num_courts: numCourts }),
         membersApi.list(),
       ]);
       setMembers(membersRes.members);
@@ -130,17 +130,13 @@ export default function HomeView() {
                 className="overflow-hidden"
               >
                 <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-                  {/* Club name */}
+                  {/* Club name — read-only, comes from Settings */}
                   <div>
                     <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Club Name</label>
-                    <input
-                      type="text"
-                      value={clubName}
-                      onChange={(e) => setClubName(e.target.value)}
-                      placeholder="e.g. Smash Club"
-                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-display font-bold text-gray-900
-                                 focus:outline-none focus:border-orange-400 transition-colors"
-                    />
+                    <div className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-display font-bold text-gray-900
+                               bg-gray-50 cursor-default select-none">
+                      {clubConfig.name || "My Club"}
+                    </div>
                   </div>
 
                   {/* Courts */}
@@ -169,7 +165,7 @@ export default function HomeView() {
 
                   <button
                     onClick={handleStart}
-                    disabled={!clubName.trim() || starting}
+                    disabled={!clubConfig.name.trim() || starting}
                     className="w-full py-3 rounded-xl font-display font-black text-white text-base
                                bg-gradient-to-r from-orange-600 to-orange-500
                                hover:from-orange-700 hover:to-orange-600

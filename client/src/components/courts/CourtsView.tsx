@@ -65,10 +65,11 @@ export default function CourtsView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length, activeMemberIds.size, pitstops.length, clubConfig.autoPickEnabled]);
 
-  // Speak announcements via state so the effect has a stable dep and only fires once per message
+  // Speak announcements via state so the effect has a stable dep and only fires once per message.
+  // NOTE: no cancel() before speak() — cancelling here stomps on Chrome's speech queue and can
+  // silently break the picking-voice cycle in CheckInPanel (same bug fixed there previously).
   useEffect(() => {
     if (!announcement || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(announcement);
     utt.rate = 0.82; utt.pitch = 1.1; utt.volume = 1;
     window.speechSynthesis.speak(utt);
@@ -217,7 +218,11 @@ export default function CourtsView() {
       .map((m) => [m.court_id, m])
   );
 
-  const cols = courts.length <= 2 ? courts.length : courts.length <= 4 ? 2 : 3;
+  // Multi-column grid only kicks in at md+ (desktop 3-panel layout). On mobile
+  // (single-panel tab view) courts always stack in one column so cards get
+  // full width instead of being squeezed side by side.
+  const desktopCols = courts.length <= 2 ? courts.length : courts.length <= 4 ? 2 : 3;
+  const desktopColsClass = desktopCols === 1 ? "md:grid-cols-1" : desktopCols === 2 ? "md:grid-cols-2" : "md:grid-cols-3";
 
   return (
     <>
@@ -235,11 +240,8 @@ export default function CourtsView() {
         </span>
       </div>
 
-      {/* Courts grid */}
-      <div
-        className="flex-1 grid gap-3 content-start overflow-y-auto min-h-0"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
-      >
+      {/* Courts grid — single column on mobile, computed columns from md+ */}
+      <div className={`flex-1 grid grid-cols-1 ${desktopColsClass} gap-3 content-start overflow-y-auto min-h-0`}>
         {(() => {
           // Only the first idle court gets the pitstop launch button (avoids ambiguity)
           const firstIdleCourtId = courts.find((c) => c.status !== "playing")?.id ?? null;

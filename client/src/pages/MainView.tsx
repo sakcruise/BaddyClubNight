@@ -18,10 +18,10 @@ import GroupMemberManager from "../components/groups/GroupMemberManager";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
 import { groupsApi } from "../services/groups";
-import { X, Users, Cog, LogOut, History, LayoutGrid, ListOrdered, Trophy, Menu, Maximize2, Minimize2 } from "lucide-react";
+import { X, Users, Cog, LogOut, History, LayoutGrid, Trophy, Menu, Maximize2, Minimize2 } from "lucide-react";
 
 type Drawer = "members" | "settings" | "menu" | null;
-type MobileTab = "queue" | "courts" | "checkins" | "leaderboard";
+type MobileTab = "live" | "checkins" | "leaderboard";
 
 export default function MainView() {
   const navigate = useNavigate();
@@ -52,41 +52,55 @@ export default function MainView() {
       document.exitFullscreen().catch(() => {});
     }
   }
-  const [mobileTab, setMobileTab] = useState<MobileTab>("courts");
-  const [courtsPct, setCourtsPct] = useState(55);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("live");
+  const [courtsPct, setCourtsPct] = useState(55);   // Courts vs Check-ins split
+  const [bannerPct, setBannerPct] = useState(78);   // Courts vs Live Commentary banner split
   const centreRef = useRef<HTMLDivElement>(null);
   const [showCheckIn, setShowCheckIn] = useState(true);
   const checkInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevQueueLenRef = useRef(queue.length);
 
-  // Auto-hide check-in panel after 90s of no queue changes; auto-show on new check-in
+  // Auto-hide check-in panel after 90s of no new check-ins; auto-show on a genuinely
+  // new check-in only. Queue length also drops when a match starts (players removed
+  // from queue) — that must NOT force the banner view back to check-ins.
   useEffect(() => {
+    const prevLen = prevQueueLenRef.current;
+    prevQueueLenRef.current = queue.length;
+    if (queue.length <= prevLen) return;
+
     setShowCheckIn(true);
     if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
     checkInTimerRef.current = setTimeout(() => setShowCheckIn(false), 90_000);
-    return () => { if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current); };
   }, [queue.length]);
 
-  const startResize = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    const startY = "touches" in e ? e.touches[0].clientY : e.clientY;
-    const startPct = courtsPct;
-    const containerH = centreRef.current?.getBoundingClientRect().height ?? 600;
-    function onMove(ev: MouseEvent | TouchEvent) {
-      const y = "touches" in ev ? ev.touches[0].clientY : ev.clientY;
-      const deltaPct = ((y - startY) / containerH) * 100;
-      setCourtsPct(Math.min(80, Math.max(20, startPct + deltaPct)));
-    }
-    function onUp() {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.removeEventListener("touchmove", onMove);
-      document.removeEventListener("touchend", onUp);
-    }
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    document.addEventListener("touchmove", onMove, { passive: false });
-    document.addEventListener("touchend", onUp);
-  }, [courtsPct]);
+  useEffect(() => () => { if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current); }, []);
+
+  // Shared drag-to-resize logic for the centre column's two mutually-exclusive splits
+  // (Courts vs Check-ins, Courts vs Live Commentary banner)
+  const makeResize = useCallback((pct: number, setPct: (v: number) => void) =>
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      const startY = "touches" in e ? e.touches[0].clientY : e.clientY;
+      const startPct = pct;
+      const containerH = centreRef.current?.getBoundingClientRect().height ?? 600;
+      function onMove(ev: MouseEvent | TouchEvent) {
+        const y = "touches" in ev ? ev.touches[0].clientY : ev.clientY;
+        const deltaPct = ((y - startY) / containerH) * 100;
+        setPct(Math.min(80, Math.max(20, startPct + deltaPct)));
+      }
+      function onUp() {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.removeEventListener("touchmove", onMove);
+        document.removeEventListener("touchend", onUp);
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, { passive: false });
+      document.addEventListener("touchend", onUp);
+    }, []);
+  const startResize = useCallback(makeResize(courtsPct, setCourtsPct), [makeResize, courtsPct]);
+  const startResizeBanner = useCallback(makeResize(bannerPct, setBannerPct), [makeResize, bannerPct]);
 
   useEffect(() => {
     if (!session) return;
@@ -221,8 +235,7 @@ export default function MainView() {
   }
 
   const mobileTabs: { id: MobileTab; label: string; icon: React.ReactNode }[] = [
-    { id: "queue",       label: "Queue",    icon: <ListOrdered size={18} /> },
-    { id: "courts",      label: "Courts",   icon: <LayoutGrid size={18} /> },
+    { id: "live",        label: "Live",     icon: <LayoutGrid size={18} /> },
     { id: "checkins",    label: "Check-in", icon: <Users size={18} /> },
     { id: "leaderboard", label: "Scores",   icon: <Trophy size={18} /> },
   ];
@@ -276,11 +289,15 @@ export default function MainView() {
         <div className="flex items-center gap-1.5">
           {/* Desktop buttons */}
           <div className="hidden md:flex items-center gap-1.5">
-            <button onClick={() => navigate("/history")}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold
-                bg-white/15 text-white hover:bg-white/25 border border-white/20 transition-all">
-              <History size={13} /> History
-            </button>
+            {/* History is club-only data (server-backed, no group_id) — groups have
+                their own Past Sessions list on the group's own page instead */}
+            {!session.group_id && (
+              <button onClick={() => navigate("/history")}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold
+                  bg-white/15 text-white hover:bg-white/25 border border-white/20 transition-all">
+                <History size={13} /> History
+              </button>
+            )}
             <button onClick={() => setDrawer(drawer === "members" ? null : "members")}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
                 ${drawer === "members" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
@@ -358,7 +375,7 @@ export default function MainView() {
           <div ref={centreRef} className="flex flex-col min-h-0 overflow-hidden gap-0">
             <div
               className="glass-card overflow-hidden flex flex-col p-4 min-h-0 transition-all duration-500"
-              style={{ height: showCheckIn ? `${courtsPct}%` : "calc(100% - 104px)" }}
+              style={{ height: `${showCheckIn ? courtsPct : bannerPct}%` }}
             >
               <CourtsView />
             </div>
@@ -366,25 +383,36 @@ export default function MainView() {
             <AnimatePresence>
               {!showCheckIn && (
                 <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 12 }}
-                  transition={{ duration: 0.4 }}
-                  className="flex flex-col gap-1.5 pt-1.5 flex-shrink-0"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="contents"
                 >
-                  <LiveCommentary />
-                  <button
-                    onClick={() => {
-                      setShowCheckIn(true);
-                      if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
-                      checkInTimerRef.current = setTimeout(() => setShowCheckIn(false), 90_000);
-                    }}
-                    className="self-center flex items-center gap-1.5 px-3 py-1 rounded-full
-                               bg-sky-50 border border-sky-200 text-sky-600 text-xs font-display font-bold
-                               hover:bg-sky-100 active:scale-95 transition-all"
+                  <div onMouseDown={startResizeBanner} onTouchStart={startResizeBanner}
+                    className="flex-shrink-0 h-4 flex items-center justify-center cursor-row-resize group select-none">
+                    <div className="w-12 h-1.5 rounded-full bg-gray-300 group-hover:bg-orange-400 transition-colors" />
+                  </div>
+                  <div
+                    className="flex flex-col gap-1.5 min-h-0 flex-shrink-0"
+                    style={{ height: `${100 - bannerPct}%` }}
                   >
-                    <span className="font-black">✓</span> Show Check-ins
-                  </button>
+                    {/* flex-1 so LiveCommentary fills the available height and scales its text/emoji up as it's dragged bigger */}
+                    <div className="flex-1 min-h-0">
+                      <LiveCommentary />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowCheckIn(true);
+                        if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
+                        checkInTimerRef.current = setTimeout(() => setShowCheckIn(false), 90_000);
+                      }}
+                      className="self-center flex items-center gap-1.5 px-3 py-1 rounded-full
+                                 bg-sky-50 border border-sky-200 text-sky-600 text-xs font-display font-bold
+                                 hover:bg-sky-100 active:scale-95 transition-all"
+                    >
+                      <span className="font-black">✓</span> Show Check-ins
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -431,28 +459,34 @@ export default function MainView() {
 
         {/* Mobile: single panel based on tab */}
         <div className="md:hidden h-full overflow-hidden p-3 pb-0">
-          <div className="glass-card h-full overflow-hidden flex flex-col p-4 min-h-0">
-            {mobileTab === "queue" && (
-              <>
+          {mobileTab === "live" ? (
+            // Courts + Queue stacked on one screen — no more tab-switching between matches
+            <div className="h-full flex flex-col gap-3">
+              <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0" style={{ height: "42%" }}>
+                <CourtsView />
+              </div>
+              <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0 flex-1">
                 <div className="section-header flex-shrink-0 mb-2">
                   <span className="text-orange-600 text-sm font-black">#</span>
                   <span className="section-title text-sm ml-2">Queue</span>
                 </div>
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden"><CheckInPanel /></div>
-              </>
-            )}
-            {mobileTab === "courts" && <CourtsView />}
-            {mobileTab === "checkins" && (
-              <>
-                <div className="section-header flex-shrink-0 mb-2">
-                  <span className="text-sky-600 text-sm font-black">✓</span>
-                  <span className="section-title text-sm ml-2">Check-ins</span>
-                </div>
-                <div className="overflow-y-auto min-h-0 flex-1"><CheckInGrid /></div>
-              </>
-            )}
-            {mobileTab === "leaderboard" && <Leaderboard />}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div className="glass-card h-full overflow-hidden flex flex-col p-4 min-h-0">
+              {mobileTab === "checkins" && (
+                <>
+                  <div className="section-header flex-shrink-0 mb-2">
+                    <span className="text-sky-600 text-sm font-black">✓</span>
+                    <span className="section-title text-sm ml-2">Check-ins</span>
+                  </div>
+                  <div className="overflow-y-auto min-h-0 flex-1"><CheckInGrid /></div>
+                </>
+              )}
+              {mobileTab === "leaderboard" && <Leaderboard />}
+            </div>
+          )}
         </div>
       </main>
 
@@ -516,10 +550,13 @@ export default function MainView() {
                     {isFullscreen ? <Minimize2 size={18} className="text-orange-500" /> : <Maximize2 size={18} className="text-orange-500" />}
                     {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                   </button>
-                  <button onClick={() => { navigate("/history"); setDrawer(null); }}
-                    className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
-                    <History size={18} className="text-orange-500" /> Session History
-                  </button>
+                  {/* History is club-only data — groups have Past Sessions on the group's own page instead */}
+                  {!session.group_id && (
+                    <button onClick={() => { navigate("/history"); setDrawer(null); }}
+                      className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                      <History size={18} className="text-orange-500" /> Session History
+                    </button>
+                  )}
                   <button onClick={() => setDrawer("members")}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
                     <Users size={18} className="text-orange-500" /> {session.group_id ? "Members" : "Club Roster"}

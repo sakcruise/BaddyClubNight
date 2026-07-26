@@ -22,6 +22,10 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     background-color: rgb(var(--p-50));
+    /* This app has no dark theme of its own — opt out of Android/Chrome's
+       "auto dark" page-inversion, which was force-darkening bg-white cards
+       inconsistently after in-app navigation. */
+    color-scheme: light;
   }
 
   h1, h2, h3, h4, h5, h6 {

@@ -210,12 +210,12 @@ export default function GroupsHomeView() {
   const hasStats = !loading && (globalStats.games > 0 || globalStats.sessions > 0);
 
   return (
-    <div
-      className="min-h-screen flex flex-col relative overflow-hidden"
-      style={{ background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-500)) 100%)" }}
-    >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-5 py-4 flex-shrink-0">
+    <div className="min-h-screen flex flex-col relative overflow-hidden bg-gray-50">
+      {/* ── Header — keeps the brand gradient; page below is white ──────────── */}
+      <header
+        className="flex items-center justify-between px-5 py-4 flex-shrink-0"
+        style={{ background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-500)) 100%)" }}
+      >
         <div className="flex items-center gap-3">
           <div className="bg-white/15 rounded-2xl p-2 backdrop-blur-sm border border-white/20">
             <ShuttlecockIcon size={28} />
@@ -266,11 +266,11 @@ export default function GroupsHomeView() {
             ].map((s, i) => (
               <div
                 key={i}
-                className="bg-white/10 border border-white/15 rounded-xl px-3 py-2.5 flex items-center gap-2 backdrop-blur-sm"
+                className="bg-purple-50 border border-purple-100 rounded-xl px-3 py-2.5 flex items-center gap-2"
               >
-                <span className="text-white/50 flex-shrink-0">{s.icon}</span>
-                <span className="font-display font-black text-white text-sm tabular-nums">{s.value}</span>
-                <span className="text-white/50 text-xs font-display truncate">{s.label}</span>
+                <span className="text-purple-400 flex-shrink-0">{s.icon}</span>
+                <span className="font-display font-black text-gray-900 text-sm tabular-nums">{s.value}</span>
+                <span className="text-gray-400 text-xs font-display truncate">{s.label}</span>
               </div>
             ))}
           </div>
@@ -286,7 +286,7 @@ export default function GroupsHomeView() {
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate(`/groups/${nextUp.gid}`)}
-            className="w-full bg-white rounded-2xl p-4 mb-3 mt-3 shadow-xl shadow-black/20 text-left flex flex-col gap-2"
+            className="w-full bg-white border border-purple-200 rounded-2xl p-4 mb-3 mt-3 shadow-lg shadow-black/5 text-left flex flex-col gap-2"
           >
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-display font-black ${nextUpWhen?.color}`}>
@@ -313,15 +313,15 @@ export default function GroupsHomeView() {
         {/* ── Group list ─────────────────────────────────────────────────── */}
         {loading ? (
           <div className="flex justify-center mt-24">
-            <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+            <div className="w-9 h-9 border-4 border-gray-200 border-t-purple-500 rounded-full animate-spin" />
           </div>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center mt-20 gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center">
-              <Users size={30} className="text-white" />
+            <div className="w-16 h-16 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center">
+              <Users size={30} className="text-purple-400" />
             </div>
-            <p className="text-white font-display font-black text-xl">No groups yet</p>
-            <p className="text-orange-200 text-sm font-display max-w-xs">
+            <p className="text-gray-900 font-display font-black text-xl">No groups yet</p>
+            <p className="text-gray-400 text-sm font-display max-w-xs">
               Create a group for your weekend crew, add your friends, and start playing.
             </p>
           </div>
@@ -337,7 +337,7 @@ export default function GroupsHomeView() {
                     key={g.id}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => navigate(`/groups/${g.id}`)}
-                    className="w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-lg shadow-black/10 text-left"
+                    className="w-full bg-white border border-purple-200 rounded-2xl p-4 flex items-center gap-4 shadow-md shadow-black/5 text-left"
                   >
                     <div className="flex-1 min-w-0">
                       {/* Name + session label */}
@@ -398,8 +398,8 @@ export default function GroupsHomeView() {
             {recentActivity.length > 0 && (
               <div className="mt-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <Activity size={13} className="text-white/40" />
-                  <span className="text-white/40 text-xs font-display font-bold uppercase tracking-wider">Recent Activity</span>
+                  <Activity size={13} className="text-gray-300" />
+                  <span className="text-gray-400 text-xs font-display font-bold uppercase tracking-wider">Recent Activity</span>
                 </div>
                 <div className="flex flex-col gap-2">
                   {recentActivity.map((match) => {
@@ -413,22 +413,22 @@ export default function GroupsHomeView() {
                         key={match.id}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => navigate(`/groups/${match.groupId}`)}
-                        className="bg-white/8 border border-white/12 rounded-2xl px-4 py-3 text-left"
+                        className="bg-purple-50 border border-purple-100 rounded-2xl px-4 py-3 text-left"
                       >
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-display font-black text-purple-300 uppercase tracking-wider">{match.groupName}</span>
-                          <span className="text-[10px] font-display text-white/35">{timeAgo(match.endedAt)}</span>
+                          <span className="text-[10px] font-display font-black text-purple-500 uppercase tracking-wider">{match.groupName}</span>
+                          <span className="text-[10px] font-display text-gray-400">{timeAgo(match.endedAt)}</span>
                         </div>
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className={`font-display font-bold text-sm leading-tight ${aWon ? "text-white" : "text-white/45"}`}>
+                          <span className={`font-display font-bold text-sm leading-tight ${aWon ? "text-gray-900" : "text-gray-400"}`}>
                             {teamAStr}
                           </span>
-                          <span className={`font-display font-black text-xs tabular-nums flex-shrink-0 ${hasScores ? "text-white/55" : "text-white/35"}`}>
+                          <span className={`font-display font-black text-xs tabular-nums flex-shrink-0 ${hasScores ? "text-gray-500" : "text-gray-300"}`}>
                             {hasScores
                               ? `${aWon ? "def." : bWon ? "lost to" : "drew"} ${match.scoreA}–${match.scoreB}`
                               : "vs"}
                           </span>
-                          <span className={`font-display font-bold text-sm leading-tight ${bWon ? "text-white" : "text-white/45"}`}>
+                          <span className={`font-display font-bold text-sm leading-tight ${bWon ? "text-gray-900" : "text-gray-400"}`}>
                             {teamBStr}
                           </span>
                         </div>
@@ -445,7 +445,7 @@ export default function GroupsHomeView() {
       {/* ── Create FAB ─────────────────────────────────────────────────────── */}
       <button
         onClick={() => setCreating(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-white shadow-2xl shadow-black/30 flex items-center justify-center active:scale-95 transition-transform"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-white border border-purple-200 shadow-xl shadow-black/15 flex items-center justify-center active:scale-95 transition-transform"
       >
         <Plus size={26} className="text-purple-600" />
       </button>

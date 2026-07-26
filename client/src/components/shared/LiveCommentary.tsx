@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMatchStore, useQueueStore, useMemberStore, useSessionStore } from "../../store";
 
@@ -43,9 +43,49 @@ export default function LiveCommentary() {
 
   const [idx, setIdx] = useState(0);
 
+  // Measure our own container height so the banner (emoji, text, character) scales
+  // up when the user drags to enlarge it, instead of just sitting in empty space.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [containerH, setContainerH] = useState(112); // fallback ~ old fixed h-28
+  useLayoutEffect(() => {
+    if (rootRef.current) setContainerH(rootRef.current.clientHeight);
+  });
+  const scale = Math.max(0.85, Math.min(containerH / 112, 2.6));
+
   const messages = useMemo<Message[]>(() => {
     const msgs: Message[] = [];
     const activeMatches = matches.filter((m) => m.result === "pending");
+
+    // Just-finished results — congratulate the winners, cheer up the losers.
+    // Shown for a short window right after completion, prioritised at the front
+    // of the list so it's the first thing the banner shows.
+    const justFinished = matches.filter(
+      (m) => m.result === "complete" && m.ended_at && now - new Date(m.ended_at).getTime() < 20_000
+    );
+    justFinished.forEach((m) => {
+      const tA = m.team_a.map((id) => members[id]?.name.split(" ")[0]).filter(Boolean).join(" & ");
+      const tB = m.team_b.map((id) => members[id]?.name.split(" ")[0]).filter(Boolean).join(" & ");
+      if (m.score_a != null && m.score_b != null) {
+        const aWon = m.score_a >= m.score_b;
+        const winners = aWon ? tA : tB;
+        const losers = aWon ? tB : tA;
+        const hi = Math.max(m.score_a, m.score_b);
+        const lo = Math.min(m.score_a, m.score_b);
+        msgs.push({
+          id: `finished-${m.id}`,
+          emoji: "🏆",
+          text: `${winners} win ${hi}–${lo}! Great game — ${losers}, next one's yours! 💪`,
+          color: "from-yellow-500 to-amber-400",
+        });
+      } else {
+        msgs.push({
+          id: `finished-${m.id}`,
+          emoji: "🙌",
+          text: `Court ${m.court_id} — good game ${tA} & ${tB}! 🏸`,
+          color: "from-yellow-500 to-amber-400",
+        });
+      }
+    });
 
     // Per-court commentary
     activeMatches.forEach((m) => {
@@ -208,7 +248,7 @@ export default function LiveCommentary() {
   };
 
   return (
-    <div className="relative h-28 flex-shrink-0 overflow-hidden rounded-2xl">
+    <div ref={rootRef} className="relative h-full flex-shrink-0 overflow-hidden rounded-2xl">
       <AnimatePresence mode="wait">
         <motion.div
           key={msg.id}
@@ -219,17 +259,22 @@ export default function LiveCommentary() {
           className={`absolute inset-0 bg-gradient-to-r ${msg.color} flex items-center gap-3 px-4 rounded-2xl`}
         >
           {/* Animated character — right side, cycles through mood frames */}
-          <div className="absolute right-3 top-0 bottom-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none select-none">
+          <div
+            className="absolute top-0 bottom-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none select-none"
+            style={{ right: 12 * scale }}
+          >
             <motion.span
               key={`char-${msg.id}`}
-              className="text-4xl leading-none"
+              className="leading-none"
+              style={{ fontSize: 36 * scale }}
               animate={charVariants[mood]}
             >
               {frames[0]}
             </motion.span>
             {mood === "sleep" && (
               <motion.span
-                className="text-lg leading-none"
+                className="leading-none"
+                style={{ fontSize: 18 * scale }}
                 animate={{ opacity: [0, 1, 0], y: [-4, -10, -16], transition: { duration: 2, repeat: Infinity, delay: 0.5 } }}
               >
                 💤
@@ -237,7 +282,8 @@ export default function LiveCommentary() {
             )}
             {mood === "run" && (
               <motion.span
-                className="text-base leading-none"
+                className="leading-none"
+                style={{ fontSize: 16 * scale }}
                 animate={{ opacity: [0.3, 1, 0.3], x: [6, -2, 6], transition: { duration: 0.5, repeat: Infinity } }}
               >
                 💨
@@ -245,7 +291,8 @@ export default function LiveCommentary() {
             )}
             {mood === "intense" && (
               <motion.span
-                className="text-lg leading-none"
+                className="leading-none"
+                style={{ fontSize: 18 * scale }}
                 animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.6, 1, 0.6], transition: { duration: 0.4, repeat: Infinity } }}
               >
                 🔥
@@ -254,14 +301,18 @@ export default function LiveCommentary() {
           </div>
 
           <motion.span
-            className="text-4xl flex-shrink-0"
+            className="flex-shrink-0"
+            style={{ fontSize: 36 * scale }}
             animate={{ scale: [1, 1.2, 1] }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             {msg.emoji}
           </motion.span>
 
-          <p className="text-white font-display font-bold text-base leading-snug pr-20">
+          <p
+            className="text-white font-display font-bold leading-snug"
+            style={{ fontSize: 16 * scale, paddingRight: 72 * scale }}
+          >
             {msg.text}
           </p>
 

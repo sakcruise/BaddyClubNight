@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck } from "lucide-react";
+import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X } from "lucide-react";
 import { useGroupStore, useSessionStore, useMemberStore, useAuthStore } from "../store";
 import { groupsApi } from "../services/groups";
 import { supabase } from "../lib/supabase";
@@ -10,6 +10,7 @@ import { v4 as uuid } from "uuid";
 import { computeLeaderboard } from "../utils/scoring";
 import SessionScheduleModal from "../components/groups/SessionScheduleModal";
 import InviteMembers from "../components/groups/InviteMembers";
+import GroupSettings from "../components/groups/GroupSettings";
 
 /** Map a Supabase matches row → Match (mirrors the api.ts mapper, used for group stats). */
 function rowToMatch(m: any): Match {
@@ -87,6 +88,9 @@ export default function GroupDetailView() {
   const [editBusy, setEditBusy] = useState(false);
   const [groupMatches, setGroupMatches] = useState<Match[]>([]);
   const [sessionsPlayed, setSessionsPlayed] = useState(0);
+  const [pastSessions, setPastSessions] = useState<Session[]>([]);
+  const [expandedPastId, setExpandedPastId] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   useCountdownTick(); // re-renders every second to keep countdowns live
 
@@ -114,18 +118,51 @@ export default function GroupDetailView() {
       .eq("group_id", id).in("status", ["completed", "ended"])
       .then(({ count }) => setSessionsPlayed(count ?? 0))
       .then(undefined, (e) => console.error("sessions count failed:", e));
+    // Past session list (the "Sessions" stat needs somewhere to drill into)
+    supabase.from("sessions").select("*").eq("group_id", id)
+      .in("status", ["completed", "ended"])
+      .order("date", { ascending: false })
+      .then(({ data }) => setPastSessions((data ?? []) as Session[]))
+      .then(undefined, (e) => console.error("past sessions fetch failed:", e));
   }, [id]);
+
+  // Self-heal: if the owner has no member row in their own group (e.g. they
+  // removed themselves), silently re-add them via the same invite-join RPC used
+  // for everyone else, so the owner can never be permanently locked out. This is
+  // a safety net only — it does NOT block the owner from deleting their own row
+  // (see handleRemoveMember below); it just guarantees they land back in the
+  // roster on next load if they ever end up with none.
+  useEffect(() => {
+    if (!id || !group || currentUserId === null || myMemberId !== null) return;
+    if (group.owner_id !== currentUserId) return;
+    const fallbackName = displayName && displayName.trim().length > 1 ? displayName.trim() : "Organiser";
+    groupsApi.join(group.invite_token, fallbackName)
+      .then(() => Promise.all([refresh(), groupsApi.myMemberId(id).then(setMyMemberId)]))
+      .catch((e) => console.error("Owner self-heal join failed:", e));
+  }, [id, group?.owner_id, currentUserId, myMemberId]);
 
   // Mini leaderboard from completed group matches (names resolved from the roster).
   const completedMatches = useMemo(() => groupMatches.filter((m) => m.result === "complete"), [groupMatches]);
-  const topPlayers = useMemo(() => {
-    if (!group || completedMatches.length === 0) return [];
-    const roster: Record<string, Member> = {};
-    group.members.forEach((m) => {
-      roster[m.id] = { id: m.id, name: m.name, member_type: m.member_type, level: 2, email: "", created_at: m.created_at };
+  const roster = useMemo(() => {
+    const r: Record<string, Member> = {};
+    group?.members.forEach((m) => {
+      r[m.id] = { id: m.id, name: m.name, member_type: m.member_type, level: 2, email: "", created_at: m.created_at };
     });
+    return r;
+  }, [group]);
+  const topPlayers = useMemo(() => {
+    if (completedMatches.length === 0) return [];
     return computeLeaderboard(completedMatches, roster).slice(0, 3);
-  }, [completedMatches, group]);
+  }, [completedMatches, roster]);
+  // How many completed games happened in each past session — shown in the history list
+  const matchCountBySession = useMemo(() => {
+    const counts: Record<string, number> = {};
+    completedMatches.forEach((m) => { counts[m.session_id] = (counts[m.session_id] ?? 0) + 1; });
+    return counts;
+  }, [completedMatches]);
+  function sessionLeaderboard(sessionId: string) {
+    return computeLeaderboard(completedMatches.filter((m) => m.session_id === sessionId), roster);
+  }
 
   async function refresh() {
     if (!id) return;
@@ -140,19 +177,17 @@ export default function GroupDetailView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center"
-        style={{ background: "linear-gradient(135deg, rgb(var(--p-900)), rgb(var(--p-600)))" }}>
-        <div className="w-9 h-9 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-9 h-9 border-4 border-gray-200 border-t-purple-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!group) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6"
-        style={{ background: "linear-gradient(135deg, rgb(var(--p-900)), rgb(var(--p-600)))" }}>
-        <p className="text-white font-display font-black text-xl">Group not found</p>
-        <button onClick={() => navigate("/groups")} className="px-4 py-2 rounded-xl bg-white text-purple-600 font-display font-bold">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 bg-gray-50">
+        <p className="text-gray-900 font-display font-black text-xl">Group not found</p>
+        <button onClick={() => navigate("/groups")} className="px-4 py-2 rounded-xl bg-purple-600 text-white font-display font-bold">
           Back to groups
         </button>
       </div>
@@ -162,9 +197,14 @@ export default function GroupDetailView() {
   const inviteLink = `${window.location.origin}/groups/join/${group.invite_token}`;
 
   async function handleRemoveMember(memberId: string) {
+    // No hard block on removing your own row — the self-heal effect above
+    // re-adds the owner automatically on next load if their row ever ends up
+    // missing, so deleting a bad/duplicate own-row entry (e.g. a wrong auto
+    // -generated name) is always safe to allow here.
     try {
       await groupsApi.removeMember(memberId);
       await refresh();
+      if (memberId === myMemberId) setMyMemberId(null);
     } catch (e: any) {
       alert(`Couldn't remove member: ${e?.message ?? "unknown error"}`);
     }
@@ -279,11 +319,11 @@ export default function GroupDetailView() {
   const nextSession = upcomingSessions[0] ?? null;
 
   return (
-    <div className="min-h-screen flex flex-col"
-      style={{ background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-500)) 100%)" }}>
+    <div className="min-h-screen flex flex-col bg-gray-50">
 
-      {/* Header */}
-      <header className="flex items-center gap-3 px-4 pt-5 pb-3 flex-shrink-0">
+      {/* Header — keeps the brand gradient; page below is white */}
+      <header className="flex items-center gap-3 px-4 pt-5 pb-3 flex-shrink-0"
+        style={{ background: "linear-gradient(135deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-500)) 100%)" }}>
         <button onClick={() => navigate("/groups")} className="p-2 rounded-xl bg-white/15 border border-white/20 text-white flex-shrink-0">
           <ArrowLeft size={18} />
         </button>
@@ -298,13 +338,18 @@ export default function GroupDetailView() {
           </div>
         )}
         {isOwner && (
+          <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl bg-white/15 border border-white/20 text-white flex-shrink-0">
+            <Cog size={15} />
+          </button>
+        )}
+        {isOwner && (
           <button onClick={handleDeleteGroup} className="p-2 rounded-xl bg-white/10 border border-white/20 text-white/60 flex-shrink-0">
             <Trash2 size={15} />
           </button>
         )}
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 pb-28 max-w-xl w-full mx-auto flex flex-col gap-3">
+      <main className="flex-1 overflow-y-auto px-4 pt-3 pb-28 max-w-xl w-full mx-auto flex flex-col gap-3">
 
         {/* Resume active session banner */}
         {activeSession?.group_id === id && activeSession?.status === "active" && (
@@ -341,7 +386,7 @@ export default function GroupDetailView() {
           const myRsvp = nextSession.rsvps.find((r) => r.member_id === myMemberId);
           const goingCount = nextSession.going_count;
           return (
-            <div className="bg-white rounded-3xl shadow-xl shadow-black/20 overflow-hidden">
+            <div className="bg-white border border-orange-200 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
               {/* Coloured top bar */}
               <div className="bg-gradient-to-r from-purple-600 to-purple-400 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -441,11 +486,11 @@ export default function GroupDetailView() {
           );
         })() : (
           /* No session yet */
-          <div className="bg-white/10 border border-white/20 rounded-3xl p-5 flex items-center gap-3">
-            <CalendarPlus size={20} className="text-white/50 flex-shrink-0" />
+          <div className="bg-orange-50 border border-orange-100 rounded-3xl p-5 flex items-center gap-3">
+            <CalendarPlus size={20} className="text-orange-400 flex-shrink-0" />
             <div>
-              <p className="font-display font-black text-white text-sm">No upcoming session</p>
-              {isOwner && <p className="text-white/50 text-xs font-display mt-0.5">Tap "Schedule Session" below to set one up.</p>}
+              <p className="font-display font-black text-gray-900 text-sm">No upcoming session</p>
+              {isOwner && <p className="text-gray-400 text-xs font-display mt-0.5">Tap "Schedule Session" below to set one up.</p>}
             </div>
           </div>
         )}
@@ -453,18 +498,18 @@ export default function GroupDetailView() {
         {/* Additional future sessions (if more than one) */}
         {upcomingSessions.length > 1 && (
           <div className="flex flex-col gap-2">
-            <p className="text-white/50 text-xs font-display font-bold uppercase tracking-wider px-1">Also scheduled</p>
+            <p className="text-gray-400 text-xs font-display font-bold uppercase tracking-wider px-1">Also scheduled</p>
             {upcomingSessions.slice(1).map((s) => {
               const { dayLabel, time } = formatScheduled(s.scheduled_at);
               return (
-                <div key={s.id} className="bg-white/10 border border-white/20 rounded-2xl px-4 py-3 flex items-center gap-3">
+                <div key={s.id} className="bg-orange-50 border border-orange-100 rounded-2xl px-4 py-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-display font-black text-white text-sm">{dayLabel} <span className="font-normal text-white/60">{time}</span></p>
-                    {s.venue && <p className="text-white/50 text-xs font-display truncate">{s.venue}</p>}
+                    <p className="font-display font-black text-gray-900 text-sm">{dayLabel} <span className="font-normal text-gray-400">{time}</span></p>
+                    {s.venue && <p className="text-gray-400 text-xs font-display truncate">{s.venue}</p>}
                   </div>
-                  <span className="text-white/50 text-xs font-display tabular-nums">{getCountdown(s.scheduled_at)}</span>
+                  <span className="text-gray-400 text-xs font-display tabular-nums">{getCountdown(s.scheduled_at)}</span>
                   {isOwner && (
-                    <button onClick={() => setEditingSession(s)} className="p-1.5 rounded-lg bg-white/10 text-white/60">
+                    <button onClick={() => setEditingSession(s)} className="p-1.5 rounded-lg bg-gray-100 text-gray-400">
                       <Pencil size={13} />
                     </button>
                   )}
@@ -476,7 +521,7 @@ export default function GroupDetailView() {
 
         {/* ── TOP PLAYERS ── */}
         {topPlayers.length > 0 && (
-          <div className="bg-white rounded-3xl shadow-lg shadow-black/10 overflow-hidden">
+          <div className="bg-white border border-orange-200 rounded-3xl shadow-md shadow-black/5 overflow-hidden">
             <div className="flex items-center gap-2 px-4 pt-4 pb-2">
               <Trophy size={15} className="text-amber-500" />
               <span className="font-display font-black text-gray-900 text-sm">Top Players</span>
@@ -501,42 +546,94 @@ export default function GroupDetailView() {
           </div>
         )}
 
+        {/* ── PAST SESSIONS ── */}
+        {pastSessions.length > 0 && (
+          <div className="bg-white border border-orange-200 rounded-3xl shadow-md shadow-black/5 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+              <History size={15} className="text-gray-500" />
+              <span className="font-display font-black text-gray-900 text-sm">Past Sessions</span>
+              <span className="ml-auto text-xs font-display font-bold text-gray-400">{pastSessions.length}</span>
+            </div>
+            {/* Roughly 2-3 collapsed rows tall — rest scrolls inside so Members/Invite below stay reachable */}
+            <div className="border-t border-gray-100 max-h-40 overflow-y-auto">
+              {pastSessions.map((s) => {
+                const { dayLabel } = formatScheduled(s.scheduled_at ?? `${s.date}T12:00:00`);
+                const isExpanded = expandedPastId === s.id;
+                const matchCount = matchCountBySession[s.id] ?? 0;
+                const board = isExpanded ? sessionLeaderboard(s.id) : [];
+                return (
+                  <div key={s.id} className="border-b border-gray-50 last:border-0">
+                    <button
+                      onClick={() => setExpandedPastId(isExpanded ? null : s.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-gray-800 text-sm">{dayLabel}</p>
+                        {s.venue && <p className="text-gray-400 text-xs font-display truncate">{s.venue}</p>}
+                      </div>
+                      <span className="text-gray-400 text-xs font-display flex-shrink-0">
+                        {matchCount} game{matchCount !== 1 ? "s" : ""}
+                      </span>
+                      <ChevronRight size={14} className={`text-gray-300 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
+                    </button>
+                    {isExpanded && (
+                      <div className="px-4 pb-3 flex flex-col gap-1.5">
+                        {board.length === 0 ? (
+                          <p className="text-gray-400 text-xs font-display text-center py-2">No scored matches</p>
+                        ) : (
+                          board.map((p, idx) => (
+                            <div key={p.member_id} className="flex items-center gap-2 px-2 py-1.5 rounded-xl bg-gray-50">
+                              <span className="text-xs font-display font-black text-gray-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
+                              <span className={`w-6 h-6 rounded-full ${TYPE_DOT[p.member?.member_type ?? "male"]} flex items-center justify-center text-white font-display font-black text-[10px] flex-shrink-0`}>
+                                {(p.member?.name ?? "?").charAt(0).toUpperCase()}
+                              </span>
+                              <span className="flex-1 font-display font-bold text-gray-700 text-xs truncate">{p.member?.name ?? "Unknown"}</span>
+                              <span className="text-[10px] font-display font-black text-green-600 flex-shrink-0">{p.wins}W</span>
+                              <span className="text-[10px] font-display font-black text-gray-400 flex-shrink-0">{p.matches_played} GP</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── MEMBERS ── */}
-        <div className="bg-white rounded-3xl shadow-lg shadow-black/10 overflow-hidden">
+        <div className="bg-white border border-orange-200 rounded-3xl shadow-md shadow-black/5 overflow-hidden">
           <div className="flex items-center gap-2 px-4 pt-4 pb-3">
             <Users size={15} className="text-purple-600" />
             <span className="font-display font-black text-gray-900 text-sm">Members</span>
             <span className="ml-auto text-xs font-display font-bold text-gray-400">{group.members.length}</span>
           </div>
 
-          {/* Avatar row */}
-          {group.members.length > 0 && (
-            <div className="flex gap-2 px-4 pb-3 flex-wrap">
-              {group.members.map((m) => (
-                <div key={m.id} className={`w-10 h-10 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-sm border-2 border-white shadow-sm`}
-                  title={m.name}>
-                  {m.name.charAt(0).toUpperCase()}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Member list */}
           <div className="border-t border-gray-100">
-            {group.members.map((m) => (
+            {group.members.map((m) => {
+              const isSelf = isOwner && m.id === myMemberId;
+              return (
               <div key={m.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 last:border-0">
                 <span className={`w-8 h-8 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-xs flex-shrink-0`}>
                   {m.name.charAt(0).toUpperCase()}
                 </span>
                 <span className="flex-1 font-display font-bold text-gray-800 text-sm truncate">{m.name}</span>
                 <span className="text-gray-300 text-xs font-display capitalize">{m.member_type}</span>
+                {isSelf && (
+                  <span className="text-[10px] font-display font-black text-purple-500 bg-purple-50 rounded-full px-2 py-0.5 ml-1">
+                    You · Owner
+                  </span>
+                )}
                 {isOwner && (
                   <button onClick={() => handleRemoveMember(m.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ml-1">
                     <Trash2 size={14} />
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
             {group.members.length === 0 && (
               <p className="text-gray-400 text-sm font-display text-center py-6">
                 Just you so far — invite friends below.
@@ -546,7 +643,7 @@ export default function GroupDetailView() {
         </div>
 
         {/* ── INVITE MEMBERS (owner) ── */}
-        {isOwner && <InviteMembers inviteLink={inviteLink} groupName={group.name} variant="dark" />}
+        {isOwner && <InviteMembers inviteLink={inviteLink} groupName={group.name} variant="light" />}
 
       </main>
 
@@ -582,6 +679,32 @@ export default function GroupDetailView() {
           onClose={() => setEditingSession(null)}
           busy={editBusy}
         />
+      )}
+
+      {/* Group Settings drawer — reachable any time, not just mid-session */}
+      {showSettings && (
+        <>
+          <motion.div
+            className="fixed inset-0 bg-black/40 z-40"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowSettings(false)}
+          />
+          <motion.div
+            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl flex flex-col"
+            initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+              <span className="font-display font-black text-gray-900 text-lg">Settings</span>
+              <button onClick={() => setShowSettings(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <GroupSettings groupId={group.id} />
+            </div>
+          </motion.div>
+        </>
       )}
     </div>
   );

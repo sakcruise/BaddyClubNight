@@ -25,14 +25,14 @@ const STEPS: Step[] = [
     body: "Players check in as they arrive and automatically join the queue in order.",
     emoji: "📋",
     position: "left",
-    mobileTab: "queue",
+    mobileTab: "live",
   },
   {
     title: "Courts",
     body: "Tap GO on a free court → pick 4 players → Start Match. That's it!",
     emoji: "🟢",
     position: "center-top",
-    mobileTab: "courts",
+    mobileTab: "live",
   },
   {
     title: "Check-in Grid",

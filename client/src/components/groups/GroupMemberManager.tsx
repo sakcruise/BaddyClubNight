@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Trash2, Users } from "lucide-react";
 import { useGroupStore, useMemberStore } from "../../store";
 import { groupsApi } from "../../services/groups";
+import { supabase } from "../../lib/supabase";
 import type { MemberType } from "../../types";
 import InviteMembers from "./InviteMembers";
 
@@ -13,12 +15,23 @@ const TYPE_DOT: Record<MemberType, string> = {
 /**
  * Group roster shown in the session Settings/Members drawer. Members join by
  * signing in through the invite link (no manual add-by-name). The owner can
- * still remove someone here; removals also drop them from the live member store.
+ * still remove someone here — including their own row (e.g. a bad auto-created
+ * entry) — since GroupDetailView's self-heal effect silently re-adds the owner
+ * on next load if they ever end up with no linked row at all.
  */
 export default function GroupMemberManager({ groupId }: { groupId: string }) {
   const group = useGroupStore((s) => s.groups.find((g) => g.id === groupId));
   const upsertGroup = useGroupStore((s) => s.upsertGroup);
   const setMembers = useMemberStore((s) => s.setMembers);
+  const [myMemberId, setMyMemberId] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    groupsApi.myMemberId(groupId).then(setMyMemberId).catch(() => {});
+    supabase.auth.getUser().then(({ data }) => {
+      setIsOwner(!!data.user && data.user.id === group?.owner_id);
+    });
+  }, [groupId, group?.owner_id]);
 
   // Re-pull the group from Supabase and mirror its roster into the live member store.
   async function refresh() {
@@ -34,6 +47,7 @@ export default function GroupMemberManager({ groupId }: { groupId: string }) {
     try {
       await groupsApi.removeMember(memberId);
       await refresh();
+      if (memberId === myMemberId) setMyMemberId(null);
     } catch (e: any) {
       alert(`Couldn't remove member: ${e?.message ?? "unknown error"}`);
     }
@@ -64,22 +78,30 @@ export default function GroupMemberManager({ groupId }: { groupId: string }) {
             <p className="text-gray-400 font-display font-bold text-sm">No members yet — invite some above</p>
           </div>
         ) : (
-          members.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-              <span className={`w-8 h-8 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-xs flex-shrink-0`}>
-                {m.name.charAt(0).toUpperCase()}
-              </span>
-              <span className="flex-1 font-display font-bold text-gray-800 text-sm truncate">{m.name}</span>
-              <span className="text-gray-300 text-xs font-display capitalize">{m.member_type}</span>
-              <button
-                onClick={() => handleRemove(m.id)}
-                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ml-1"
-                title="Remove member"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))
+          members.map((m) => {
+            const isSelf = isOwner && m.id === myMemberId;
+            return (
+              <div key={m.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                <span className={`w-8 h-8 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-xs flex-shrink-0`}>
+                  {m.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="flex-1 font-display font-bold text-gray-800 text-sm truncate">{m.name}</span>
+                <span className="text-gray-300 text-xs font-display capitalize">{m.member_type}</span>
+                {isSelf && (
+                  <span className="text-[10px] font-display font-black text-purple-500 bg-purple-50 rounded-full px-2 py-0.5 ml-1">
+                    You · Owner
+                  </span>
+                )}
+                <button
+                  onClick={() => handleRemove(m.id)}
+                  className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ml-1"
+                  title="Remove member"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

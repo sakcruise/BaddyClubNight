@@ -1,4 +1,5 @@
-export type ThemeKey = "orange" | "blue" | "green" | "purple" | "red" | "teal" | "pink";
+export type ThemeKey = "orange" | "blue" | "green" | "purple" | "red" | "teal" | "pink"
+  | "royal" | "clay" | "emerald" | "lagoon";
 
 export interface ThemeScale {
   "50":  string;
@@ -55,6 +56,27 @@ export const THEMES: Theme[] = [
     key: "pink", name: "Pink", emoji: "🩷",
     colors: { "50":"#fdf2f8","100":"#fce7f3","200":"#fbcfe8","300":"#f9a8d4",
                "400":"#f472b6","500":"#ec4899","600":"#db2777","700":"#be185d","800":"#9d174d","900":"#831843" },
+  },
+  // ── "Professional" set — calmer, gradient-friendly tones for a more premium look ──
+  {
+    key: "royal", name: "Royal Court", emoji: "🔷",
+    colors: { "50":"#eef1fc","100":"#dae1f8","200":"#b6c4f1","300":"#8ca3e6",
+               "400":"#5f7bd6","500":"#3d5ac0","600":"#2a45ae","700":"#22368c","800":"#1a2a6e","900":"#131f52" },
+  },
+  {
+    key: "clay", name: "Sunset Clay", emoji: "🟤",
+    colors: { "50":"#fcf3ec","100":"#f9e2d1","200":"#f1c29e","300":"#e49a65",
+               "400":"#d0793c","500":"#b65c22","600":"#a04a17","700":"#833b12","800":"#632c0d","900":"#451f09" },
+  },
+  {
+    key: "emerald", name: "Match Point", emoji: "💚",
+    colors: { "50":"#eaf7f1","100":"#d0eee0","200":"#a0dcc1","300":"#66c29d",
+               "400":"#38a97c","500":"#1f9163","600":"#157a51","700":"#106041","800":"#0b4832","900":"#073123" },
+  },
+  {
+    key: "lagoon", name: "Lagoon & Citrus", emoji: "🌊",
+    colors: { "50":"#eaf7f8","100":"#d0eef1","200":"#a3dee4","300":"#6bc5cf",
+               "400":"#3ca8b4","500":"#24899a","600":"#1a7284","700":"#145a69","800":"#0f4550","900":"#0a2f37" },
   },
 ];
 
