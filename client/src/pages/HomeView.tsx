@@ -92,10 +92,10 @@ export default function HomeView() {
             <ShuttlecockIcon size={80} />
           </motion.div>
           <h2 className="text-white font-display font-black text-4xl leading-tight mb-1">
-            What would you<br />like to do?
+            Ready for club night?
           </h2>
           <p className="text-orange-200 text-sm font-display font-semibold">
-            Choose an option below to get started
+            Let's get {displayName} up and running
           </p>
         </div>
 
