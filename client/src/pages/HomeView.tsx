@@ -92,10 +92,10 @@ export default function HomeView() {
             <ShuttlecockIcon size={80} />
           </motion.div>
           <h2 className="text-white font-display font-black text-4xl leading-tight mb-1">
-            Ready for club night?
+            Welcome, {displayName}! 👋
           </h2>
           <p className="text-orange-200 text-sm font-display font-semibold">
-            Let's get {displayName} up and running
+            Ready to start tonight's session?
           </p>
         </div>
 
@@ -130,15 +130,7 @@ export default function HomeView() {
                 className="overflow-hidden"
               >
                 <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-                  {/* Club name — read-only, comes from Settings */}
-                  <div>
-                    <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Club Name</label>
-                    <div className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 font-display font-bold text-gray-900
-                               bg-gray-50 cursor-default select-none">
-                      {clubConfig.name || "My Club"}
-                    </div>
-                  </div>
-
+                  {/* Club name already shown top-left in the header — no need to repeat it here */}
                   {/* Courts */}
                   <div>
                     <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Courts Tonight</label>
