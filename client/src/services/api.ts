@@ -10,7 +10,7 @@
 import { supabase } from "../lib/supabase";
 import type { Member, Session, Match, QueuePosition, MemberType } from "../types";
 import { v4 as uuid } from "uuid";
-import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessionArchiveStore } from "../store";
+import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessionArchiveStore, useGroupStore } from "../store";
 
 // ─── Offline detection ────────────────────────────────────────────────────────
 // True ONLY when the user explicitly chose offline mode or the browser reports no
@@ -158,12 +158,20 @@ export const authApi = {
     localStorage.removeItem("offline-mode");
     localStorage.removeItem("offline-cached-at");
     localStorage.removeItem("friends-guest"); // clear any legacy guest-mode flag
-    // Reset app mode so the next user starts fresh (avoids stale "friends" mode
-    // when a club account logs in after a group session)
-    try {
-      const { useGroupStore } = await import("../store");
-      useGroupStore.getState().setAppMode(null);
-    } catch { /* best effort */ }
+
+    // Fully clear all account-scoped state — otherwise the next login (possibly a
+    // different account type, e.g. a club account after a group session) can land
+    // straight back into the previous account's stale active session: App.tsx's
+    // ModeChooser gate only fires on `appMode === null && !session?.group_id`, so a
+    // leftover session with group_id set bypasses it entirely even after appMode
+    // itself is reset.
+    useSessionStore.setState({ session: null, courts: [] });
+    useQueueStore.getState().setQueue([]);
+    useQueueStore.getState().setActiveMemberIds(new Set());
+    useQueueStore.getState().clearPitstops();
+    useMatchStore.getState().setMatches([]);
+    useMemberStore.getState().setMembers([]);
+    useGroupStore.setState({ groups: [], appMode: null });
   },
 
   /**
