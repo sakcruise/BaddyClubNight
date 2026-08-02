@@ -46,7 +46,9 @@ export default function CourtsView() {
     const newPitstops: PitstopState[] = [];
     for (let i = 0; i < slotsNeeded; i++) {
       const eligible = freshQueue
-        .filter((q) => !freshActiveIds.has(q.member_id) && !excludedIds.has(q.member_id))
+        // Exclude ids with no resolvable member (e.g. someone removed from the group,
+        // or a stale queue row) — never auto-pick someone whose name can't be shown
+        .filter((q) => !freshActiveIds.has(q.member_id) && !excludedIds.has(q.member_id) && memberMap[q.member_id])
         .sort((a, b) => a.position - b.position)
         .map((q) => q.member_id);
       if (eligible.length < 4) break;

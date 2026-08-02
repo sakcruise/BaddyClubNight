@@ -457,21 +457,31 @@ export const queueApi = {
       return { queue: useQueueStore.getState().queue };
     }
     // Group sessions: queue_entries.member_id points at group_members, not members,
-    // so we can't join the members table. Resolve player objects from the roster
-    // already loaded into the member store at session start.
+    // so we can't join the members table. The member store is only hydrated once at
+    // session start (MainView), so anyone who joins the group mid-session is missing
+    // from it — fetch the roster fresh here and merge it back in so their name
+    // resolves everywhere (queue, pitstops, etc.) instead of falling back to a raw id.
     if (activeGroupId()) {
-      const { data, error } = await supabase
-        .from("queue_entries")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("position");
+      const gid = activeGroupId()!;
+      const [{ data, error }, { data: gmData }] = await Promise.all([
+        supabase.from("queue_entries").select("*").eq("session_id", sessionId).order("position"),
+        supabase.from("group_members").select("id, display_name, member_type, joined_at").eq("group_id", gid),
+      ]);
       const rows = check(data, error);
-      const roster = useMemberStore.getState().members;
+      const existing = useMemberStore.getState().members;
+      const freshRoster: Record<string, Member> = { ...existing };
+      (gmData ?? []).forEach((m: any) => {
+        freshRoster[m.id] = {
+          id: m.id, name: m.display_name, member_type: (m.member_type ?? "male") as MemberType,
+          level: 2, email: "", created_at: m.joined_at,
+        };
+      });
+      useMemberStore.getState().setMembers(Object.values(freshRoster));
       const queue: QueuePosition[] = rows.map((r: any) => ({
         member_id: r.member_id,
         position: r.position,
         checked_in_at: r.checked_in_at,
-        member: roster[r.member_id],
+        member: freshRoster[r.member_id],
       }));
       return { queue };
     }
