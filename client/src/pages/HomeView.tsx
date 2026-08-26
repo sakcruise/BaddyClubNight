@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSessionStore, useAuthStore, useMemberStore } from "../store";
@@ -6,7 +6,7 @@ import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
-import { History, Users, Cog, LogOut, Play, X, BarChart2 } from "lucide-react";
+import { History, Users, Cog, LogOut, Play, X, BarChart2, Zap, Info } from "lucide-react";
 
 type Panel = "start" | "members" | "settings" | null;
 
@@ -14,12 +14,20 @@ export default function HomeView() {
   const navigate = useNavigate();
   const { adminName, displayName: authDisplayName } = useAuthStore();
   const logout = () => authApi.logout();
-  const { setSession, setCourts, clubName } = useSessionStore();
+  const { setSession, setCourts, clubName, clubConfig, setClubConfig } = useSessionStore();
   const { setMembers } = useMemberStore();
 
   const [panel, setPanel] = useState<Panel>(null);
   const [numCourts, setNumCourts] = useState(4);
   const [starting, setStarting] = useState(false);
+  const [infoTip, setInfoTip] = useState<"balanced" | "competitive" | null>(null);
+
+  useEffect(() => {
+    if (!infoTip) return;
+    const close = () => setInfoTip(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [infoTip]);
 
   const displayName = clubName || authDisplayName || "Club Night";
 
@@ -153,6 +161,73 @@ export default function HomeView() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Auto-Pick */}
+                  <div className="rounded-xl border border-gray-200 px-4 py-3 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-violet-600">
+                        <Zap size={15} />
+                        <span className="font-display font-bold text-sm text-gray-800">Auto-Pick Players</span>
+                      </div>
+                      <button
+                        onClick={() => setClubConfig({ autoPickEnabled: !clubConfig.autoPickEnabled })}
+                        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0
+                          ${clubConfig.autoPickEnabled ? "bg-violet-500" : "bg-gray-200"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform
+                          ${clubConfig.autoPickEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                      </button>
+                    </div>
+
+                    {clubConfig.autoPickEnabled && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div
+                          onClick={() => setClubConfig({ autoPickMode: "balanced" })}
+                          className={`relative py-2 px-3 rounded-xl border-2 text-left transition-all cursor-pointer
+                            ${clubConfig.autoPickMode === "balanced" || !clubConfig.autoPickMode
+                              ? "border-violet-400 bg-violet-50"
+                              : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="font-display font-bold text-xs text-gray-900">⚖️ Balanced</p>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setInfoTip(infoTip === "balanced" ? null : "balanced"); }}
+                              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                            >
+                              <Info size={12} />
+                            </button>
+                          </div>
+                          {infoTip === "balanced" && (
+                            <div className="absolute z-10 top-full left-0 mt-1 w-44 bg-gray-900 text-white text-[10px] font-body leading-snug rounded-lg px-2.5 py-2 shadow-lg">
+                              Mixes strong &amp; weak players - great for social play
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          onClick={() => setClubConfig({ autoPickMode: "competitive" })}
+                          className={`relative py-2 px-3 rounded-xl border-2 text-left transition-all cursor-pointer
+                            ${clubConfig.autoPickMode === "competitive"
+                              ? "border-violet-400 bg-violet-50"
+                              : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="font-display font-bold text-xs text-gray-900">🏆 Competitive</p>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setInfoTip(infoTip === "competitive" ? null : "competitive"); }}
+                              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                            >
+                              <Info size={12} />
+                            </button>
+                          </div>
+                          {infoTip === "competitive" && (
+                            <div className="absolute z-10 top-full right-0 mt-1 w-44 bg-gray-900 text-white text-[10px] font-body leading-snug rounded-lg px-2.5 py-2 shadow-lg">
+                              Groups similar levels - tighter, more even matches
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <button
