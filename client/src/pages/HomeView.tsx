@@ -14,7 +14,7 @@ export default function HomeView() {
   const navigate = useNavigate();
   const { adminName, displayName: authDisplayName } = useAuthStore();
   const logout = () => authApi.logout();
-  const { setSession, setCourts, clubName, clubConfig } = useSessionStore();
+  const { setSession, setCourts, clubName } = useSessionStore();
   const { setMembers } = useMemberStore();
 
   const [panel, setPanel] = useState<Panel>(null);
@@ -28,11 +28,11 @@ export default function HomeView() {
   });
 
   async function handleStart() {
-    if (!clubConfig.name.trim()) return;
+    if (!displayName.trim()) return;
     setStarting(true);
     try {
       const [{ session }, membersRes] = await Promise.all([
-        sessionsApi.start({ club_name: clubConfig.name.trim(), num_courts: numCourts }),
+        sessionsApi.start({ club_name: displayName.trim(), num_courts: numCourts }),
         membersApi.list(),
       ]);
       setMembers(membersRes.members);
@@ -157,7 +157,7 @@ export default function HomeView() {
 
                   <button
                     onClick={handleStart}
-                    disabled={!clubConfig.name.trim() || starting}
+                    disabled={!displayName.trim() || starting}
                     className="w-full py-3 rounded-xl font-display font-black text-white text-base
                                bg-gradient-to-r from-orange-600 to-orange-500
                                hover:from-orange-700 hover:to-orange-600
