@@ -769,8 +769,8 @@ export default function CheckInPanel() {
         />
       ))}
 
-      {/* Set up Pitstop — shown when enough free players exist and under the cap of 2 */}
-      {pitstops.length < 2 && (() => {
+      {/* Set up Pitstop — only makes sense once courts are full; a free court should just be filled directly */}
+      {!freeCourt && pitstops.length < 2 && (() => {
         const pitstopPlayerIds = new Set(pitstops.flatMap((ps) => ps.players));
         const eligible = sortedQueue.filter((q) => !activeMemberIds.has(q.member_id) && !pitstopPlayerIds.has(q.member_id));
         if (eligible.length < 4) return null;
