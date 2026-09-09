@@ -8,9 +8,13 @@ import Button from "../shared/Button";
 interface Props {
   matchId: string;
   onClose: () => void;
+  /** Fires after the score is actually saved. If omitted, falls back to onClose
+   * so existing callers keep working — pass this when the caller needs to tell
+   * "saved" apart from "cancelled" (e.g. to mark something complete only on save). */
+  onSaved?: (scoreA: number, scoreB: number) => void;
 }
 
-export default function ScoreEntry({ matchId, onClose }: Props) {
+export default function ScoreEntry({ matchId, onClose, onSaved }: Props) {
   const { matches, updateMatch } = useMatchStore();
   const { members } = useMemberStore();
   const match = matches.find((m) => m.id === matchId);
@@ -29,7 +33,8 @@ export default function ScoreEntry({ matchId, onClose }: Props) {
     try {
       const updated = await matchesApi.score(matchId, scoreA, scoreB);
       updateMatch(matchId, updated.match);
-      onClose();
+      if (onSaved) onSaved(scoreA, scoreB);
+      else onClose();
     } finally {
       setSaving(false);
     }
@@ -45,9 +50,20 @@ export default function ScoreEntry({ matchId, onClose }: Props) {
         >
           −
         </button>
-        <span className="w-16 text-center font-display font-black text-5xl text-brand-900">
-          {value}
-        </span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={value}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            onChange(Number.isNaN(n) ? 0 : Math.max(0, n));
+          }}
+          onFocus={(e) => e.target.select()}
+          className="w-20 text-center font-display font-black text-5xl text-brand-900
+                     bg-transparent border-b-2 border-brand-200 focus:border-brand-500 focus:outline-none
+                     [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
         <button
           onClick={() => onChange(value + 1)}
           className="w-14 h-14 rounded-2xl bg-brand-500 text-white text-2xl font-black

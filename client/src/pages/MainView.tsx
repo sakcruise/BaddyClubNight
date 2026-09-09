@@ -187,6 +187,7 @@ export default function MainView() {
   }, [session?.id]);
 
   if (!session) return appMode === "friends" ? <Navigate to="/groups" replace /> : <HomeView />;
+  if (session.tournament_id) return <Navigate to={`/tournament/${session.tournament_id}`} replace />;
 
   const queuedIds = new Set(queue.map((q) => q.member_id));
   const allCheckedInIds = new Set([...queuedIds, ...activeMemberIds]);

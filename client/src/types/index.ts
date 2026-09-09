@@ -60,8 +60,48 @@ export interface Session {
   num_courts: number;
   status: "setup" | "active" | "ended" | "upcoming";
   group_id?: string;      // set when this session belongs to a friends-group (runs on local engine)
+  tournament_id?: string; // set when this session is running a tournament
   scheduled_at?: string;  // ISO datetime for upcoming/scheduled sessions
   venue?: string;
+  created_at: string;
+}
+
+// ─── Tournaments (level-balanced groups → round-robin → knockout) ─────────────
+
+export type TournamentStatus = "groups" | "knockout" | "complete";
+export type FixtureStage = "group" | "knockout";
+export type FixtureStatus = "pending" | "active" | "complete";
+
+export interface Tournament {
+  id: string;
+  session_id: string;
+  name: string;
+  num_groups: number;
+  advance_per_group: number;
+  status: TournamentStatus;
+  created_at: string;
+}
+
+export interface TournamentPlayer {
+  id: string;
+  tournament_id: string;
+  member_id: string;
+  group_index: number;
+  pair_index: number | null; // null = reserve (odd one out, not paired)
+  seed: number;
+}
+
+export interface TournamentFixture {
+  id: string;
+  tournament_id: string;
+  stage: FixtureStage;
+  group_index: number | null;
+  round: number;
+  seed: number | null;
+  team_a: [string, string] | null;
+  team_b: [string, string] | null; // null = bye (team_a auto-advances)
+  match_id: string | null;
+  status: FixtureStatus;
   created_at: string;
 }
 

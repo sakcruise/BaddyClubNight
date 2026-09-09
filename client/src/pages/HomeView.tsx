@@ -6,7 +6,7 @@ import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
-import { History, Users, Cog, LogOut, Play, X, BarChart2, Zap, Info } from "lucide-react";
+import { History, Users, Cog, LogOut, Play, X, BarChart2, Zap, Info, Trophy } from "lucide-react";
 
 type Panel = "start" | "members" | "settings" | null;
 
@@ -20,6 +20,7 @@ export default function HomeView() {
   const [panel, setPanel] = useState<Panel>(null);
   const [numCourts, setNumCourts] = useState(4);
   const [starting, setStarting] = useState(false);
+  const [startingTournament, setStartingTournament] = useState(false);
   const [infoTip, setInfoTip] = useState<"balanced" | "competitive" | null>(null);
 
   useEffect(() => {
@@ -48,6 +49,23 @@ export default function HomeView() {
       setCourts(Array.from({ length: numCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function handleStartTournament() {
+    if (!displayName.trim()) return;
+    setStartingTournament(true);
+    try {
+      const [{ session }, membersRes] = await Promise.all([
+        sessionsApi.start({ club_name: displayName.trim(), num_courts: numCourts }),
+        membersApi.list(),
+      ]);
+      setMembers(membersRes.members);
+      setSession(session);
+      setCourts(Array.from({ length: numCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
+      navigate(`/tournament-setup/${session.id}`);
+    } finally {
+      setStartingTournament(false);
     }
   }
 
@@ -244,6 +262,24 @@ export default function HomeView() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Start a Tournament — primary */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleStartTournament}
+            disabled={!displayName.trim() || startingTournament}
+            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left disabled:opacity-50"
+          >
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-500/30">
+              <Trophy size={22} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-display font-black text-gray-900 text-base">
+                {startingTournament ? "Starting…" : "Start a Tournament"}
+              </div>
+              <div className="text-gray-500 text-sm font-display">Level-balanced groups, round-robin &amp; knockout</div>
+            </div>
+          </motion.button>
 
           {/* Secondary options */}
           <div className="grid grid-cols-2 gap-3">

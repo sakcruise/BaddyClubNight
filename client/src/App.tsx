@@ -7,6 +7,8 @@ import AnalyticsView from "./pages/AnalyticsView";
 import ModeChooser from "./pages/ModeChooser";
 import GroupsHomeView from "./pages/GroupsHomeView";
 import GroupDetailView from "./pages/GroupDetailView";
+import TournamentSetupView from "./pages/TournamentSetupView";
+import TournamentView from "./pages/TournamentView";
 import JoinView from "./pages/JoinView";
 import SessionRsvpView from "./pages/SessionRsvpView";
 import MasterAdminView from "./pages/MasterAdminView";
@@ -40,6 +42,8 @@ function AppRoutes() {
       <Route path="/analytics" element={<AnalyticsView />} />
       <Route path="/groups" element={<GroupsHomeView />} />
       <Route path="/groups/:id" element={<GroupDetailView />} />
+      <Route path="/tournament-setup/:sessionId" element={<TournamentSetupView />} />
+      <Route path="/tournament/:id" element={<TournamentView />} />
       {/* Catch-all redirects for old/unused routes */}
       <Route path="/leaderboard" element={<Navigate to="/" replace />} />
       <Route path="/kiosk" element={<Navigate to="/" replace />} />
