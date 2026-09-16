@@ -73,19 +73,30 @@ function rowToFixture(f: any): TournamentFixture {
 }
 
 export const tournamentsApi = {
-  /** Snake-draft + pair + round-robin the given participants, then persist the
-   * whole group stage in one go. */
+  /** Draft the roster into level-balanced, pairable groups (snake draft +
+   * strongest-with-weakest pairing) WITHOUT persisting anything — a preview
+   * the admin can review and hand-edit before create() commits it. */
+  draft: (participantIds: string[], numGroups: number): { pairsByGroup: Array<[string, string]>[]; reserves: string[] } => {
+    const members = useMemberStore.getState().members;
+    const { groups, reserves } = snakeDraftGroups(participantIds, members, numGroups);
+    const pairsByGroup = groups.map((groupMemberIds) => pairStrongestWithWeakest(groupMemberIds, members));
+    return { pairsByGroup, reserves };
+  },
+
+  /** Persist a (possibly hand-edited) group stage: pairsByGroup[g] is the
+   * final list of pairs for group g, in whatever order the admin settled on. */
   create: async (
     sessionId: string,
-    participantIds: string[],
-    numGroups: number,
+    pairsByGroup: Array<[string, string]>[],
+    reserves: string[],
     advancePerGroup = 1
   ): Promise<Tournament> => {
     const clubId = await getClubId();
     const members = useMemberStore.getState().members;
+    const numGroups = pairsByGroup.length;
 
-    const { groups, reserves } = snakeDraftGroups(participantIds, members, numGroups);
-    const seedOf = new Map(rankParticipants(participantIds, members).map((id, i) => [id, i + 1]));
+    const allParticipantIds = [...pairsByGroup.flat(2), ...reserves];
+    const seedOf = new Map(rankParticipants(allParticipantIds, members).map((id, i) => [id, i + 1]));
 
     const { data: tRow, error: tErr } = await supabase
       .from("tournaments")
@@ -97,8 +108,7 @@ export const tournamentsApi = {
     const playerRows: any[] = [];
     const fixtureRows: any[] = [];
 
-    groups.forEach((groupMemberIds, groupIndex) => {
-      const pairs = pairStrongestWithWeakest(groupMemberIds, members);
+    pairsByGroup.forEach((pairs, groupIndex) => {
       pairs.forEach(([a, b], pairIndex) => {
         playerRows.push({ tournament_id: tournament.id, member_id: a, group_index: groupIndex, pair_index: pairIndex, seed: seedOf.get(a) });
         playerRows.push({ tournament_id: tournament.id, member_id: b, group_index: groupIndex, pair_index: pairIndex, seed: seedOf.get(b) });
