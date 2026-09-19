@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Court, Match, Member, Tournament, TournamentFixture } from "../../types";
 import type { GroupStanding } from "../../utils/tournament";
 
@@ -171,6 +171,31 @@ function buildLines(p: Props, tick: number): string[] {
   return lines;
 }
 
+type Mood = "trophy" | "fire" | "live" | "cheer" | "ouch" | "wink" | "banter";
+
+// Lines are plain strings; the mood (and so the emoji/colour/animation) is read off the wording.
+function moodOf(line: string): Mood {
+  if (/champion|trophy|🏆/i.test(line)) return "trophy";
+  if (/nailbiter|final time|demolition|heating up/i.test(line)) return "fire";
+  if (/^court \d|on court|popcorn|going home/i.test(line)) return "live";
+  if (/unbeaten|cruising|belongs to|lead group|latest result|win \d/i.test(line)) return "cheer";
+  if (/thoughts and prayers|character building|chop chop|haven't hit|all talk/i.test(line)) return "ouch";
+  if (/bye|jammy|dead heat/i.test(line)) return "wink";
+  return "banter";
+}
+
+const MOOD_STYLE: Record<Mood, { emoji: string; text: string; sweep: string }> = {
+  trophy: { emoji: "🏆", text: "text-amber-700", sweep: "from-amber-200/0 via-amber-200/70 to-amber-200/0" },
+  fire: { emoji: "🔥", text: "text-red-600", sweep: "from-red-200/0 via-red-200/60 to-red-200/0" },
+  live: { emoji: "🏸", text: "text-violet-900", sweep: "from-violet-200/0 via-violet-200/70 to-violet-200/0" },
+  cheer: { emoji: "🎉", text: "text-emerald-700", sweep: "from-emerald-200/0 via-emerald-200/60 to-emerald-200/0" },
+  ouch: { emoji: "😬", text: "text-gray-700", sweep: "from-gray-200/0 via-gray-200/70 to-gray-200/0" },
+  wink: { emoji: "😉", text: "text-violet-800", sweep: "from-violet-200/0 via-violet-200/60 to-violet-200/0" },
+  banter: { emoji: "💬", text: "text-violet-900", sweep: "from-violet-200/0 via-violet-200/50 to-violet-200/0" },
+};
+
+const CONFETTI = ["#f59e0b", "#8b5cf6", "#10b981", "#ef4444", "#3b82f6", "#ec4899"];
+
 function useClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -204,6 +229,9 @@ export default function TournamentTicker(props: Props) {
     [props.fixtures, props.standingsByGroup, props.matches, props.courts, props.tournament.status, Math.floor(tick / 5)]
   );
   const line = pool.length > 0 ? pool[tick % pool.length] : "";
+  const mood = moodOf(line);
+  const style = MOOD_STYLE[mood];
+  const reduceMotion = useReducedMotion();
 
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -222,18 +250,64 @@ export default function TournamentTicker(props: Props) {
       </div>
 
       {/* Rotating commentary */}
-      <div className="relative flex-1 min-w-0 h-12 flex items-center pr-4">
+      <div className="relative flex-1 min-w-0 h-12 flex items-center pr-4 overflow-hidden">
+        {/* Highlight sweep on every new line */}
+        {!reduceMotion && (
+          <motion.div
+            key={`sweep-${tick}`}
+            initial={{ x: "-100%" }}
+            animate={{ x: "200%" }}
+            transition={{ duration: 1.1, ease: "easeOut" }}
+            className={`pointer-events-none absolute inset-y-0 w-1/3 bg-gradient-to-r ${style.sweep}`}
+          />
+        )}
+        {/* Confetti for the big moments */}
+        {!reduceMotion && (mood === "trophy" || mood === "fire") && (
+          <div key={`confetti-${tick}`} className="pointer-events-none absolute inset-0">
+            {CONFETTI.map((c, i) => (
+              <motion.span
+                key={i}
+                initial={{ x: 24, y: 24, opacity: 1, scale: 1 }}
+                animate={{ x: 24 + (i - 2.5) * 34, y: [24, -16, 40], opacity: [1, 1, 0], rotate: 360 }}
+                transition={{ duration: 1.3, delay: i * 0.04, ease: "easeOut" }}
+                className="absolute w-1.5 h-1.5 rounded-sm"
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+        )}
         <AnimatePresence mode="wait">
-          <motion.p
+          <motion.div
             key={`${tick}-${line}`}
-            initial={{ y: 22, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -22, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="font-display font-bold text-sm truncate w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : -18 }}
+            transition={{ duration: 0.25 }}
+            className={`flex items-center gap-2.5 w-full min-w-0 font-display font-bold text-sm ${style.text}`}
           >
-            {line}
-          </motion.p>
+            <motion.span
+              initial={reduceMotion ? {} : { scale: 0, rotate: -30 }}
+              animate={reduceMotion ? {} : { scale: [0, 1.4, 1], rotate: [-30, 12, -8, 0] }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="text-lg leading-none flex-shrink-0"
+              aria-hidden
+            >
+              {style.emoji}
+            </motion.span>
+            <span className="truncate">
+              {line.split(" ").map((word, i) => (
+                <motion.span
+                  key={i}
+                  initial={reduceMotion ? {} : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: reduceMotion ? 0 : 0.12 + i * 0.035, type: "spring", stiffness: 500, damping: 30 }}
+                  className="inline-block"
+                >
+                  {word}&nbsp;
+                </motion.span>
+              ))}
+            </span>
+          </motion.div>
         </AnimatePresence>
         <motion.div
           key={tick}
