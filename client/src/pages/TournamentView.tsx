@@ -283,7 +283,7 @@ export default function TournamentView() {
     }
   }
 
-  function FixtureRow({ fixture }: { fixture: TournamentFixture }) {
+  function FixtureRow({ fixture, isKnockout = false }: { fixture: TournamentFixture; isKnockout?: boolean }) {
     const [courtChoice, setCourtChoice] = useState<number | "">("");
     const isBye = !fixture.team_b;
     const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
@@ -299,7 +299,7 @@ export default function TournamentView() {
             <p className="text-xs font-display text-gray-400 capitalize">{isBye ? "bye — auto-advanced" : fixture.status}</p>
           )}
         </div>
-        {!isBye && fixture.status === "pending" && (
+        {!isBye && !isKnockout && fixture.status === "pending" && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <select
               value={courtChoice}
@@ -472,7 +472,7 @@ export default function TournamentView() {
                         )}
                       </div>
 
-                      <div className="overflow-x-auto -mx-1 px-1">
+                      <div className="w-full">
                         <table className="border-collapse text-sm font-display w-full">
                           <thead>
                             <tr>
@@ -641,7 +641,7 @@ export default function TournamentView() {
                     members={members}
                     busy={busy}
                     onAdvance={handleAdvanceRound}
-                    renderFixture={(f) => <FixtureRow key={f.id} fixture={f} />}
+                    renderFixture={(f) => <FixtureRow key={f.id} fixture={f} isKnockout={true} />}
                   />
                 </section>
               )}
