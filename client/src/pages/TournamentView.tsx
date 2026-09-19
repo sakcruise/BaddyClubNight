@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useSessionStore, useMemberStore, useMatchStore } from "../store";
+import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessionArchiveStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
-import { matchesApi } from "../services/api";
+import { matchesApi, sessionsApi } from "../services/api";
 import type { GroupStanding } from "../utils/tournament";
 import type { Tournament, TournamentFixture, TournamentPlayer } from "../types";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
-import { Trophy, ChevronLeft } from "lucide-react";
+import EndNightCheers from "../components/shared/EndNightCheers";
+import { Trophy, LogOut } from "lucide-react";
 
 function pairName(ids: [string, string] | null, members: ReturnType<typeof useMemberStore.getState>["members"]) {
   if (!ids) return "Bye";
@@ -77,8 +78,10 @@ export default function TournamentView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { members } = useMemberStore();
-  const { courts, updateCourtStatus, session } = useSessionStore();
-  const { addMatch } = useMatchStore();
+  const { courts, updateCourtStatus, session, endSession } = useSessionStore();
+  const { matches, addMatch, setMatches } = useMatchStore();
+  const { setQueue, setActiveMemberIds } = useQueueStore();
+  const { archiveSession } = useSessionArchiveStore();
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
@@ -87,6 +90,8 @@ export default function TournamentView() {
   const [scoringFixture, setScoringFixture] = useState<TournamentFixture | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCheers, setShowCheers] = useState(false);
+  const [ending, setEnding] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -169,6 +174,32 @@ export default function TournamentView() {
     }
   }
 
+  function handleEndNight() {
+    if (!session) return;
+    setShowCheers(true);
+  }
+
+  async function confirmEndNight() {
+    if (!session) return;
+    setEnding(true);
+    try {
+      archiveSession({ ...session, status: "ended" }, matches);
+      await sessionsApi.end(session.id);
+      setShowCheers(false);
+      endSession();
+      setMatches([]);
+      setQueue([]);
+      setActiveMemberIds(new Set());
+      navigate("/");
+    } catch (err) {
+      console.error("End night failed:", err);
+      setShowCheers(false);
+      alert(`Could not end the session: ${err instanceof Error ? err.message : "unknown error"}. Please try again.`);
+    } finally {
+      setEnding(false);
+    }
+  }
+
   async function handleAdvanceRound(round: number) {
     if (!id) return;
     setBusy(true);
@@ -227,8 +258,8 @@ export default function TournamentView() {
   return (
     <div className="min-h-screen min-h-[100dvh] bg-gray-50 flex flex-col">
       <header className="flex items-center gap-3 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
-        <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-500">
-          <ChevronLeft size={20} />
+        <button onClick={handleEndNight} title="End Night" className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-500">
+          <LogOut size={20} />
         </button>
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0">
           <Trophy size={18} className="text-white" />
@@ -340,6 +371,17 @@ export default function TournamentView() {
           matchId={scoringFixture.match_id}
           onClose={() => setScoringFixture(null)}
           onSaved={() => handleScoreSaved(scoringFixture)}
+        />
+      )}
+
+      {showCheers && (
+        <EndNightCheers
+          matches={matches}
+          members={members}
+          onConfirm={confirmEndNight}
+          onCancel={() => setShowCheers(false)}
+          ending={ending}
+          isGroup={!!session?.group_id}
         />
       )}
     </div>
