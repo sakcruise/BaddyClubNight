@@ -332,7 +332,7 @@ export default function TournamentView() {
         {!isBye && fixture.status === "active" && (
           <div className="flex gap-2">
             <Button size="md" fullWidth onClick={() => setScoringFixture(fixture)}>
-              <Radio size={14} /> Enter Score
+              <Radio size={14} /> Score
             </Button>
             <button
               onClick={() => handleResetFixture(fixture)}
