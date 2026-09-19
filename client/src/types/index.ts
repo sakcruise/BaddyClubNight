@@ -8,7 +8,7 @@ export interface Member {
   avatar_url?: string;
   email?: string;
   member_type: MemberType;
-  level: number;          // 1=Beginner 2=Improver 3=Intermediate 4=Advanced 5=Elite
+  level: number;          // 1..MAX_LEVEL, see LEVEL_LABELS
   created_at: string;
 }
 
@@ -18,9 +18,12 @@ export const LEVEL_LABELS: Record<number, string> = {
   1: "Beginner",
   2: "Improver",
   3: "Intermediate",
-  4: "Advanced",
-  5: "Elite",
+  4: "Upper Intermediate",
+  5: "Advanced",
+  6: "Elite",
 };
+export const MAX_LEVEL = 6;
+export const LEVELS = Array.from({ length: MAX_LEVEL }, (_, i) => i + 1);
 
 export type CourtStatus = "idle" | "playing" | "reserved";
 

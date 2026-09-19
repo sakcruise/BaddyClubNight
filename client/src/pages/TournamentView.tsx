@@ -292,12 +292,11 @@ export default function TournamentView() {
     return sortedCourts.length > 0 ? sortedCourts[g % sortedCourts.length] : undefined;
   }
 
-  // Prefer the group's own court, otherwise any free one — the operator never picks.
+  // Always launches: the group's own court, no busy check. Courts here are just labels —
+  // the operator decides who's actually on which court.
   function handlePlayGroupFixture(g: number, fixture: TournamentFixture) {
-    if (sortedCourts.length === 0) { setError("No courts are set up for this session."); return; }
-    const own = courtForGroup(g);
-    const court = own?.status === "idle" ? own : idleCourts[0];
-    if (!court) { setError("All courts are busy — finish a match first."); return; }
+    const court = courtForGroup(g);
+    if (!court) { setError("No courts are set up for this session."); return; }
     handleLaunch(fixture, court.id);
   }
 
@@ -460,7 +459,8 @@ export default function TournamentView() {
     const aWon = hasScore && scoreA > scoreB;
     const nameCls = (won: boolean) =>
       `truncate font-display font-bold text-sm ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-800"}`;
-    const freeCourt = idleCourts[0];
+    // First free court if there is one, otherwise just the first court — never blocked.
+    const freeCourt = idleCourts[0] ?? sortedCourts[0];
 
     return (
       <div
@@ -480,7 +480,7 @@ export default function TournamentView() {
 
         {!isBye && fixture.status === "pending" && (
           <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
-            <Play size={14} /> {freeCourt ? "Play" : "All courts busy"}
+            <Play size={14} /> Play
           </Button>
         )}
         {!isBye && fixture.status === "active" && (

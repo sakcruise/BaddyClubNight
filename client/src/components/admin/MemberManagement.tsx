@@ -4,20 +4,21 @@ import { useMemberStore } from "../../store";
 import Avatar from "../shared/Avatar";
 import { UserPlus, Trash2, Check, X, Pencil, CloudDownload } from "lucide-react";
 import type { MemberType } from "../../types";
-import { LEVEL_LABELS } from "../../types";
+import { LEVEL_LABELS, LEVELS } from "../../types";
 
 const TYPE_OPTIONS: { value: MemberType; label: string; color: string }[] = [
   { value: "male",   label: "♂ Male",   color: "bg-blue-100 text-blue-700 border-blue-300" },
   { value: "female", label: "♀ Female", color: "bg-pink-100 text-pink-700 border-pink-300" },
 ];
 
-const LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
+const LEVEL_OPTIONS = LEVELS;
 const LEVEL_COLORS: Record<number, string> = {
   1: "bg-gray-100 text-gray-600 border-gray-300",
   2: "bg-green-100 text-green-700 border-green-300",
   3: "bg-blue-100 text-blue-700 border-blue-300",
-  4: "bg-purple-100 text-purple-700 border-purple-300",
+  4: "bg-violet-100 text-violet-700 border-violet-300",
   5: "bg-orange-100 text-orange-700 border-orange-300",
+  6: "bg-red-100 text-red-700 border-red-300",
 };
 
 export default function MemberManagement() {
