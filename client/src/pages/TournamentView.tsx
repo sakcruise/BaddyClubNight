@@ -528,7 +528,7 @@ export default function TournamentView() {
   }
 
   return (
-    <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col overflow-hidden antialiased">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0">
           <Trophy size={18} className="text-white" />
@@ -706,8 +706,8 @@ export default function TournamentView() {
                       <div className="flex items-center gap-2">
                         <h2 className="font-display font-bold text-gray-900 text-base">Group {g + 1}</h2>
                         {leader && (
-                          <span className="flex items-center gap-1.5 text-lg font-body font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3.5 py-1">
-                            <Trophy size={16} className="text-violet-500" /> {pairName(leader.pair, members)}
+                          <span className="flex items-center gap-1.5 text-[15px] font-body font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3 py-0.5">
+                            <Trophy size={13} className="text-violet-500" /> {pairName(leader.pair, members)}
                           </span>
                         )}
                       </div>

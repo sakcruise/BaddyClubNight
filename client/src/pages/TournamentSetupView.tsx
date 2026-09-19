@@ -101,6 +101,28 @@ export default function TournamentSetupView() {
     }
   }
 
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Check in / out everyone on the roster in one go (ignores the search/letter filter).
+  async function setEveryone(checkedIn: boolean) {
+    if (!sessionId) return;
+    setBulkBusy(true);
+    try {
+      const ids = checkedIn
+        ? Object.values(members).filter((m) => m.member_type !== "guest" && m.active !== false && !selected.has(m.id)).map((m) => m.id)
+        : Array.from(selected);
+      let latest = queue;
+      for (const id of ids) {
+        const res = checkedIn ? await queueApi.checkIn(sessionId, id) : await queueApi.remove(sessionId, id);
+        latest = res.queue;
+      }
+      setQueue(latest);
+      if (!checkedIn) setSitOut("");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function addGuest() {
     if (!guestName.trim() || !sessionId) return;
     setAddingGuest(true);
@@ -233,6 +255,20 @@ export default function TournamentSetupView() {
                     ${showGuestForm ? "bg-violet-600 border-violet-600 text-white" : "border-violet-200 text-violet-600 active:bg-violet-50"}`}
                 >
                   <UserPlus size={16} /> Guest
+                </button>
+                <button
+                  onClick={() => setEveryone(true)}
+                  disabled={bulkBusy || notYet.length === 0 && !search && !letter}
+                  className="h-11 px-3 rounded-xl border-2 border-emerald-200 text-emerald-700 text-sm font-display font-semibold active:bg-emerald-50 disabled:opacity-40"
+                >
+                  {bulkBusy ? "Working…" : "Check in everyone"}
+                </button>
+                <button
+                  onClick={() => setEveryone(false)}
+                  disabled={bulkBusy || count === 0}
+                  className="h-11 px-3 rounded-xl border-2 border-gray-200 text-gray-500 text-sm font-display font-semibold active:bg-gray-50 disabled:opacity-40"
+                >
+                  Clear all
                 </button>
               </div>
             </div>
