@@ -13,6 +13,9 @@ import EndNightCheers from "../components/shared/EndNightCheers";
 import TournamentTicker from "../components/tournament/TournamentTicker";
 import { Trophy, LogOut, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
 
+// Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
+const MIN_FIT_ZOOM = 0.4;
+
 // Previous years' champions, shown in the header. Add the newest year first.
 const PAST_CHAMPIONS = [
   { year: 2025, winners: "Sakthi & Dilone" },
@@ -116,6 +119,32 @@ export default function TournamentView() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Fit-to-height: the whole board is zoomed down (never up) so it always fits under the
+  // header without vertical scrolling. Horizontal scroll is fine. Clamped so it stays tappable.
+  const fitOuterRef = useRef<HTMLElement>(null);
+  const fitInnerRef = useRef<HTMLDivElement>(null);
+  const [fitZoom, setFitZoom] = useState(1);
+  useEffect(() => {
+    const outer = fitOuterRef.current;
+    const inner = fitInnerRef.current;
+    if (!outer || !inner) return;
+    const recompute = () => {
+      // Real rendered height divided by the zoom currently applied gives the height at zoom 1,
+      // whatever the browser's offset/scrollHeight semantics are under CSS zoom.
+      const applied = parseFloat(inner.style.zoom || "1") || 1;
+      const natural = inner.getBoundingClientRect().height / applied;
+      const available = outer.clientHeight;
+      if (natural <= 0 || available <= 0) return;
+      const next = Math.max(MIN_FIT_ZOOM, Math.min(1, available / natural));
+      setFitZoom((z) => (Math.abs(z - next) > 0.005 ? next : z));
+    };
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(outer);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [tournament?.id]);
 
   // Once the bracket exists, slide it into view so the operator lands on the knockout, not the group scores.
   const knockoutRef = useRef<HTMLDivElement>(null);
@@ -371,7 +400,7 @@ export default function TournamentView() {
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gray-50 flex flex-col">
+    <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col overflow-hidden">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0">
           <Trophy size={18} className="text-white" />
@@ -425,7 +454,11 @@ export default function TournamentView() {
         courts={courts}
       />
 
-      <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 w-full">
+      <main
+        ref={fitOuterRef}
+        className={`flex-1 min-h-0 overflow-x-auto w-full ${fitZoom <= MIN_FIT_ZOOM ? "overflow-y-auto" : "overflow-y-hidden"}`}
+      >
+       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max min-w-full">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
 
         {(() => {
@@ -798,6 +831,7 @@ export default function TournamentView() {
             </div>
           </div>
         )}
+       </div>
       </main>
 
       {scoringFixture?.match_id && (
