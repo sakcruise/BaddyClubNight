@@ -374,7 +374,7 @@ export default function TournamentTicker(props: Props) {
       </div>
 
       {/* Rotating commentary */}
-      <div className="relative flex-1 min-w-0 h-16 flex items-center pr-4 overflow-hidden">
+      <div className="relative flex-1 min-w-0 h-16 flex items-center justify-center px-4 overflow-hidden">
         {/* Highlight sweep on every new line */}
         {!reduceMotion && (
           <motion.div
@@ -407,7 +407,7 @@ export default function TournamentTicker(props: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, y: reduceMotion ? 0 : -18 }}
             transition={{ duration: 0.25 }}
-            className={`flex items-center gap-3 w-full min-w-0 font-display font-semibold text-xl ${style.text}`}
+            className={`flex items-center justify-center gap-3 max-w-full min-w-0 font-display font-semibold text-xl text-center ${style.text}`}
           >
             <motion.span
               initial={reduceMotion ? {} : { scale: 0, rotate: -30 }}
