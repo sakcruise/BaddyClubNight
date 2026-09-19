@@ -5,7 +5,7 @@ import { tournamentsApi } from "../services/tournaments";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
-import { Trophy, ChevronLeft, ArrowLeftRight, X } from "lucide-react";
+import { Trophy, ChevronLeft, ArrowLeftRight } from "lucide-react";
 
 type Pairs = [string, string][][];
 
@@ -51,8 +51,8 @@ export default function TournamentSetupView() {
   // Odd headcount needs someone to sit out — let the admin pick who, rather
   // than have the draft algorithm silently choose one for them.
   const [sitOut, setSitOut] = useState<string>("");
-  // Track which pair is being edited for the swap modal
-  const [editingPair, setEditingPair] = useState<{ groupIndex: number; pairIndex: number; slot: 0 | 1 } | null>(null);
+  // Tap-to-swap: first tap highlights a player, second tap (anywhere) swaps them.
+  const [selectedSlot, setSelectedSlot] = useState<{ groupIndex: number; pairIndex: number; slot: 0 | 1 } | null>(null);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -205,7 +205,9 @@ export default function TournamentSetupView() {
         <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 max-w-[1800px] w-full mx-auto">
           {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
           <p className="text-xs font-display text-gray-500">
-            Tap a player to swap them with someone from any group. Everyone stays paired, nothing gets lost.
+            {selectedSlot
+              ? <>Now tap who <strong>{name(pairsByGroup[selectedSlot.groupIndex][selectedSlot.pairIndex][selectedSlot.slot])}</strong> should swap with — any group. Tap them again to cancel.</>
+              : "Tap a player, then tap another (same group or a different one) to swap them. Everyone stays paired, nothing gets lost."}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
@@ -222,18 +224,34 @@ export default function TournamentSetupView() {
                   {pairs.map((pair, pairIndex) => (
                     <div key={pairIndex} className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-xl px-2 py-1.5">
                       <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                        {[0, 1].map((slot) => (
-                          <button
-                            key={slot}
-                            onClick={() => setEditingPair({ groupIndex: g, pairIndex, slot: slot as 0 | 1 })}
-                            className="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-all active:scale-95"
-                          >
-                            <Avatar name={members[pair[slot]]?.name ?? "?"} size="xs" memberType={members[pair[slot]]?.member_type} />
-                            <span className="text-xs font-display font-bold text-gray-800 truncate">
-                              {name(pair[slot]).split(" ")[0]}
-                            </span>
-                          </button>
-                        ))}
+                        {([0, 1] as const).map((slot) => {
+                          const isSelected =
+                            selectedSlot?.groupIndex === g && selectedSlot.pairIndex === pairIndex && selectedSlot.slot === slot;
+                          return (
+                            <button
+                              key={slot}
+                              onClick={() => {
+                                if (!selectedSlot) { setSelectedSlot({ groupIndex: g, pairIndex, slot }); return; }
+                                if (isSelected) { setSelectedSlot(null); return; }
+                                setPairsByGroup((prev) =>
+                                  swapInto(prev, selectedSlot.groupIndex, selectedSlot.pairIndex, selectedSlot.slot, pair[slot])
+                                );
+                                setSelectedSlot(null);
+                              }}
+                              className={`flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all active:scale-95
+                                ${isSelected
+                                  ? "bg-violet-600 border-violet-600 text-white shadow-md ring-2 ring-violet-300"
+                                  : selectedSlot
+                                    ? "bg-white border-dashed border-violet-300 text-gray-800 hover:bg-violet-50 hover:border-violet-500"
+                                    : "bg-white border-gray-200 text-gray-800 hover:border-violet-400 hover:bg-violet-50"}`}
+                            >
+                              <Avatar name={members[pair[slot]]?.name ?? "?"} size="xs" memberType={members[pair[slot]]?.member_type} />
+                              <span className="text-xs font-display font-bold truncate">
+                                {name(pair[slot]).split(" ")[0]}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                       <span className="text-[10px] font-display font-bold text-gray-400 flex-shrink-0 tabular-nums">
                         {avgLevel(pair).toFixed(1)}
@@ -254,51 +272,6 @@ export default function TournamentSetupView() {
           <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
             {creating ? "Starting…" : "Confirm & Start Tournament →"}
           </Button>
-
-          {/* Swap modal */}
-          {editingPair && (
-            <div className="fixed inset-0 bg-black/30 flex items-end z-50">
-              <div className="w-full bg-white rounded-t-3xl p-5 flex flex-col gap-4 max-h-[80dvh] overflow-y-auto animate-in slide-in-from-bottom-4">
-                <div className="flex items-center justify-between sticky top-0 bg-white -mx-5 px-5 py-4 -mt-5 border-b border-gray-100">
-                  <div>
-                    <h2 className="font-display font-black text-gray-900">Swap Player</h2>
-                    <p className="text-xs text-gray-500 font-display mt-0.5">
-                      Pick someone to replace {name(pairsByGroup[editingPair.groupIndex][editingPair.pairIndex][editingPair.slot])}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setEditingPair(null)}
-                    className="p-2 rounded-xl hover:bg-gray-100 text-gray-400"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {pairsByGroup.flat().flat().map((memberId) => (
-                    <button
-                      key={memberId}
-                      onClick={() => {
-                        if (editingPair) {
-                          setPairsByGroup((prev) =>
-                            swapInto(prev, editingPair.groupIndex, editingPair.pairIndex, editingPair.slot, memberId)
-                          );
-                          setEditingPair(null);
-                        }
-                      }}
-                      className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-all active:scale-95"
-                    >
-                      <Avatar name={members[memberId]?.name ?? "?"} size="sm" memberType={members[memberId]?.member_type} />
-                      <div className="flex-1 text-left">
-                        <p className="text-xs font-display font-bold text-gray-800">{name(memberId)}</p>
-                        <p className="text-[10px] text-gray-400">{LEVEL_LABELS[members[memberId]?.level ?? 2]}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </main>
       )}
     </div>
