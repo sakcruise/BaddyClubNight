@@ -170,8 +170,12 @@ export default function TournamentView() {
       const next = Math.max(MIN_FIT_ZOOM, Math.min(MAX_FIT_ZOOM, fit));
       setFitZoom((z) => (Math.abs(z - next) > 0.005 ? next : z));
       // Zoom fits the tighter axis; stretch the board to fill the other so there are no gaps.
-      inner.style.minWidth = `${Math.floor(availableW / next)}px`;
-      inner.style.minHeight = `${Math.floor(availableH / next)}px`;
+      // Only the group sheets can absorb a stretch (their tables share the extra space).
+      // The bracket can't, so in the knockout stage the board keeps its shape and is centred.
+      if (tournament?.status === "groups") {
+        inner.style.minWidth = `${Math.floor(availableW / next)}px`;
+        inner.style.minHeight = `${Math.floor(availableH / next)}px`;
+      }
 
       // Would a different number of group columns fit larger? Estimate each candidate's
       // board size from one sheet's size and swap only for a clear (>3%) improvement.
@@ -209,7 +213,7 @@ export default function TournamentView() {
     ro.observe(outer);
     ro.observe(inner);
     return () => ro.disconnect();
-  }, [tournament?.id, groupCols]);
+  }, [tournament?.id, tournament?.status, groupCols]);
 
   // Once the bracket exists, slide it into view so the operator lands on the knockout, not the group scores.
   const knockoutRef = useRef<HTMLDivElement>(null);
@@ -558,9 +562,9 @@ export default function TournamentView() {
 
       <main
         ref={fitOuterRef}
-        className={`flex-1 min-h-0 w-full ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
+        className={`flex-1 min-h-0 w-full flex ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
       >
-       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max mx-auto">
+       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max m-auto">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
 
         {(() => {
@@ -658,8 +662,12 @@ export default function TournamentView() {
             {(tournament.status === "groups" || showFullGroups) && (
             <div
               ref={groupsGridRef}
-              className="grid gap-6 flex-1 min-w-0"
-              style={{ gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, minmax(0, 1fr))`, gridAutoRows: "1fr" }}
+              className={`grid gap-6 ${tournament.status === "groups" ? "flex-1 min-w-0" : "flex-shrink-0 w-max"}`}
+              style={
+                tournament.status === "groups"
+                  ? { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, minmax(0, 1fr))`, gridAutoRows: "1fr" }
+                  : { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)` }
+              }
             >
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   // Rows/columns stay in drafted pair order so the sheet doesn't reshuffle after
