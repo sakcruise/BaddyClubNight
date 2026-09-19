@@ -856,26 +856,49 @@ function KnockoutBracket({
   const roundFixturesByRound = rounds.map((round) => fixtures.filter((f) => f.round === round));
   const roundCounts = roundFixturesByRound.map((rf) => rf.length);
 
+  // Rounds that haven't been generated yet are still drawn (as "Winner of …"
+  // placeholders) so the whole tree and its lines are visible from the start.
+  const firstRoundSize = roundCounts[0] ?? 1;
+  const totalRounds = Math.round(Math.log2(firstRoundSize)) + 1;
+  const allCounts = Array.from({ length: totalRounds }, (_, i) => firstRoundSize / 2 ** i);
+  const columns = `repeat(${totalRounds}, minmax(220px, 1fr))`;
+
   return (
     <div className="overflow-x-auto pb-2 -mx-1 px-1">
-      <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(220px, 1fr))` }}>
-        {rounds.map((round, ri) => (
-          <h2 key={round} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
-            {knockoutRoundLabel(roundFixturesByRound[ri].length)}
+      <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: columns }}>
+        {allCounts.map((count, ri) => (
+          <h2 key={ri} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
+            {knockoutRoundLabel(count)}
           </h2>
         ))}
       </div>
 
-      <BracketGrid roundCounts={roundCounts} cell={(ri, mi) => renderFixture(roundFixturesByRound[ri][mi])} rowHeight={132} fill />
-
-      <div className="grid gap-x-8 mt-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(220px, 1fr))` }}>
-        {rounds.map((round, ri) => {
-          const roundFixtures = roundFixturesByRound[ri];
-          const isLastRound = ri === rounds.length - 1;
-          const allComplete = roundFixtures.every((f) => f.status === "complete");
+      <BracketGrid
+        roundCounts={allCounts}
+        rowHeight={132}
+        fill
+        cell={(ri, mi) => {
+          const fixture = roundFixturesByRound[ri]?.[mi];
+          if (fixture) return renderFixture(fixture);
+          const feeder = knockoutRoundLabel(allCounts[ri - 1]);
           return (
-            <div key={round} className="flex justify-center">
-              {allComplete && isLastRound && roundFixtures.length > 1 && (
+            <div className="p-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 text-xs font-display font-bold text-gray-400 flex flex-col gap-2">
+              <span>Winner · {feeder} {mi * 2 + 1}</span>
+              <span>Winner · {feeder} {mi * 2 + 2}</span>
+            </div>
+          );
+        }}
+      />
+
+      <div className="grid gap-x-8 mt-3" style={{ gridTemplateColumns: columns }}>
+        {allCounts.map((_, ri) => {
+          const round = rounds[ri];
+          const roundFixtures = roundFixturesByRound[ri];
+          const isLatestRound = ri === rounds.length - 1;
+          const allComplete = !!roundFixtures && roundFixtures.every((f) => f.status === "complete");
+          return (
+            <div key={ri} className="flex justify-center">
+              {round !== undefined && allComplete && isLatestRound && roundFixtures.length > 1 && (
                 <Button size="lg" fullWidth disabled={busy} onClick={() => onAdvance(round)}>
                   Next round →
                 </Button>
