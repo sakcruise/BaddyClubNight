@@ -556,7 +556,7 @@ export default function TournamentView() {
 
             {/* Groups in 2-column grid layout (3 per column) */}
             {(tournament.status === "groups" || showFullGroups) && (
-            <div className="grid grid-cols-2 gap-6 flex-shrink-0 w-max">
+            <div className={`grid gap-6 flex-shrink-0 w-max ${tournament.status === "groups" && compactKnockout ? "grid-cols-3" : "grid-cols-2"}`}>
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   // Rows/columns stay in drafted pair order so the sheet doesn't reshuffle after
                   // every score; the ranked standings only drive the leader badge and highlight.
