@@ -208,19 +208,21 @@ export default function TournamentTicker(props: Props) {
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
-    <div className="flex items-stretch gap-0 bg-gray-900 text-white overflow-hidden flex-shrink-0">
+    <div className="flex items-stretch bg-violet-50 border-b border-violet-100 text-violet-900 overflow-hidden flex-shrink-0">
       {/* LIVE badge */}
-      <div className="flex items-center gap-2 px-4 bg-red-600 flex-shrink-0">
-        <motion.span
-          animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
-          transition={{ repeat: Infinity, duration: 1.2 }}
-          className="w-2 h-2 rounded-full bg-white"
-        />
-        <span className="text-[11px] font-display font-black uppercase tracking-[0.2em]">Live</span>
+      <div className="flex items-center px-4 flex-shrink-0">
+        <span className="flex items-center gap-1.5 rounded-full bg-white border border-violet-200 pl-2 pr-2.5 py-1">
+          <motion.span
+            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+            transition={{ repeat: Infinity, duration: 1.2 }}
+            className="w-2 h-2 rounded-full bg-red-500"
+          />
+          <span className="text-[10px] font-display font-black uppercase tracking-[0.2em] text-violet-700">Live</span>
+        </span>
       </div>
 
       {/* Rotating commentary */}
-      <div className="relative flex-1 min-w-0 h-11 flex items-center px-4">
+      <div className="relative flex-1 min-w-0 h-12 flex items-center pr-4">
         <AnimatePresence mode="wait">
           <motion.p
             key={`${tick}-${line}`}
@@ -238,17 +240,17 @@ export default function TournamentTicker(props: Props) {
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
           transition={{ duration: ROTATE_MS / 1000, ease: "linear" }}
-          className="absolute left-0 bottom-0 h-0.5 w-full bg-violet-400 origin-left opacity-60"
+          className="absolute left-0 bottom-0 h-0.5 w-full bg-violet-300 origin-left"
         />
       </div>
 
       {/* Clock */}
-      <div className="flex items-center gap-4 px-4 border-l border-white/10 flex-shrink-0 tabular-nums">
+      <div className="flex items-center gap-4 px-4 border-l border-violet-100 bg-white flex-shrink-0 tabular-nums">
         <div className="text-right leading-tight">
-          <div className="text-[9px] font-display font-bold uppercase tracking-widest text-white/50">Running</div>
-          <div className="font-display font-black text-sm text-violet-300">{elapsedLabel(props.tournament.created_at, now)}</div>
+          <div className="text-[9px] font-display font-bold uppercase tracking-widest text-gray-400">Running</div>
+          <div className="font-display font-black text-sm text-violet-600">{elapsedLabel(props.tournament.created_at, now)}</div>
         </div>
-        <div className="font-display font-black text-xl tracking-wide">{time}</div>
+        <div className="font-display font-black text-xl tracking-wide text-gray-900">{time}</div>
       </div>
     </div>
   );

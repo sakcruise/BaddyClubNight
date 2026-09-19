@@ -13,6 +13,12 @@ import EndNightCheers from "../components/shared/EndNightCheers";
 import TournamentTicker from "../components/tournament/TournamentTicker";
 import { Trophy, LogOut, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
 
+// Previous years' champions, shown in the header. Add the newest year first.
+const PAST_CHAMPIONS = [
+  { year: 2025, winners: "Sakthi & Dilone" },
+  { year: 2024, winners: "Sid & Hilary" },
+];
+
 function pairName(ids: [string, string] | null, members: ReturnType<typeof useMemberStore.getState>["members"]) {
   if (!ids) return "Bye";
   return ids.map((id) => members[id]?.name?.split(" ")[0] ?? "?").join(" & ");
@@ -370,9 +376,20 @@ export default function TournamentView() {
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0">
           <Trophy size={18} className="text-white" />
         </div>
-        <div className="flex-1 min-w-[120px]">
+        <div className="min-w-[120px]">
           <h1 className="font-display font-black text-gray-900 text-lg leading-tight">{tournament.name}</h1>
           <p className="text-gray-500 text-xs font-display capitalize">{tournament.status} stage</p>
+        </div>
+        <div className="flex-1 flex flex-wrap items-center gap-2 px-2">
+          {PAST_CHAMPIONS.map((c) => (
+            <span
+              key={c.year}
+              className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-display font-bold text-amber-800"
+            >
+              <Trophy size={12} className="text-amber-500" />
+              <span className="text-amber-500">{c.year}</span> {c.winners}
+            </span>
+          ))}
         </div>
         <button
           onClick={handleResetGroups}
