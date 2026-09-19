@@ -11,7 +11,8 @@ import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
 import TournamentTicker from "../components/tournament/TournamentTicker";
-import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight, Maximize2, Minimize2, WifiOff } from "lucide-react";
+import { isOffline } from "../services/api";
 
 // Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
 const MIN_FIT_ZOOM = 0.4;
@@ -105,6 +106,19 @@ export default function TournamentView() {
   const [champions, setChampions] = useState<TournamentChampion[]>([]);
   const [showWinners, setShowWinners] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  // Browser full-screen for the wall/touch display.
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.();
+  }
+  const offline = isOffline();
   // During the knockout the groups collapse to a scoreboard; this flips them back to the full matrices.
   const [showFullGroups, setShowFullGroups] = useState(false);
   // During the group stage the knockout preview can be shrunk to a narrow qualifiers list.
@@ -468,7 +482,7 @@ export default function TournamentView() {
     const hasScore = fixture.status === "complete" && scoreA !== undefined && scoreB !== undefined;
     const aWon = hasScore && scoreA > scoreB;
     const nameCls = (won: boolean) =>
-      `truncate font-display font-semibold text-sm ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-800"}`;
+      `truncate font-body font-medium text-[15px] ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-700"}`;
     // First free court if there is one, otherwise just the first court — never blocked.
     const freeCourt = idleCourts[0] ?? sortedCourts[0];
 
@@ -548,6 +562,19 @@ export default function TournamentView() {
             </span>
           ))}
         </div>
+        {offline && (
+          <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-display font-semibold">
+            <WifiOff size={14} /> Offline — saved on this device
+          </span>
+        )}
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit full screen" : "Full screen"}
+          aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-semibold hover:bg-gray-100 transition-all"
+        >
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {isFullscreen ? "Exit" : "Full screen"}
+        </button>
         <button
           onClick={handleResetGroups}
           disabled={busy}
@@ -724,8 +751,8 @@ export default function TournamentView() {
                                   {pairName(s.pair, members)}
                                 </th>
                               ))}
-                              <th className="p-2 text-[10px] text-gray-500 font-semibold border-b border-gray-200 min-w-[80px]">Points Won</th>
-                              <th className="p-2 text-[10px] text-gray-500 font-semibold border-b border-gray-200 min-w-[80px]">Average</th>
+                              <th className="p-2 font-body font-normal text-[13px] text-gray-600 border-b border-gray-200 min-w-[96px] whitespace-nowrap">Points Won</th>
+                              <th className="p-2 font-body font-normal text-[13px] text-gray-600 border-b border-gray-200 min-w-[80px]">Average</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -742,7 +769,7 @@ export default function TournamentView() {
                                           <Avatar key={pid} name={members[pid]?.name ?? "?"} size="xs" />
                                         ))}
                                       </div>
-                                      <span className="font-body font-medium text-gray-900 text-[15px] tracking-tight">{pairName(rowS.pair, members)}</span>
+                                      <span className="font-body font-medium text-gray-700 text-[15px] tracking-tight">{pairName(rowS.pair, members)}</span>
                                     </div>
                                   </th>
                                   {rows.map((colS, ci) => {
@@ -839,10 +866,10 @@ export default function TournamentView() {
                                       </td>
                                     );
                                   })}
-                                  <td className="border-b border-gray-100 text-center font-display font-bold text-gray-800 tabular-nums text-sm">
+                                  <td className="border-b border-gray-100 text-center font-body font-semibold text-gray-700 tabular-nums text-base">
                                     {rowS.pointsFor}
                                   </td>
-                                  <td className="border-b border-gray-100 text-center font-display font-bold text-violet-600 tabular-nums text-sm">
+                                  <td className="border-b border-gray-100 text-center font-body font-semibold text-violet-600 tabular-nums text-base">
                                     {avg.toFixed(1)}
                                   </td>
                                 </tr>

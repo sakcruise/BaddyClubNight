@@ -16,7 +16,7 @@ import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessi
 // True ONLY when the user explicitly chose offline mode or the browser reports no
 // network. Group sessions run on the same online Supabase engine as clubs
 // (migration 014 made the play tables group-aware).
-function isOffline(): boolean {
+export function isOffline(): boolean {
   return localStorage.getItem("offline-mode") === "true" || !navigator.onLine;
 }
 

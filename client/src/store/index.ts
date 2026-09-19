@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type {
   Session, Court, QueuePosition, Match, Member, PickerState, SyncState,
   Group, GroupMember, MemberType, PitstopState,
+  Tournament, TournamentPlayer, TournamentFixture,
 } from "../types";
 import { normalisePositions } from "../utils/queueLogic";
 import { v4 as uuid } from "uuid";
@@ -452,5 +453,47 @@ export const useSessionArchiveStore = create<SessionArchiveStore>()(
       clearArchive: () => set({ archivedSessions: [] }),
     }),
     { name: "session-archive-store" }
+  )
+);
+
+// ─── Tournament Store (offline copy of tournaments / players / fixtures) ──────
+// Used as the source of truth when offline; online, Supabase is authoritative.
+
+interface TournamentStore {
+  tournaments: Record<string, Tournament>;
+  players: TournamentPlayer[];
+  fixtures: TournamentFixture[];
+  putTournament: (t: Tournament) => void;
+  patchTournament: (id: string, patch: Partial<Tournament>) => void;
+  removeTournament: (id: string) => void;
+  addPlayers: (ps: TournamentPlayer[]) => void;
+  addFixtures: (fs: TournamentFixture[]) => void;
+  patchFixture: (id: string, patch: Partial<TournamentFixture>) => void;
+}
+
+export const useTournamentStore = create<TournamentStore>()(
+  persist(
+    (set) => ({
+      tournaments: {},
+      players: [],
+      fixtures: [],
+      putTournament: (t) => set((s) => ({ tournaments: { ...s.tournaments, [t.id]: t } })),
+      patchTournament: (id, patch) =>
+        set((s) => (s.tournaments[id] ? { tournaments: { ...s.tournaments, [id]: { ...s.tournaments[id], ...patch } } } : {})),
+      removeTournament: (id) =>
+        set((s) => {
+          const { [id]: _removed, ...rest } = s.tournaments;
+          return {
+            tournaments: rest,
+            players: s.players.filter((p) => p.tournament_id !== id),
+            fixtures: s.fixtures.filter((f) => f.tournament_id !== id),
+          };
+        }),
+      addPlayers: (ps) => set((s) => ({ players: [...s.players, ...ps] })),
+      addFixtures: (fs) => set((s) => ({ fixtures: [...s.fixtures, ...fs] })),
+      patchFixture: (id, patch) =>
+        set((s) => ({ fixtures: s.fixtures.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+    }),
+    { name: "tournament-store" }
   )
 );
