@@ -10,7 +10,7 @@ import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
 import EndNightCheers from "../components/shared/EndNightCheers";
-import { Trophy, LogOut, RotateCcw, Play, Radio, Flag } from "lucide-react";
+import { Trophy, LogOut, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
 
 function pairName(ids: [string, string] | null, members: ReturnType<typeof useMemberStore.getState>["members"]) {
   if (!ids) return "Bye";
@@ -88,6 +88,8 @@ export default function TournamentView() {
   const [error, setError] = useState<string | null>(null);
   const [showCheers, setShowCheers] = useState(false);
   const [ending, setEnding] = useState(false);
+  // During the knockout the groups collapse to a scoreboard; this flips them back to the full matrices.
+  const [showFullGroups, setShowFullGroups] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -149,13 +151,12 @@ export default function TournamentView() {
     return sortedCourts.length > 0 ? sortedCourts[g % sortedCourts.length] : undefined;
   }
 
+  // Prefer the group's own court, otherwise any free one — the operator never picks.
   function handlePlayGroupFixture(g: number, fixture: TournamentFixture) {
-    const court = courtForGroup(g);
-    if (!court) { setError("No courts are set up for this session."); return; }
-    if (court.status !== "idle") {
-      setError(`Court ${court.id} (Group ${g + 1}'s court) is still in use — finish that match first.`);
-      return;
-    }
+    if (sortedCourts.length === 0) { setError("No courts are set up for this session."); return; }
+    const own = courtForGroup(g);
+    const court = own?.status === "idle" ? own : idleCourts[0];
+    if (!court) { setError("All courts are busy — finish a match first."); return; }
     handleLaunch(fixture, court.id);
   }
 
@@ -325,7 +326,7 @@ export default function TournamentView() {
 
         {!isBye && fixture.status === "pending" && (
           <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
-            <Play size={14} /> {freeCourt ? `Play on Court ${freeCourt.id}` : "Waiting for a free court"}
+            <Play size={14} /> {freeCourt ? "Play" : "All courts busy"}
           </Button>
         )}
         {!isBye && fixture.status === "active" && (
@@ -465,7 +466,7 @@ export default function TournamentView() {
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex items-start gap-6 overflow-x-auto pb-2 -mx-1 px-1">
             {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
-            {tournament.status !== "groups" && (
+            {tournament.status !== "groups" && !showFullGroups && (
               <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-max self-center">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
@@ -492,7 +493,7 @@ export default function TournamentView() {
             )}
 
             {/* Groups in 2-column grid layout (3 per column) */}
-            {tournament.status === "groups" && (
+            {(tournament.status === "groups" || showFullGroups) && (
             <div className="grid grid-cols-2 gap-6 flex-shrink-0 w-max">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
@@ -624,7 +625,6 @@ export default function TournamentView() {
                                           <button
                                             onClick={() => handlePlayGroupFixture(g, fixture)}
                                             disabled={busy}
-                                            title={`Send to Group ${g + 1}'s court`}
                                             className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2border border-dashed border-gray-300 text-gray-400
                                                        hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 active:scale-95 transition-all disabled:opacity-50"
                                           >
@@ -653,7 +653,28 @@ export default function TournamentView() {
             </div>
             )}
 
-            <div ref={knockoutRef} className="flex flex-col justify-center gap-4 flex-shrink-0 w-max self-stretch scroll-mx-5">
+            {tournament.status !== "groups" && (
+              <button
+                onClick={() => {
+                  const next = !showFullGroups;
+                  setShowFullGroups(next);
+                  if (!next) setTimeout(() => knockoutRef.current?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" }), 50);
+                }}
+                className="self-stretch flex-shrink-0 w-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
+                aria-label={showFullGroups ? "Back to compact groups" : "Show full group scores"}
+              >
+                {showFullGroups ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
+                <span className="text-[10px] font-display font-black uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                  {showFullGroups ? "Compact" : "Full groups"}
+                </span>
+              </button>
+            )}
+
+            <div
+              ref={knockoutRef}
+              className={`flex flex-col justify-center gap-4 flex-shrink-0 self-stretch scroll-mx-5
+                ${tournament.status === "groups" ? "w-max" : "flex-1 min-w-[760px]"}`}
+            >
               {tournament.status === "groups" && (() => {
                 // Round 1 slots track the live standings: whoever leads each group right now is
                 // named in the bracket, and the name updates as scores come in.
@@ -769,11 +790,14 @@ function BracketGrid({
   cell,
   colWidth = 220,
   rowHeight = 76,
+  fill = false,
 }: {
   roundCounts: number[];
   cell: (roundIndex: number, matchIndex: number) => React.ReactNode;
   colWidth?: number;
   rowHeight?: number;
+  /** Stretch columns to the container width instead of fixed colWidth. */
+  fill?: boolean;
 }) {
   const colGap = 32; // px — matches gap-x-8 below
   const rowCount = roundCounts[0] ?? 1;
@@ -781,7 +805,7 @@ function BracketGrid({
     <div
       className="grid gap-x-8"
       style={{
-        gridTemplateColumns: `repeat(${roundCounts.length}, ${colWidth}px)`,
+        gridTemplateColumns: `repeat(${roundCounts.length}, ${fill ? `minmax(${colWidth}px, 1fr)` : `${colWidth}px`})`,
         gridTemplateRows: `repeat(${rowCount}, ${rowHeight}px)`,
       }}
     >
@@ -833,7 +857,7 @@ function KnockoutBracket({
 
   return (
     <div className="overflow-x-auto pb-2 -mx-1 px-1">
-      <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, 220px)` }}>
+      <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(220px, 1fr))` }}>
         {rounds.map((round, ri) => (
           <h2 key={round} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
             {knockoutRoundLabel(roundFixturesByRound[ri].length)}
@@ -841,9 +865,9 @@ function KnockoutBracket({
         ))}
       </div>
 
-      <BracketGrid roundCounts={roundCounts} cell={(ri, mi) => renderFixture(roundFixturesByRound[ri][mi])} rowHeight={132} />
+      <BracketGrid roundCounts={roundCounts} cell={(ri, mi) => renderFixture(roundFixturesByRound[ri][mi])} rowHeight={132} fill />
 
-      <div className="grid gap-x-8 mt-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, 220px)` }}>
+      <div className="grid gap-x-8 mt-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, minmax(220px, 1fr))` }}>
         {rounds.map((round, ri) => {
           const roundFixtures = roundFixturesByRound[ri];
           const isLastRound = ri === rounds.length - 1;
