@@ -127,6 +127,19 @@ export default function TournamentView() {
   // the best use of the screen's shape (wide screens get more columns, tall ones fewer).
   const [groupCols, setGroupCols] = useState(2);
   const groupsGridRef = useRef<HTMLDivElement>(null);
+  // Knockout stage: how big the groups panel is relative to the bracket. The operator
+  // nudges it with the +/- on the divider; remembered on this device.
+  const [groupsScale, setGroupsScale] = useState(() => {
+    const v = parseFloat(localStorage.getItem("tournament-groups-scale") ?? "1");
+    return Number.isFinite(v) ? Math.min(2, Math.max(0.5, v)) : 1;
+  });
+  function nudgeGroupsScale(delta: number) {
+    setGroupsScale((s) => {
+      const next = Math.round(Math.min(2, Math.max(0.5, s + delta)) * 100) / 100;
+      localStorage.setItem("tournament-groups-scale", String(next));
+      return next;
+    });
+  }
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -730,7 +743,7 @@ export default function TournamentView() {
           <div className="flex items-stretch gap-6 flex-1 min-h-0">
             {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
             {tournament.status !== "groups" && !showFullGroups && (
-              <div className="grid grid-cols-2 gap-2 flex-shrink-0 w-max self-center">
+              <div className="grid grid-cols-2 gap-2 flex-shrink-0 w-max self-center" style={{ zoom: groupsScale }}>
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
@@ -763,7 +776,7 @@ export default function TournamentView() {
               style={
                 tournament.status === "groups"
                   ? { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, minmax(0, 1fr))`, gridAutoRows: "1fr" }
-                  : { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)` }
+                  : { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)`, zoom: groupsScale }
               }
             >
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
@@ -940,23 +953,41 @@ export default function TournamentView() {
             )}
 
             {tournament.status !== "groups" && (
-              <button
-                onClick={() => {
-                  const next = !showFullGroups;
-                  setShowFullGroups(next);
-                  setTimeout(() => {
-                    if (next) fitOuterRef.current?.scrollTo({ left: 0, behavior: "smooth" });
-                    else knockoutRef.current?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-                  }, 50);
-                }}
-                className="self-stretch flex-shrink-0 w-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
-                aria-label={showFullGroups ? "Back to compact groups" : "Show full group scores"}
-              >
-                {showFullGroups ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
-                <span className="text-[10px] font-display font-bold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
-                  {showFullGroups ? "Compact" : "Full groups"}
-                </span>
-              </button>
+              <div className="self-stretch flex-shrink-0 w-14 flex flex-col gap-2">
+                <button
+                  onClick={() => nudgeGroupsScale(0.1)}
+                  disabled={groupsScale >= 2}
+                  aria-label="Make the groups panel bigger"
+                  className="h-12 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-500 text-xl font-display font-bold active:bg-violet-50 disabled:opacity-30"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => {
+                    const next = !showFullGroups;
+                    setShowFullGroups(next);
+                    setTimeout(() => {
+                      if (next) fitOuterRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+                      else knockoutRef.current?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+                    }, 50);
+                  }}
+                  className="flex-1 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
+                  aria-label={showFullGroups ? "Back to compact groups" : "Show full group scores"}
+                >
+                  {showFullGroups ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
+                  <span className="text-[10px] font-display font-bold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                    {showFullGroups ? "Compact" : "Full groups"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => nudgeGroupsScale(-0.1)}
+                  disabled={groupsScale <= 0.5}
+                  aria-label="Make the groups panel smaller"
+                  className="h-12 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-500 text-xl font-display font-bold active:bg-violet-50 disabled:opacity-30"
+                >
+                  −
+                </button>
+              </div>
             )}
 
             {tournament.status === "groups" && (
@@ -1223,7 +1254,7 @@ function BracketGrid({
       className="grid gap-x-8"
       style={{
         gridTemplateColumns: `repeat(${roundCounts.length}, ${fill ? `minmax(${colWidth}px, 1fr)` : `${colWidth}px`})`,
-        gridTemplateRows: `repeat(${rowCount}, ${rowHeight}px)`,
+        gridTemplateRows: `repeat(${rowCount}, minmax(${rowHeight}px, auto))`,
       }}
     >
       {roundCounts.map((count, ri) => {
@@ -1269,7 +1300,10 @@ function KnockoutBracket({
   renderFixture: (f: TournamentFixture) => React.ReactNode;
 }) {
   const rounds = Array.from(new Set(fixtures.map((f) => f.round))).sort((a, b) => a - b);
-  const roundFixturesByRound = rounds.map((round) => fixtures.filter((f) => f.round === round));
+  // Seed order within each round, so the tree and the "QF 1 / SF 2" tags agree.
+  const roundFixturesByRound = rounds.map((round) =>
+    fixtures.filter((f) => f.round === round).sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+  );
   const roundCounts = roundFixturesByRound.map((rf) => rf.length);
 
   // Rounds that haven't been generated yet are still drawn (as "Winner of …"

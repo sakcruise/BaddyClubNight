@@ -369,12 +369,12 @@ export default function TournamentTicker(props: Props) {
             transition={{ repeat: Infinity, duration: 1.2 }}
             className="w-2 h-2 rounded-full bg-red-500"
           />
-          <span className="text-[10px] font-display font-bold uppercase tracking-[0.2em] text-violet-700">Live</span>
+          <span className="text-xs font-display font-bold uppercase tracking-[0.2em] text-violet-700">Live</span>
         </span>
       </div>
 
       {/* Rotating commentary */}
-      <div className="relative flex-1 min-w-0 h-12 flex items-center pr-4 overflow-hidden">
+      <div className="relative flex-1 min-w-0 h-16 flex items-center pr-4 overflow-hidden">
         {/* Highlight sweep on every new line */}
         {!reduceMotion && (
           <motion.div
@@ -407,13 +407,13 @@ export default function TournamentTicker(props: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, y: reduceMotion ? 0 : -18 }}
             transition={{ duration: 0.25 }}
-            className={`flex items-center gap-2.5 w-full min-w-0 font-display font-semibold text-sm ${style.text}`}
+            className={`flex items-center gap-3 w-full min-w-0 font-display font-semibold text-xl ${style.text}`}
           >
             <motion.span
               initial={reduceMotion ? {} : { scale: 0, rotate: -30 }}
               animate={reduceMotion ? {} : { scale: [0, 1.4, 1], rotate: [-30, 12, -8, 0] }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-lg leading-none flex-shrink-0"
+              className="text-3xl leading-none flex-shrink-0"
               aria-hidden
             >
               {style.emoji}
@@ -448,7 +448,7 @@ export default function TournamentTicker(props: Props) {
           <div className="text-[9px] font-display font-semibold uppercase tracking-widest text-gray-400">Running</div>
           <div className="font-display font-bold text-sm text-violet-600">{elapsedLabel(props.tournament.created_at, now)}</div>
         </div>
-        <div className="font-display font-bold text-xl tracking-wide text-gray-900">{time}</div>
+        <div className="font-display font-bold text-3xl tracking-wide text-gray-900">{time}</div>
       </div>
     </div>
   );
