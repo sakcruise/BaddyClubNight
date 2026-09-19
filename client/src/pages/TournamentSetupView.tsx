@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemberStore, useQueueStore } from "../store";
+import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
-import { queueApi, membersApi } from "../services/api";
+import { queueApi, membersApi, sessionsApi } from "../services/api";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
@@ -103,6 +103,24 @@ export default function TournamentSetupView() {
 
   const [bulkBusy, setBulkBusy] = useState(false);
 
+  // Backing out of the check-in page abandons the tournament night: "Start a Tournament"
+  // opened a session, so we close it again and land on the home page, not club night.
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  async function cancelTournamentNight() {
+    setCancelling(true);
+    try {
+      const s = useSessionStore.getState().session;
+      if (s) await sessionsApi.end(s.id).catch(() => {});
+      useSessionStore.getState().endSession();
+      useMatchStore.getState().setMatches([]);
+      setQueue([]);
+      navigate("/", { replace: true });
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   // Check in / out everyone on the roster in one go (ignores the search/letter filter).
   async function setEveryone(checkedIn: boolean) {
     if (!sessionId) return;
@@ -189,7 +207,7 @@ export default function TournamentSetupView() {
     <div className="min-h-screen min-h-[100dvh] bg-gray-50 flex flex-col">
       <header className="flex items-center gap-3 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
         <button
-          onClick={() => (step === "review" ? setStep("select") : navigate("/"))}
+          onClick={() => (step === "review" ? setStep("select") : setShowCancel(true))}
           className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-500"
         >
           <ChevronLeft size={20} />
@@ -206,6 +224,32 @@ export default function TournamentSetupView() {
           </p>
         </div>
       </header>
+
+      {showCancel && (
+        <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-7 flex flex-col gap-4"
+          >
+            <div>
+              <h2 className="font-display font-bold text-xl text-gray-900">Cancel the tournament?</h2>
+              <p className="text-sm font-body text-gray-500 mt-1">
+                Nothing has been drafted yet. This closes tonight's session and takes you back to the home page.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-2">
+              <Button variant="ghost" size="lg" fullWidth onClick={() => setShowCancel(false)}>
+                Keep going
+              </Button>
+              <Button size="lg" fullWidth disabled={cancelling} onClick={cancelTournamentNight}>
+                {cancelling ? "Closing…" : "Yes, go home"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {step === "select" && (
         <main className="flex-1 min-h-0 overflow-y-auto px-5 py-5 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 w-full">
