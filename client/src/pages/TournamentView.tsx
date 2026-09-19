@@ -179,13 +179,14 @@ export default function TournamentView() {
         const gridRect = grid.getBoundingClientRect();
         const gridW = gridRect.width / applied;
         const gridH = gridRect.height / applied;
-        const koH = (knockoutRef.current?.getBoundingClientRect().height ?? 0) / applied;
+        // The column is stretched to the row height, so measure the card inside it.
+        const koH = (knockoutRef.current?.firstElementChild?.getBoundingClientRect().height ?? 0) / applied;
         const restW = naturalW - gridW;
         const restH = naturalH - Math.max(gridH, koH);
         let bestCols = groupCols;
         let bestFit = 0;
         let currentFit = 0;
-        for (const cols of [2, 3, 4]) {
+        for (const cols of [1, 2, 3, 4]) {
           if (cols > n) continue;
           const rows = Math.ceil(n / cols);
           const w = cols * sheetW + (cols - 1) * gap + restW;
