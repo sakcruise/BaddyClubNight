@@ -625,7 +625,7 @@ export default function TournamentView() {
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-bold text-gray-400 px-1">
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-lg border border-dashed border-gray-300 text-gray-400 px-1.5 py-0.5">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-violet-100 border border-violet-300 text-violet-800 px-1.5 py-0.5">
                 <Play size={9} /> Play
               </span>
               not yet scheduled
@@ -829,8 +829,8 @@ export default function TournamentView() {
                                           <button
                                             onClick={() => handlePlayGroupFixture(g, fixture)}
                                             disabled={busy}
-                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2border border-dashed border-gray-300 text-gray-400
-                                                       hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 active:scale-95 transition-all disabled:opacity-50"
+                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2 bg-violet-100 border border-violet-300 text-violet-800
+                                                       active:bg-violet-200 active:scale-95 transition-all disabled:opacity-50"
                                           >
                                             <Play size={10} className="flex-shrink-0" />
                                             <span className="text-[10px] font-display font-bold">Play</span>
