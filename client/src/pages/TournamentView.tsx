@@ -704,10 +704,10 @@ export default function TournamentView() {
                   return (
                     <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-full h-full min-w-0">
                       <div className="flex items-center gap-2">
-                        <h2 className="font-display font-bold text-gray-900 text-sm">Group {g + 1}</h2>
+                        <h2 className="font-display font-bold text-gray-900 text-base">Group {g + 1}</h2>
                         {leader && (
-                          <span className="flex items-center gap-1 text-xs font-display font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-0.5">
-                            <Trophy size={11} /> {pairName(leader.pair, members)}
+                          <span className="flex items-center gap-1.5 text-lg font-body font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3.5 py-1">
+                            <Trophy size={16} className="text-violet-500" /> {pairName(leader.pair, members)}
                           </span>
                         )}
                       </div>
