@@ -16,7 +16,10 @@ import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from 
 // Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
 const MIN_FIT_ZOOM = 0.4;
 // On big screens the board may scale up a little to fill the space, but not so far it looks blown up.
-const MAX_FIT_ZOOM = 1.3;
+const MAX_FIT_ZOOM = 1.6;
+// In the knockout stage the bracket may widen this much beyond its natural width to
+// use a big screen, but no further - wider than this the cards look stretched.
+const MAX_KNOCKOUT_STRETCH = 1.25;
 
 // Champions from before the app kept records. Years the app has run are read from
 // completed tournaments and take precedence over these.
@@ -175,6 +178,8 @@ export default function TournamentView() {
       if (tournament?.status === "groups") {
         inner.style.minWidth = `${Math.floor(availableW / next)}px`;
         inner.style.minHeight = `${Math.floor(availableH / next)}px`;
+      } else {
+        inner.style.minWidth = `${Math.floor(Math.min(availableW / next, naturalW * MAX_KNOCKOUT_STRETCH))}px`;
       }
 
       // Would a different number of group columns fit larger? Estimate each candidate's
