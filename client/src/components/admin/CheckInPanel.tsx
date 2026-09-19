@@ -128,7 +128,7 @@ export default function CheckInPanel() {
       }),
     // Non-guest members not yet checked in: alphabetical
     ...allMembers
-      .filter((m) => !queuedIds.has(m.id) && m.member_type !== "guest")
+      .filter((m) => !queuedIds.has(m.id) && m.member_type !== "guest" && m.active !== false)
       .sort((a, b) => a.name.localeCompare(b.name)),
   ];
 

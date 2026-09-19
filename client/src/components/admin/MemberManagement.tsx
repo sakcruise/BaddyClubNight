@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { membersApi, syncApi } from "../../services/api";
 import { useMemberStore } from "../../store";
 import Avatar from "../shared/Avatar";
-import { UserPlus, Trash2, Check, X, Pencil, CloudDownload } from "lucide-react";
+import { UserPlus, Archive, Check, X, Pencil, CloudDownload, RotateCcw } from "lucide-react";
 import type { MemberType } from "../../types";
 import { LEVEL_LABELS, LEVELS } from "../../types";
 
@@ -22,7 +22,7 @@ const LEVEL_COLORS: Record<number, string> = {
 };
 
 export default function MemberManagement() {
-  const { members, setMembers, addMember, updateMember, deleteMember } = useMemberStore();
+  const { members, setMembers, addMember, updateMember } = useMemberStore();
 
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<MemberType>("male");
@@ -55,10 +55,25 @@ export default function MemberManagement() {
     }
   }
 
-  // Only show permanent members (not guests)
+  // Only show permanent, active members (not guests, not archived)
   const roster = Object.values(members)
-    .filter((m) => m.member_type !== "guest")
+    .filter((m) => m.member_type !== "guest" && m.active !== false)
     .sort((a, b) => a.name.localeCompare(b.name));
+  const archived = Object.values(members)
+    .filter((m) => m.member_type !== "guest" && m.active === false)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Members can't be hard-deleted once they've played (matches reference them), so
+  // "remove" archives: hidden from every roster, still named in old results.
+  async function handleArchive(id: string, active: boolean) {
+    setDeletingId(id);
+    try {
+      await membersApi.update(id, { active });
+      updateMember(id, { active });
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -85,16 +100,6 @@ export default function MemberManagement() {
     await membersApi.update(id, { name: editName.trim(), member_type: editType, level: editLevel });
     updateMember(id, { name: editName.trim(), member_type: editType, level: editLevel });
     setEditingId(null);
-  }
-
-  async function handleDelete(id: string) {
-    setDeletingId(id);
-    try {
-      await membersApi.delete(id);
-      deleteMember(id);
-    } finally {
-      setDeletingId(null);
-    }
   }
 
   return (
@@ -278,11 +283,12 @@ export default function MemberManagement() {
                     <Pencil size={14} />
                   </button>
                   <button
-                    onClick={() => handleDelete(member.id)}
+                    onClick={() => handleArchive(member.id, false)}
                     disabled={isDeleting}
+                    title="Archive - remove from the roster, keep their results"
                     className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
                   >
-                    <Trash2 size={14} />
+                    <Archive size={14} />
                   </button>
                 </div>
               )}
@@ -295,6 +301,29 @@ export default function MemberManagement() {
             <span className="text-4xl">🏸</span>
             <p className="text-gray-400 font-display font-bold text-sm">No members yet — add some above!</p>
           </div>
+        )}
+
+        {archived.length > 0 && (
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs font-display font-bold text-gray-400 uppercase tracking-widest px-1">
+              Archived ({archived.length})
+            </summary>
+            <div className="mt-2 flex flex-col gap-1">
+              {archived.map((member) => (
+                <div key={member.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 opacity-70">
+                  <Avatar name={member.name} url={member.avatar_url} memberType={member.member_type} size="sm" />
+                  <span className="flex-1 font-display font-bold text-gray-600 text-sm">{member.name}</span>
+                  <button
+                    onClick={() => handleArchive(member.id, true)}
+                    disabled={deletingId === member.id}
+                    className="flex items-center gap-1 text-xs font-display font-bold text-violet-600 px-2 py-1.5 rounded-lg hover:bg-violet-50 disabled:opacity-40"
+                  >
+                    <RotateCcw size={12} /> Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          </details>
         )}
       </div>
     </div>

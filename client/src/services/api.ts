@@ -72,6 +72,7 @@ function rowToMember(m: any): Member {
     avatar_url: m.avatar_url ?? undefined,
     member_type: m.member_type ?? "male",
     level: m.level ?? 2,
+    active: m.active ?? true,
     created_at: m.created_at,
   };
 }
@@ -233,7 +234,7 @@ export const membersApi = {
     return { member: rowToMember(check(data, error)) };
   },
 
-  update: async (id: string, patch: { name?: string; member_type?: MemberType; level?: number }) => {
+  update: async (id: string, patch: { name?: string; member_type?: MemberType; level?: number; active?: boolean }) => {
     if (isOffline()) {
       useMemberStore.getState().updateMember(id, patch);
       const member = useMemberStore.getState().members[id];

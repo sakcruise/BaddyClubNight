@@ -59,7 +59,7 @@ export default function TournamentSetupView() {
   const notYet = useMemo(
     () =>
       Object.values(members)
-        .filter((m) => !selected.has(m.id) && m.member_type !== "guest")
+        .filter((m) => !selected.has(m.id) && m.member_type !== "guest" && m.active !== false)
         .filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [members, selected, search]

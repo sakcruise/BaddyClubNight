@@ -9,6 +9,7 @@ export interface Member {
   email?: string;
   member_type: MemberType;
   level: number;          // 1..MAX_LEVEL, see LEVEL_LABELS
+  active?: boolean;       // false = archived: hidden from rosters, kept for history
   created_at: string;
 }
 
