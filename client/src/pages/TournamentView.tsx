@@ -1,25 +1,26 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessionArchiveStore } from "../store";
+import { useSessionStore, useMemberStore, useMatchStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
-import { matchesApi, sessionsApi } from "../services/api";
+import type { TournamentChampion } from "../services/tournaments";
+import { matchesApi } from "../services/api";
 import type { GroupStanding } from "../utils/tournament";
 import type { Tournament, TournamentFixture, TournamentPlayer } from "../types";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
-import EndNightCheers from "../components/shared/EndNightCheers";
 import TournamentTicker from "../components/tournament/TournamentTicker";
-import { Trophy, LogOut, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
 
 // Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
 const MIN_FIT_ZOOM = 0.4;
 // On big screens the board may scale up a little to fill the space, but not so far it looks blown up.
 const MAX_FIT_ZOOM = 1.3;
 
-// Previous years' champions, shown in the header. Add the newest year first.
-const PAST_CHAMPIONS = [
+// Champions from before the app kept records. Years the app has run are read from
+// completed tournaments and take precedence over these.
+const PAST_CHAMPIONS: Array<{ year: number; winners: string }> = [
   { year: 2025, winners: "Sakthi & Dilone" },
   { year: 2024, winners: "Sid & Hilary" },
 ];
@@ -86,10 +87,8 @@ export default function TournamentView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { members } = useMemberStore();
-  const { courts, updateCourtStatus, session, setSession, endSession } = useSessionStore();
-  const { matches, addMatch, setMatches } = useMatchStore();
-  const { setQueue, setActiveMemberIds } = useQueueStore();
-  const { archiveSession } = useSessionArchiveStore();
+  const { courts, updateCourtStatus, session, setSession } = useSessionStore();
+  const { matches, addMatch } = useMatchStore();
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
@@ -98,16 +97,29 @@ export default function TournamentView() {
   const [scoringFixture, setScoringFixture] = useState<TournamentFixture | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCheers, setShowCheers] = useState(false);
-  const [ending, setEnding] = useState(false);
+  const [champions, setChampions] = useState<TournamentChampion[]>([]);
+  const [showWinners, setShowWinners] = useState(false);
   // During the knockout the groups collapse to a scoreboard; this flips them back to the full matrices.
   const [showFullGroups, setShowFullGroups] = useState(false);
   // During the group stage the knockout preview can be shrunk to a narrow qualifiers list.
   const [compactKnockout, setCompactKnockout] = useState(false);
+  // How many group sheets per row. Chosen automatically by the fit logic below to make
+  // the best use of the screen's shape (wide screens get more columns, tall ones fewer).
+  const [groupCols, setGroupCols] = useState(2);
+  const groupsGridRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const bundle = await tournamentsApi.get(id);
+    let bundle: Awaited<ReturnType<typeof tournamentsApi.get>>;
+    try {
+      bundle = await tournamentsApi.get(id);
+    } catch {
+      // Tournament was deleted (e.g. reset from another screen) — drop the stale link and go home.
+      const s = useSessionStore.getState().session;
+      if (s?.tournament_id === id) useSessionStore.getState().setSession({ ...s, tournament_id: undefined });
+      navigate("/", { replace: true });
+      return;
+    }
     setTournament(bundle.tournament);
     setPlayers(bundle.players);
     setFixtures(bundle.fixtures);
@@ -118,11 +130,17 @@ export default function TournamentView() {
       )
     );
     setStandingsByGroup(Object.fromEntries(entries));
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Past champions come from completed tournaments; refresh once this one completes too.
+  const tournamentStatus = tournament?.status;
+  useEffect(() => {
+    tournamentsApi.champions().then(setChampions).catch(() => {});
+  }, [tournamentStatus]);
 
   // Fit-to-height: the whole board is zoomed down (never up) so it always fits under the
   // header without vertical scrolling. Horizontal scroll is fine. Clamped so it stays tappable.
@@ -148,13 +166,43 @@ export default function TournamentView() {
       const fit = Math.min(availableH / naturalH, availableW / naturalW) * 0.99;
       const next = Math.max(MIN_FIT_ZOOM, Math.min(MAX_FIT_ZOOM, fit));
       setFitZoom((z) => (Math.abs(z - next) > 0.005 ? next : z));
+
+      // Would a different number of group columns fit larger? Estimate each candidate's
+      // board size from one sheet's size and swap only for a clear (>3%) improvement.
+      const grid = groupsGridRef.current;
+      if (grid && grid.children.length > 1) {
+        const n = grid.children.length;
+        const gap = 24;
+        const sheets = Array.from(grid.children).map((c) => c.getBoundingClientRect());
+        const sheetW = Math.max(...sheets.map((r) => r.width)) / applied;
+        const sheetH = Math.max(...sheets.map((r) => r.height)) / applied;
+        const gridRect = grid.getBoundingClientRect();
+        const gridW = gridRect.width / applied;
+        const gridH = gridRect.height / applied;
+        const koH = (knockoutRef.current?.getBoundingClientRect().height ?? 0) / applied;
+        const restW = naturalW - gridW;
+        const restH = naturalH - Math.max(gridH, koH);
+        let bestCols = groupCols;
+        let bestFit = 0;
+        let currentFit = 0;
+        for (const cols of [2, 3, 4]) {
+          if (cols > n) continue;
+          const rows = Math.ceil(n / cols);
+          const w = cols * sheetW + (cols - 1) * gap + restW;
+          const h = Math.max(rows * sheetH + (rows - 1) * gap, koH) + restH;
+          const f = Math.min(availableW / w, availableH / h);
+          if (cols === groupCols) currentFit = f;
+          if (f > bestFit) { bestFit = f; bestCols = cols; }
+        }
+        if (bestCols !== groupCols && bestFit > currentFit * 1.03) setGroupCols(bestCols);
+      }
     };
     recompute();
     const ro = new ResizeObserver(recompute);
     ro.observe(outer);
     ro.observe(inner);
     return () => ro.disconnect();
-  }, [tournament?.id]);
+  }, [tournament?.id, groupCols]);
 
   // Once the bracket exists, slide it into view so the operator lands on the knockout, not the group scores.
   const knockoutRef = useRef<HTMLDivElement>(null);
@@ -165,6 +213,14 @@ export default function TournamentView() {
     }
   }, [status]);
 
+  // Header honours board: seeded years plus every completed tournament (newest first).
+  const championsByYear = useMemo(() => {
+    const byYear = new Map<number, { year: number; winners: string }>();
+    for (const c of PAST_CHAMPIONS) byYear.set(c.year, c);
+    for (const c of champions) byYear.set(c.year, { year: c.year, winners: pairName(c.pair, members) });
+    return Array.from(byYear.values()).sort((a, b) => b.year - a.year);
+  }, [champions, members]);
+
   if (!tournament || !id) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -172,6 +228,8 @@ export default function TournamentView() {
       </div>
     );
   }
+
+  const thisChampion = champions.find((c) => c.tournamentId === tournament.id) ?? null;
 
   const allGroupFixturesComplete = fixtures
     .filter((f) => f.stage === "group")
@@ -271,9 +329,20 @@ export default function TournamentView() {
     }
   }
 
-  async function handleEndTournament() {
+  // Ending a finished tournament crowns the champions first; the result stays saved
+  // (the tournament row is complete) and only the session link is dropped afterwards.
+  function handleEndTournament() {
     if (!tournament || !session) return;
-    if (!confirm("End this tournament? Club night continues as normal — courts go back to the regular check-in flow.")) return;
+    if (tournament.status === "complete") {
+      setShowWinners(true);
+      return;
+    }
+    if (!confirm("The final hasn't been played, so no champions will be recorded. End the tournament anyway? Club night carries on as normal.")) return;
+    finishTournament();
+  }
+
+  async function finishTournament() {
+    if (!session) return;
     setBusy(true);
     setError(null);
     try {
@@ -282,6 +351,7 @@ export default function TournamentView() {
       navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not end the tournament");
+      setShowWinners(false);
     } finally {
       setBusy(false);
     }
@@ -298,32 +368,6 @@ export default function TournamentView() {
       setError(e instanceof Error ? e.message : "Could not generate the bracket");
     } finally {
       setBusy(false);
-    }
-  }
-
-  function handleEndNight() {
-    if (!session) return;
-    setShowCheers(true);
-  }
-
-  async function confirmEndNight() {
-    if (!session) return;
-    setEnding(true);
-    try {
-      archiveSession({ ...session, status: "ended" }, matches);
-      await sessionsApi.end(session.id);
-      setShowCheers(false);
-      endSession();
-      setMatches([]);
-      setQueue([]);
-      setActiveMemberIds(new Set());
-      navigate("/");
-    } catch (err) {
-      console.error("End night failed:", err);
-      setShowCheers(false);
-      alert(`Could not end the session: ${err instanceof Error ? err.message : "unknown error"}. Please try again.`);
-    } finally {
-      setEnding(false);
     }
   }
 
@@ -420,7 +464,7 @@ export default function TournamentView() {
           <p className="text-gray-500 text-xs font-display capitalize">{tournament.status} stage</p>
         </div>
         <div className="flex-1 flex flex-wrap items-center gap-2 px-2">
-          {PAST_CHAMPIONS.map((c) => (
+          {championsByYear.map((c) => (
             <span
               key={c.year}
               className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-display font-bold text-amber-800"
@@ -445,13 +489,6 @@ export default function TournamentView() {
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-display font-bold hover:bg-amber-100 transition-all disabled:opacity-50"
         >
           <Flag size={14} /> End Tournament
-        </button>
-        <button
-          onClick={handleEndNight}
-          title="End Night"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-display font-bold hover:bg-red-100 transition-all"
-        >
-          <LogOut size={14} /> End Night
         </button>
       </header>
 
@@ -564,7 +601,11 @@ export default function TournamentView() {
 
             {/* Groups in 2-column grid layout (3 per column) */}
             {(tournament.status === "groups" || showFullGroups) && (
-            <div className={`grid gap-6 flex-shrink-0 w-max ${tournament.status === "groups" && compactKnockout ? "grid-cols-3" : "grid-cols-2"}`}>
+            <div
+              ref={groupsGridRef}
+              className="grid gap-6 flex-shrink-0 w-max"
+              style={{ gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)` }}
+            >
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   // Rows/columns stay in drafted pair order so the sheet doesn't reshuffle after
                   // every score; the ranked standings only drive the leader badge and highlight.
@@ -882,10 +923,14 @@ export default function TournamentView() {
               )}
 
               {tournament.status === "complete" && (
-                <div className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-center text-white shadow-xl">
+                <button
+                  onClick={() => setShowWinners(true)}
+                  className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-center text-white shadow-xl active:scale-[0.98] transition-transform"
+                >
                   <Trophy size={40} className="mx-auto mb-2" />
                   <p className="font-display font-black text-lg">Tournament complete! 🎉</p>
-                </div>
+                  <p className="text-xs font-display font-bold text-violet-100 mt-1">Tap to crown the champions</p>
+                </button>
               )}
             </div>
           </div>
@@ -902,15 +947,62 @@ export default function TournamentView() {
       )}
 
 
-      {showCheers && (
-        <EndNightCheers
-          matches={matches}
-          members={members}
-          onConfirm={confirmEndNight}
-          onCancel={() => setShowCheers(false)}
-          ending={ending}
-          isGroup={!!session?.group_id}
-        />
+      {showWinners && thisChampion && (
+        <div className="fixed inset-0 z-50 bg-violet-950/80 backdrop-blur-sm flex items-center justify-center p-6">
+          {/* Confetti */}
+          {Array.from({ length: 40 }, (_, i) => (
+            <motion.span
+              key={i}
+              initial={{ y: -40, x: 0, opacity: 0, rotate: 0 }}
+              animate={{ y: "110vh", x: (i % 5 - 2) * 60, opacity: [0, 1, 1, 0.6], rotate: 720 }}
+              transition={{ duration: 3.5 + (i % 7) * 0.4, delay: (i % 10) * 0.25, repeat: Infinity, ease: "linear" }}
+              className="pointer-events-none absolute top-0 w-2.5 h-4 rounded-sm"
+              style={{ left: `${(i * 37) % 100}%`, background: ["#f59e0b", "#a78bfa", "#34d399", "#f87171", "#60a5fa", "#f472b6"][i % 6] }}
+            />
+          ))}
+          <motion.div
+            initial={{ scale: 0.7, opacity: 0, y: 30 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg p-8 text-center flex flex-col items-center gap-5"
+          >
+            <motion.div
+              animate={{ rotate: [0, -8, 8, -4, 0], scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.5 }}
+              className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-300/50"
+            >
+              <Trophy size={48} className="text-white" />
+            </motion.div>
+            <div>
+              <p className="text-xs font-display font-black uppercase tracking-[0.3em] text-amber-500">{thisChampion.year} Champions</p>
+              <h2 className="font-display font-black text-3xl text-gray-900 leading-tight mt-1">
+                {thisChampion.pair.map((id) => members[id]?.name ?? "?").join(" & ")}
+              </h2>
+            </div>
+            <div className="flex -space-x-3">
+              {thisChampion.pair.map((id) => (
+                <div key={id} className="ring-4 ring-white rounded-full">
+                  <Avatar name={members[id]?.name ?? "?"} url={members[id]?.avatar_url} memberType={members[id]?.member_type} size="lg" />
+                </div>
+              ))}
+            </div>
+            {thisChampion.runnersUp && (
+              <p className="text-sm font-display font-bold text-gray-500">
+                Runners-up: {pairName(thisChampion.runnersUp, members)}
+                {thisChampion.score && <span className="text-gray-400"> · {thisChampion.score[0]}-{thisChampion.score[1]} in the final</span>}
+              </p>
+            )}
+            <p className="text-xs font-display text-gray-400">Saved to the club's honours board — they'll show in the header next year.</p>
+            <div className="flex gap-3 w-full mt-2">
+              <Button variant="ghost" size="lg" onClick={() => setShowWinners(false)}>
+                Back
+              </Button>
+              <Button size="lg" fullWidth disabled={busy} onClick={finishTournament}>
+                Finish · Back to Club Night
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

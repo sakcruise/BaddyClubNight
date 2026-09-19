@@ -72,7 +72,65 @@ function rowToFixture(f: any): TournamentFixture {
   };
 }
 
+export interface TournamentChampion {
+  tournamentId: string;
+  year: number;
+  pair: [string, string];
+  runnersUp: [string, string] | null;
+  score: [number, number] | null;
+}
+
 export const tournamentsApi = {
+  /** Every completed tournament's champions (winner of the final), newest first.
+   * Derived from the saved fixtures/matches, so nothing extra has to be written. */
+  champions: async (): Promise<TournamentChampion[]> => {
+    const { data: ts, error } = await supabase
+      .from("tournaments")
+      .select("id, created_at")
+      .eq("status", "complete")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    if (!ts || ts.length === 0) return [];
+
+    const { data: fs, error: fe } = await supabase
+      .from("tournament_fixtures")
+      .select("*")
+      .in("tournament_id", ts.map((t: any) => t.id))
+      .eq("stage", "knockout")
+      .eq("status", "complete");
+    if (fe) throw new Error(fe.message);
+    const fixtures = (fs ?? []).map(rowToFixture);
+
+    const finals = ts
+      .map((t: any) => {
+        const ko = fixtures.filter((f) => f.tournament_id === t.id && f.team_a);
+        const maxRound = Math.max(...ko.map((f) => f.round), 0);
+        const final = ko.find((f) => f.round === maxRound);
+        return final ? { t, final } : null;
+      })
+      .filter((x): x is { t: any; final: TournamentFixture } => !!x);
+
+    const matchIds = finals.map((x) => x.final.match_id).filter((m): m is string => !!m);
+    const scores = new Map<string, [number, number]>();
+    if (matchIds.length > 0) {
+      const { data: ms, error: me } = await supabase.from("matches").select("id, score_a, score_b").in("id", matchIds);
+      if (me) throw new Error(me.message);
+      for (const m of ms ?? []) if (m.score_a != null && m.score_b != null) scores.set(m.id, [m.score_a, m.score_b]);
+    }
+
+    return finals.map(({ t, final }) => {
+      const score = final.match_id ? scores.get(final.match_id) ?? null : null;
+      const aWon = !final.team_b || !score || score[0] > score[1];
+      return {
+        tournamentId: t.id,
+        year: new Date(t.created_at).getFullYear(),
+        pair: (aWon ? final.team_a : final.team_b) as [string, string],
+        runnersUp: final.team_b ? (aWon ? final.team_b : final.team_a) : null,
+        score: score ? (aWon ? score : [score[1], score[0]]) : null,
+      };
+    });
+  },
+
   /** Draft the roster into level-balanced, pairable groups (snake draft +
    * strongest-with-weakest pairing) WITHOUT persisting anything — a preview
    * the admin can review and hand-edit before create() commits it. */

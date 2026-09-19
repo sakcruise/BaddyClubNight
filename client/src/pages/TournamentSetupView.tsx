@@ -202,7 +202,7 @@ export default function TournamentSetupView() {
       )}
 
       {step === "review" && (
-        <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 max-w-[1800px] w-full mx-auto">
+        <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 w-full">
           {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
           <p className="text-xs font-display text-gray-500">
             {selectedSlot
@@ -210,7 +210,11 @@ export default function TournamentSetupView() {
               : "Tap a player, then tap another (same group or a different one) to swap them. Everyone stays paired, nothing gets lost."}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+          {/* Two equal rows across the full width: 6 groups → 3 + 3, 4 → 2 + 2, 5 → 3 + 2. */}
+          <div
+            className="grid gap-4 items-start"
+            style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.ceil(pairsByGroup.length / 2))}, minmax(0, 1fr))` }}
+          >
             {pairsByGroup.map((pairs, g) => {
               const groupMemberIds = pairs.flat();
               return (
