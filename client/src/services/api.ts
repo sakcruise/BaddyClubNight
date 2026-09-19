@@ -10,7 +10,7 @@
 import { supabase } from "../lib/supabase";
 import type { Member, Session, Match, QueuePosition, MemberType } from "../types";
 import { v4 as uuid } from "uuid";
-import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessionArchiveStore, useGroupStore } from "../store";
+import { useMemberStore, useSessionStore, useQueueStore, useMatchStore, useSessionArchiveStore, useGroupStore, useTournamentStore, defaultClubConfig } from "../store";
 
 // ─── Offline detection ────────────────────────────────────────────────────────
 // True ONLY when the user explicitly chose offline mode or the browser reports no
@@ -166,13 +166,24 @@ export const authApi = {
     // ModeChooser gate only fires on `appMode === null && !session?.group_id`, so a
     // leftover session with group_id set bypasses it entirely even after appMode
     // itself is reset.
-    useSessionStore.setState({ session: null, courts: [] });
+    // clubName/clubConfig are account-scoped (e.g. "Rivermead Badminton Club")
+    // and must be wiped too — otherwise the next login on this device (a
+    // different club account) can briefly render with the previous club's
+    // name/theme still on screen until fresh data arrives.
+    useSessionStore.setState({
+      session: null,
+      courts: [],
+      clubName: "",
+      clubConfig: defaultClubConfig,
+    });
     useQueueStore.getState().setQueue([]);
     useQueueStore.getState().setActiveMemberIds(new Set());
     useQueueStore.getState().clearPitstops();
     useMatchStore.getState().setMatches([]);
     useMemberStore.getState().setMembers([]);
     useGroupStore.setState({ groups: [], appMode: null });
+    useSessionArchiveStore.getState().clearArchive();
+    useTournamentStore.setState({ tournaments: {}, players: [], fixtures: [] });
   },
 
   /**

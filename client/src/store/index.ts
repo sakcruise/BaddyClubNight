@@ -68,7 +68,7 @@ interface SessionStore {
   setClubConfig: (cfg: Partial<ClubConfig>) => void;
 }
 
-const defaultClubConfig: ClubConfig = {
+export const defaultClubConfig: ClubConfig = {
   name: "",
   venue: "",
   nightDay: "Friday",
