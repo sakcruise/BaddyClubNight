@@ -9,8 +9,11 @@ import { LEVEL_LABELS } from "../types";
 import { Trophy, ChevronLeft, Search, UserPlus, Check, UserCheck, X, PartyPopper } from "lucide-react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
-const LEVEL_DOT: Record<number, string> = {
-  1: "bg-gray-400", 2: "bg-green-500", 3: "bg-blue-500", 4: "bg-violet-500", 5: "bg-orange-500", 6: "bg-red-500",
+// Chip border follows the avatar colour scheme: blue = male, pink = female, purple = guest.
+const GENDER_BORDER: Record<string, string> = {
+  male: "border-blue-300",
+  female: "border-pink-300",
+  guest: "border-purple-300",
 };
 
 type Pairs = [string, string][][];
@@ -363,7 +366,7 @@ export default function TournamentSetupView() {
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
                         onClick={() => toggleCheckIn(m.id)}
                         disabled={loadingId === m.id}
-                        className="min-h-[48px] w-full flex items-center gap-2 pl-1.5 pr-3 rounded-xl bg-white border-2 border-emerald-400 text-gray-900 font-display font-bold text-sm shadow-sm text-left disabled:opacity-50"
+                        className={`min-h-[48px] w-full flex items-center gap-2 pl-1.5 pr-3 rounded-xl bg-emerald-50 border-2 ${GENDER_BORDER[m.member_type] ?? "border-gray-300"} text-gray-900 font-display font-semibold text-sm shadow-sm text-left disabled:opacity-50`}
                       >
                         <span className="relative">
                           <Avatar name={m.name} url={m.avatar_url} memberType={m.member_type} size="sm" />
@@ -372,7 +375,6 @@ export default function TournamentSetupView() {
                           </span>
                         </span>
                         <span>{m.name}</span>
-                        <span className={`w-2 h-2 rounded-full ${LEVEL_DOT[m.level ?? 2]}`} title={LEVEL_LABELS[m.level ?? 2]} />
                       </motion.button>
                     ))}
                   </AnimatePresence>
@@ -421,11 +423,10 @@ export default function TournamentSetupView() {
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
                         onClick={() => toggleCheckIn(m.id)}
                         disabled={loadingId === m.id}
-                        className="min-h-[48px] w-full flex items-center gap-2 pl-1.5 pr-3 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-display font-bold text-sm text-left hover:border-emerald-300 disabled:opacity-50"
+                        className={`min-h-[48px] w-full flex items-center gap-2 pl-1.5 pr-3 rounded-xl bg-white border-2 ${GENDER_BORDER[m.member_type] ?? "border-gray-200"} text-gray-700 font-display font-semibold text-sm text-left disabled:opacity-50`}
                       >
                         <Avatar name={m.name} url={m.avatar_url} memberType={m.member_type} size="sm" />
                         <span>{m.name}</span>
-                        <span className={`w-2 h-2 rounded-full ${LEVEL_DOT[m.level ?? 2]}`} title={LEVEL_LABELS[m.level ?? 2]} />
                       </motion.button>
                     ))}
                   </AnimatePresence>
