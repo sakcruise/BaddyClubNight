@@ -15,6 +15,8 @@ import { Trophy, LogOut, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight
 
 // Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
 const MIN_FIT_ZOOM = 0.4;
+// On big screens the board may scale up a little to fill the space, but not so far it looks blown up.
+const MAX_FIT_ZOOM = 1.3;
 
 // Previous years' champions, shown in the header. Add the newest year first.
 const PAST_CHAMPIONS = [
@@ -135,10 +137,16 @@ export default function TournamentView() {
       // Real rendered height divided by the zoom currently applied gives the height at zoom 1,
       // whatever the browser's offset/scrollHeight semantics are under CSS zoom.
       const applied = parseFloat(inner.style.zoom || "1") || 1;
-      const natural = inner.getBoundingClientRect().height / applied;
-      const available = outer.clientHeight;
-      if (natural <= 0 || available <= 0) return;
-      const next = Math.max(MIN_FIT_ZOOM, Math.min(1, available / natural));
+      const rect = inner.getBoundingClientRect();
+      const naturalH = rect.height / applied;
+      const naturalW = rect.width / applied;
+      const availableH = outer.clientHeight;
+      const availableW = outer.clientWidth;
+      if (naturalH <= 0 || naturalW <= 0 || availableH <= 0 || availableW <= 0) return;
+      // Fit both axes: whichever is tighter wins, so nothing scrolls in either direction.
+      // 1% margin so sub-pixel rounding never leaves a stray scrollbar.
+      const fit = Math.min(availableH / naturalH, availableW / naturalW) * 0.99;
+      const next = Math.max(MIN_FIT_ZOOM, Math.min(MAX_FIT_ZOOM, fit));
       setFitZoom((z) => (Math.abs(z - next) > 0.005 ? next : z));
     };
     recompute();
@@ -460,7 +468,7 @@ export default function TournamentView() {
         ref={fitOuterRef}
         className={`flex-1 min-h-0 overflow-x-auto w-full ${fitZoom <= MIN_FIT_ZOOM ? "overflow-y-auto" : "overflow-y-hidden"}`}
       >
-       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max min-w-full">
+       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max mx-auto">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
 
         {(() => {
