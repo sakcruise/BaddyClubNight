@@ -706,7 +706,7 @@ export default function TournamentView() {
                       <div className="flex items-center gap-2">
                         <h2 className="font-display font-bold text-gray-900 text-base">Group {g + 1}</h2>
                         {leader && (
-                          <span className="flex items-center gap-1.5 text-lg font-body font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3.5 py-1">
+                          <span className="flex items-center gap-1.5 text-lg font-body font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3.5 py-1">
                             <Trophy size={16} className="text-violet-500" /> {pairName(leader.pair, members)}
                           </span>
                         )}
@@ -720,7 +720,7 @@ export default function TournamentView() {
                                 Pair
                               </th>
                               {rows.map((s) => (
-                                <th key={s.pair.join("-")} className="p-2 font-body font-medium text-[13px] text-gray-600 border-b border-gray-200 min-w-[110px] whitespace-nowrap">
+                                <th key={s.pair.join("-")} className="p-2 font-body font-normal text-[13px] text-gray-600 border-b border-gray-200 min-w-[110px] whitespace-nowrap">
                                   {pairName(s.pair, members)}
                                 </th>
                               ))}
@@ -742,7 +742,7 @@ export default function TournamentView() {
                                           <Avatar key={pid} name={members[pid]?.name ?? "?"} size="xs" />
                                         ))}
                                       </div>
-                                      <span className="font-body font-semibold text-gray-900 text-[15px] tracking-tight">{pairName(rowS.pair, members)}</span>
+                                      <span className="font-body font-medium text-gray-900 text-[15px] tracking-tight">{pairName(rowS.pair, members)}</span>
                                     </div>
                                   </th>
                                   {rows.map((colS, ci) => {
