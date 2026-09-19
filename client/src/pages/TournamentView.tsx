@@ -456,9 +456,8 @@ export default function TournamentView() {
 
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex items-start gap-6 overflow-x-auto pb-2 -mx-1 px-1">
-            <div className="flex flex-col gap-6">
-              {/* Groups in 2-column grid layout (3 per column) */}
-              <div className="grid grid-cols-2 gap-6">
+            {/* Groups in 2-column grid layout (3 per column) */}
+            <div className="grid grid-cols-2 gap-6 flex-shrink-0">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
@@ -615,22 +614,21 @@ export default function TournamentView() {
                     </section>
                   );
                 })}
-              </div>
-
-              {/* Knockout button after groups */}
-              {tournament.status === "groups" && (
-                <div className="self-start">
-                  {!allGroupFixturesComplete && (
-                    <p className="text-xs font-display font-bold text-amber-600 mb-2">
-                      Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
-                    </p>
-                  )}
-                  <Button size="lg" disabled={busy} onClick={handleGenerateKnockout}>
-                    ✅ Group Stage Completed — Generate Knockout
-                  </Button>
-                </div>
-              )}
             </div>
+
+            {/* Knockout button after groups */}
+            {tournament.status === "groups" && (
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                {!allGroupFixturesComplete && (
+                  <p className="text-xs font-display font-bold text-amber-600 max-w-xs">
+                    Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
+                  </p>
+                )}
+                <Button size="lg" disabled={busy} onClick={handleGenerateKnockout}>
+                  ✅ Group Stage Completed — Generate Knockout
+                </Button>
+              </div>
+            )}
 
             <div className="flex flex-col gap-4 w-[500px] flex-shrink-0">
               {(tournament.status === "knockout" || tournament.status === "complete") && (
