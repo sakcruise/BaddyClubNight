@@ -5,7 +5,7 @@ import { tournamentsApi } from "../services/tournaments";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
-import { Trophy, ChevronLeft, ArrowLeftRight } from "lucide-react";
+import { Trophy, ChevronLeft } from "lucide-react";
 
 type Pairs = [string, string][][];
 
