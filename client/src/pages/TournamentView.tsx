@@ -457,11 +457,11 @@ export default function TournamentView() {
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex items-start gap-6 overflow-x-auto pb-2 -mx-1 px-1">
             {/* Groups in 2-column grid layout (3 per column) */}
-            <div className="grid grid-cols-2 gap-6 flex-shrink-0">
+            <div className="grid grid-cols-2 gap-6 flex-shrink-0 w-max">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
-                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-[380px]">
+                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-max">
                       <div className="flex items-center gap-2">
                         <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
                         {rows[0] && (
@@ -616,21 +616,48 @@ export default function TournamentView() {
                 })}
             </div>
 
-            {/* Knockout button after groups */}
-            {tournament.status === "groups" && (
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                {!allGroupFixturesComplete && (
-                  <p className="text-xs font-display font-bold text-amber-600 max-w-xs">
-                    Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
-                  </p>
-                )}
-                <Button size="lg" disabled={busy} onClick={handleGenerateKnockout}>
-                  ✅ Group Stage Completed — Generate Knockout
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-col gap-4 flex-shrink-0 w-max">
+              {tournament.status === "groups" && (
+                <section className="flex flex-col gap-3">
+                  <h2 className="font-display font-black text-gray-900 text-base">Knockout</h2>
+                  {(() => {
+                    const previewRounds = knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group);
+                    return (
+                      <div>
+                        <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${previewRounds.length}, 220px)` }}>
+                          {previewRounds.map((r) => (
+                            <h3 key={r.label} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
+                              {r.label}
+                            </h3>
+                          ))}
+                        </div>
+                        <BracketGrid
+                          roundCounts={previewRounds.map((r) => r.matchups.length)}
+                          cell={(ri, mi) => {
+                            const [a, b] = previewRounds[ri].matchups[mi];
+                            return (
+                              <div className="px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs font-display font-bold text-gray-500 text-center">
+                                {a} <span className="text-gray-300">vs</span> {b}
+                              </div>
+                            );
+                          }}
+                        />
+                      </div>
+                    );
+                  })()}
+                  {!allGroupFixturesComplete && (
+                    <p className="text-xs font-display font-bold text-amber-600 max-w-md">
+                      Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
+                    </p>
+                  )}
+                  <div>
+                    <Button size="lg" disabled={busy} onClick={handleGenerateKnockout}>
+                      ✅ Group Stage Completed — Generate Knockout
+                    </Button>
+                  </div>
+                </section>
+              )}
 
-            <div className="flex flex-col gap-4 w-[500px] flex-shrink-0">
               {(tournament.status === "knockout" || tournament.status === "complete") && (
                 <section className="flex flex-col gap-3">
                   <h2 className="font-display font-black text-gray-900 text-base">Knockout</h2>
