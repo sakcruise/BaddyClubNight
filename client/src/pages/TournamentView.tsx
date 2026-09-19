@@ -523,14 +523,29 @@ export default function TournamentView() {
             {(tournament.status === "groups" || showFullGroups) && (
             <div className="grid grid-cols-2 gap-6 flex-shrink-0 w-max">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
-                  const rows = standingsByGroup[g] ?? [];
+                  // Rows/columns stay in drafted pair order so the sheet doesn't reshuffle after
+                  // every score; the ranked standings only drive the leader badge and highlight.
+                  const ranked = standingsByGroup[g] ?? [];
+                  const draftedPairs = Object.values(
+                    players
+                      .filter((p) => p.group_index === g && p.pair_index != null)
+                      .reduce<Record<number, string[]>>((acc, p) => {
+                        (acc[p.pair_index!] ??= []).push(p.member_id);
+                        return acc;
+                      }, {})
+                  );
+                  const rows = draftedPairs
+                    .filter((ids) => ids.length === 2)
+                    .map((ids) => ranked.find((s) => pairEq(s.pair, ids as [string, string])))
+                    .filter((s): s is GroupStanding => !!s);
+                  const leader = ranked[0];
                   return (
                     <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-max">
                       <div className="flex items-center gap-2">
                         <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
-                        {rows[0] && (
+                        {leader && (
                           <span className="flex items-center gap-1 text-xs font-display font-bold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-0.5">
-                            <Trophy size={11} /> {pairName(rows[0].pair, members)}
+                            <Trophy size={11} /> {pairName(leader.pair, members)}
                           </span>
                         )}
                       </div>
@@ -555,7 +570,7 @@ export default function TournamentView() {
                             {rows.map((rowS, ri) => {
                               const played = rowS.wins + rowS.losses;
                               const avg = played > 0 ? rowS.pointsFor / played : 0;
-                              const isLeader = ri === 0;
+                              const isLeader = !!leader && pairEq(leader.pair, rowS.pair);
                               return (
                                 <tr key={rowS.pair.join("-")} className={isLeader ? "bg-violet-50/60" : ""}>
                                   <th scope="row" className="sticky left-0 z-10 bg-inherit p-2 text-left border-b border-gray-100 whitespace-nowrap">
