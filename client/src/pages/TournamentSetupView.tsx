@@ -5,21 +5,25 @@ import { tournamentsApi } from "../services/tournaments";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
-import { Trophy, ChevronLeft, ArrowLeftRight } from "lucide-react";
+import { Trophy, ChevronLeft, ArrowLeftRight, X } from "lucide-react";
 
 type Pairs = [string, string][][];
 
+// Swaps whoever's in (groupIndex, pairIndex, slot) with newMemberId, searching
+// every group (not just this one) — so a pair can be rebalanced across group
+// boundaries, not just reshuffled within the same group.
 function swapInto(pairsByGroup: Pairs, groupIndex: number, pairIndex: number, slot: 0 | 1, newMemberId: string): Pairs {
   const oldMemberId = pairsByGroup[groupIndex][pairIndex][slot];
   if (oldMemberId === newMemberId) return pairsByGroup;
   const next = pairsByGroup.map((g) => g.map((p) => [...p] as [string, string]));
-  const group = next[groupIndex];
-  for (let pi = 0; pi < group.length; pi++) {
-    for (let si = 0; si < 2; si++) {
-      if (group[pi][si] === newMemberId) {
-        group[pi][si] = oldMemberId;
-        group[pairIndex][slot] = newMemberId;
-        return next;
+  for (const group of next) {
+    for (let pi = 0; pi < group.length; pi++) {
+      for (let si = 0; si < 2; si++) {
+        if (group[pi][si] === newMemberId) {
+          group[pi][si] = oldMemberId;
+          next[groupIndex][pairIndex][slot] = newMemberId;
+          return next;
+        }
       }
     }
   }
@@ -44,6 +48,11 @@ export default function TournamentSetupView() {
   const [reserves, setReserves] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Odd headcount needs someone to sit out — let the admin pick who, rather
+  // than have the draft algorithm silently choose one for them.
+  const [sitOut, setSitOut] = useState<string>("");
+  // Track which pair is being edited for the swap modal
+  const [editingPair, setEditingPair] = useState<{ groupIndex: number; pairIndex: number; slot: 0 | 1 } | null>(null);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -52,16 +61,20 @@ export default function TournamentSetupView() {
       else next.add(id);
       return next;
     });
+    if (id === sitOut) setSitOut("");
   }
 
   const count = selected.size;
-  const canDraft = count >= numGroups * 2 && numGroups >= 1;
+  const isOdd = count % 2 === 1;
+  const playingCount = isOdd && sitOut ? count - 1 : count;
+  const canDraft = numGroups >= 1 && (!isOdd || !!sitOut) && playingCount >= numGroups * 2;
 
   function handleDraft() {
     if (!canDraft) return;
-    const { pairsByGroup: drafted, reserves: draftedReserves } = tournamentsApi.draft(Array.from(selected), numGroups);
+    const participantIds = Array.from(selected).filter((id) => id !== sitOut);
+    const { pairsByGroup: drafted, reserves: draftedReserves } = tournamentsApi.draft(participantIds, numGroups);
     setPairsByGroup(drafted);
-    setReserves(draftedReserves);
+    setReserves(sitOut ? [...draftedReserves, sitOut] : draftedReserves);
     setStep("review");
   }
 
@@ -80,6 +93,10 @@ export default function TournamentSetupView() {
   }
 
   const name = (id: string) => members[id]?.name ?? "?";
+  // "Points" here means each player's skill level (1-5, see LEVEL_LABELS) —
+  // averaging it per group/pair is how the draft balances strength, so
+  // showing it lets the admin confirm groups/pairs actually came out even.
+  const avgLevel = (ids: string[]) => ids.reduce((sum, id) => sum + (members[id]?.level ?? 2), 0) / ids.length;
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -153,9 +170,27 @@ export default function TournamentSetupView() {
               </div>
             </div>
 
-            {count > 0 && count < numGroups * 2 && (
+            {isOdd && count > 0 && (
+              <div>
+                <label className="text-xs font-display font-bold text-amber-600 mb-1.5 block uppercase tracking-widest">
+                  Odd headcount — who's sitting out?
+                </label>
+                <select
+                  value={sitOut}
+                  onChange={(e) => setSitOut(e.target.value)}
+                  className="w-full text-sm font-display font-bold border-2 border-amber-300 rounded-xl px-3 py-2.5 bg-amber-50"
+                >
+                  <option value="">Choose a player…</option>
+                  {Array.from(selected).map((id) => (
+                    <option key={id} value={id}>{name(id)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {playingCount > 0 && playingCount < numGroups * 2 && (
               <p className="text-xs font-display font-bold text-amber-600">
-                Need at least {numGroups * 2} players for {numGroups} groups (so every group can pair off). Pick more players or fewer groups.
+                Need at least {numGroups * 2} playing for {numGroups} groups (so every group can pair off). Pick more players or fewer groups.
               </p>
             )}
           </section>
@@ -170,7 +205,7 @@ export default function TournamentSetupView() {
         <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 max-w-[1800px] w-full mx-auto">
           {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
           <p className="text-xs font-display text-gray-500">
-            Pick a different player into any slot to swap them with whoever's there — everyone stays paired, nothing gets lost.
+            Tap a player to swap them with someone from any group. Everyone stays paired, nothing gets lost.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
@@ -178,22 +213,31 @@ export default function TournamentSetupView() {
               const groupMemberIds = pairs.flat();
               return (
                 <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-2">
-                  <h2 className="font-display font-black text-gray-900 text-sm mb-1">Group {g + 1}</h2>
+                  <div className="flex items-center justify-between mb-1">
+                    <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
+                    <span className="text-[10px] font-display font-bold text-violet-500 bg-violet-50 rounded-full px-2 py-0.5">
+                      Avg {avgLevel(groupMemberIds).toFixed(1)}
+                    </span>
+                  </div>
                   {pairs.map((pair, pairIndex) => (
                     <div key={pairIndex} className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-xl px-2 py-1.5">
-                      {[0, 1].map((slot) => (
-                        <select
-                          key={slot}
-                          value={pair[slot as 0 | 1]}
-                          onChange={(e) => setPairsByGroup((prev) => swapInto(prev, g, pairIndex, slot as 0 | 1, e.target.value))}
-                          className="flex-1 min-w-0 text-xs font-display font-bold border border-gray-200 rounded-lg px-1.5 py-1.5 bg-white"
-                        >
-                          {groupMemberIds.map((id) => (
-                            <option key={id} value={id}>{name(id)}</option>
-                          ))}
-                        </select>
-                      ))}
-                      <ArrowLeftRight size={12} className="text-gray-300 flex-shrink-0" />
+                      <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                        {[0, 1].map((slot) => (
+                          <button
+                            key={slot}
+                            onClick={() => setEditingPair({ groupIndex: g, pairIndex, slot: slot as 0 | 1 })}
+                            className="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-all active:scale-95"
+                          >
+                            <Avatar name={members[pair[slot]]?.name ?? "?"} size="xs" memberType={members[pair[slot]]?.member_type} />
+                            <span className="text-xs font-display font-bold text-gray-800 truncate">
+                              {name(pair[slot]).split(" ")[0]}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-display font-bold text-gray-400 flex-shrink-0 tabular-nums">
+                        {avgLevel(pair).toFixed(1)}
+                      </span>
                     </div>
                   ))}
                 </section>
@@ -210,6 +254,51 @@ export default function TournamentSetupView() {
           <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
             {creating ? "Starting…" : "Confirm & Start Tournament →"}
           </Button>
+
+          {/* Swap modal */}
+          {editingPair && (
+            <div className="fixed inset-0 bg-black/30 flex items-end z-50">
+              <div className="w-full bg-white rounded-t-3xl p-5 flex flex-col gap-4 max-h-[80dvh] overflow-y-auto animate-in slide-in-from-bottom-4">
+                <div className="flex items-center justify-between sticky top-0 bg-white -mx-5 px-5 py-4 -mt-5 border-b border-gray-100">
+                  <div>
+                    <h2 className="font-display font-black text-gray-900">Swap Player</h2>
+                    <p className="text-xs text-gray-500 font-display mt-0.5">
+                      Pick someone to replace {name(pairsByGroup[editingPair.groupIndex][editingPair.pairIndex][editingPair.slot])}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setEditingPair(null)}
+                    className="p-2 rounded-xl hover:bg-gray-100 text-gray-400"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {pairsByGroup.flat().flat().map((memberId) => (
+                    <button
+                      key={memberId}
+                      onClick={() => {
+                        if (editingPair) {
+                          setPairsByGroup((prev) =>
+                            swapInto(prev, editingPair.groupIndex, editingPair.pairIndex, editingPair.slot, memberId)
+                          );
+                          setEditingPair(null);
+                        }
+                      }}
+                      className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-all active:scale-95"
+                    >
+                      <Avatar name={members[memberId]?.name ?? "?"} size="sm" memberType={members[memberId]?.member_type} />
+                      <div className="flex-1 text-left">
+                        <p className="text-xs font-display font-bold text-gray-800">{name(memberId)}</p>
+                        <p className="text-[10px] text-gray-400">{LEVEL_LABELS[members[memberId]?.level ?? 2]}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       )}
     </div>

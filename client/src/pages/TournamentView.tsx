@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessionArchiveStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
 import { matchesApi, sessionsApi } from "../services/api";
@@ -9,25 +10,16 @@ import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
 import EndNightCheers from "../components/shared/EndNightCheers";
-import { Trophy, LogOut } from "lucide-react";
+import { Trophy, LogOut, RotateCcw, Play, Radio, Flag } from "lucide-react";
 
 function pairName(ids: [string, string] | null, members: ReturnType<typeof useMemberStore.getState>["members"]) {
   if (!ids) return "Bye";
   return ids.map((id) => members[id]?.name?.split(" ")[0] ?? "?").join(" & ");
 }
 
-// Tailwind scans for literal class strings, so the possible grid-cols classes
-// must be spelled out here rather than built with a template string at runtime.
-const GROUP_GRID_COLS: Record<number, string> = {
-  1: "lg:grid-cols-1",
-  2: "lg:grid-cols-2",
-  3: "lg:grid-cols-3",
-  4: "lg:grid-cols-4",
-  5: "lg:grid-cols-5",
-  6: "lg:grid-cols-6",
-  7: "lg:grid-cols-6",
-  8: "lg:grid-cols-6",
-};
+function pairEq(a: [string, string], b: [string, string]) {
+  return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
+}
 
 function nextPowerOfTwo(n: number): number {
   let p = 1;
@@ -78,7 +70,7 @@ export default function TournamentView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { members } = useMemberStore();
-  const { courts, updateCourtStatus, session, endSession } = useSessionStore();
+  const { courts, updateCourtStatus, session, setSession, endSession } = useSessionStore();
   const { matches, addMatch, setMatches } = useMatchStore();
   const { setQueue, setActiveMemberIds } = useQueueStore();
   const { archiveSession } = useSessionArchiveStore();
@@ -126,9 +118,35 @@ export default function TournamentView() {
     .filter((f) => f.stage === "group")
     .every((f) => f.status === "complete");
   const idleCourts = courts.filter((c) => c.status === "idle");
-  // Pad every group's standings list to the same row count so the "Fixtures"
-  // header lines up at the same height across all group cards.
-  const maxStandingsRows = Math.max(1, ...Object.values(standingsByGroup).map((s) => s.length));
+
+  function findGroupFixture(g: number, a: [string, string], b: [string, string]) {
+    return fixtures.find(
+      (f) =>
+        f.stage === "group" &&
+        f.group_index === g &&
+        f.team_a &&
+        f.team_b &&
+        ((pairEq(f.team_a, a) && pairEq(f.team_b, b)) || (pairEq(f.team_a, b) && pairEq(f.team_b, a)))
+    );
+  }
+
+  // Each group plays out on its own court for the whole tournament (Group 1 ->
+  // court 1, Group 2 -> court 2, ...), so group-stage fixtures never need a
+  // court picker — wrapping if there are fewer courts than groups.
+  const sortedCourts = [...courts].sort((a, b) => a.id - b.id);
+  function courtForGroup(g: number) {
+    return sortedCourts.length > 0 ? sortedCourts[g % sortedCourts.length] : undefined;
+  }
+
+  function handlePlayGroupFixture(g: number, fixture: TournamentFixture) {
+    const court = courtForGroup(g);
+    if (!court) { setError("No courts are set up for this session."); return; }
+    if (court.status !== "idle") {
+      setError(`Court ${court.id} (Group ${g + 1}'s court) is still in use — finish that match first.`);
+      return;
+    }
+    handleLaunch(fixture, court.id);
+  }
 
   async function handleLaunch(fixture: TournamentFixture, courtId: number) {
     if (!session) return;
@@ -155,6 +173,57 @@ export default function TournamentView() {
       await tournamentsApi.completeFixture(fixture.id);
       setScoringFixture(null);
       await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetFixture(fixture: TournamentFixture) {
+    if (!confirm("Reset this match? The court will be freed and any score entered will be lost.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
+      await tournamentsApi.resetFixture(fixture);
+      if (match) {
+        updateCourtStatus(match.court_id, "idle");
+        useMatchStore.getState().deleteMatch(match.id);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reset that fixture");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetGroups() {
+    if (!tournament || !session) return;
+    if (!confirm("Reset groups? This deletes the current draft and all scores, and takes you back to re-pick players.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await tournamentsApi.delete(tournament.id);
+      setSession({ ...session, tournament_id: undefined });
+      navigate(`/tournament-setup/${session.id}`, { replace: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reset the groups");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleEndTournament() {
+    if (!tournament || !session) return;
+    if (!confirm("End this tournament? Club night continues as normal — courts go back to the regular check-in flow.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await tournamentsApi.unlinkSession(session.id);
+      setSession({ ...session, tournament_id: undefined });
+      navigate("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not end the tournament");
     } finally {
       setBusy(false);
     }
@@ -217,13 +286,18 @@ export default function TournamentView() {
   function FixtureRow({ fixture }: { fixture: TournamentFixture }) {
     const [courtChoice, setCourtChoice] = useState<number | "">("");
     const isBye = !fixture.team_b;
+    const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
     return (
       <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200">
         <div className="flex-1 min-w-0">
           <p className="font-display font-bold text-gray-800 text-sm truncate">
             {pairName(fixture.team_a, members)} <span className="text-gray-300">vs</span> {pairName(fixture.team_b, members)}
           </p>
-          <p className="text-xs font-display text-gray-400 capitalize">{isBye ? "bye — auto-advanced" : fixture.status}</p>
+          {fixture.status === "complete" && match?.score_a !== undefined && match?.score_b !== undefined ? (
+            <p className="text-xs font-display font-bold text-violet-600">{match.score_a} - {match.score_b}</p>
+          ) : (
+            <p className="text-xs font-display text-gray-400 capitalize">{isBye ? "bye — auto-advanced" : fixture.status}</p>
+          )}
         </div>
         {!isBye && fixture.status === "pending" && (
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -247,9 +321,34 @@ export default function TournamentView() {
           </div>
         )}
         {!isBye && fixture.status === "active" && (
-          <Button size="sm" variant="secondary" onClick={() => setScoringFixture(fixture)}>
-            Enter Score
-          </Button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button size="sm" variant="secondary" onClick={() => setScoringFixture(fixture)}>
+              Enter Score
+            </Button>
+            <button
+              onClick={() => handleResetFixture(fixture)}
+              disabled={busy}
+              title="Reset match"
+              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        )}
+        {!isBye && fixture.status === "complete" && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button size="sm" variant="secondary" onClick={() => setScoringFixture(fixture)}>
+              Edit Score
+            </Button>
+            <button
+              onClick={() => handleResetFixture(fixture)}
+              disabled={busy}
+              title="Reset match"
+              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
         )}
       </div>
     );
@@ -257,111 +356,303 @@ export default function TournamentView() {
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-gray-50 flex flex-col">
-      <header className="flex items-center gap-3 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
-        <button onClick={handleEndNight} title="End Night" className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-500">
-          <LogOut size={20} />
-        </button>
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0">
           <Trophy size={18} className="text-white" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-[120px]">
           <h1 className="font-display font-black text-gray-900 text-lg leading-tight">{tournament.name}</h1>
           <p className="text-gray-500 text-xs font-display capitalize">{tournament.status} stage</p>
         </div>
+        <button
+          onClick={handleResetGroups}
+          disabled={busy}
+          title="Delete this draft and re-pick players"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-bold hover:bg-gray-100 transition-all disabled:opacity-50"
+        >
+          <RotateCcw size={14} /> Reset Groups
+        </button>
+        <button
+          onClick={handleEndTournament}
+          disabled={busy}
+          title="Stop the tournament, keep club night running"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-display font-bold hover:bg-amber-100 transition-all disabled:opacity-50"
+        >
+          <Flag size={14} /> End Tournament
+        </button>
+        <button
+          onClick={handleEndNight}
+          title="End Night"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-display font-bold hover:bg-red-100 transition-all"
+        >
+          <LogOut size={14} /> End Night
+        </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 max-w-[1800px] w-full mx-auto">
+      <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 w-full">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
 
-        {tournament.status === "groups" && (
-          <>
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${GROUP_GRID_COLS[tournament.num_groups] ?? "lg:grid-cols-4"} gap-4 items-start`}>
-              {Array.from({ length: tournament.num_groups }, (_, g) => (
-                <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-4">
-                  <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
-
-                  {standingsByGroup[g]?.[0] && (
-                    <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
-                      <Trophy size={14} className="text-violet-500 flex-shrink-0" />
-                      <span className="text-xs font-display font-bold text-violet-700 truncate">
-                        Leading: {pairName(standingsByGroup[g][0].pair, members)}
+        {(() => {
+          const liveFixtures = fixtures.filter((f) => f.status === "active");
+          if (liveFixtures.length === 0) return null;
+          return (
+            <section className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-2.5">
+              <div className="flex items-center gap-2">
+                <motion.span
+                  animate={{ opacity: [1, 0.35, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.4 }}
+                  className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"
+                />
+                <h2 className="text-xs font-display font-black text-amber-700 uppercase tracking-widest">
+                  Now Playing ({liveFixtures.length})
+                </h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {liveFixtures.map((f) => {
+                  const match = f.match_id ? matches.find((m) => m.id === f.match_id) : undefined;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setScoringFixture(f)}
+                      className="flex items-center gap-2 bg-white border border-amber-300 rounded-xl pl-3 pr-2 py-1.5 hover:bg-amber-100 transition-colors"
+                    >
+                      {match && (
+                        <span className="text-[10px] font-display font-black text-amber-600 bg-amber-100 rounded-md px-1.5 py-0.5">
+                          Court {match.court_id}
+                        </span>
+                      )}
+                      <span className="text-xs font-display font-bold text-gray-800">
+                        {pairName(f.team_a, members)} <span className="text-gray-300">vs</span> {pairName(f.team_b, members)}
                       </span>
-                    </div>
-                  )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
 
-                  <div className="flex flex-col gap-1.5">
-                    {(standingsByGroup[g] ?? []).map((s, i) => (
-                      <div key={s.pair.join("-")} className="h-6 flex items-center gap-2 text-sm font-display">
-                        <span className="w-5 text-gray-400 font-bold">{i + 1}</span>
-                        <div className="flex -space-x-2">
-                          {s.pair.map((pid) => (
-                            <Avatar key={pid} name={members[pid]?.name ?? "?"} size="xs" />
-                          ))}
-                        </div>
-                        <span className="flex-1 font-bold text-gray-800 truncate">{pairName(s.pair, members)}</span>
-                        <span className="text-gray-500">{s.wins}W {s.losses}L</span>
-                        <span className="text-gray-400 w-10 text-right">{s.pointDiff >= 0 ? "+" : ""}{s.pointDiff}</span>
+        {fixtures.some((f) => f.stage === "group") && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-bold text-gray-400 px-1">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-lg border border-dashed border-gray-300 text-gray-400 px-1.5 py-0.5">
+                <Play size={9} /> Play
+              </span>
+              not yet scheduled
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 px-1.5 py-0.5">
+                <Radio size={9} /> Live
+              </span>
+              on court now
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5">11/7</span>
+              <span className="rounded-lg bg-red-50 border border-red-200 text-red-600 px-1.5 py-0.5">7/11</span>
+              win / loss — tap to edit
+            </span>
+          </div>
+        )}
+
+        {fixtures.some((f) => f.stage === "group") && (
+          <div className="flex items-start gap-6 overflow-x-auto pb-2 -mx-1 px-1">
+            <div className="flex flex-col gap-6">
+              {/* Groups in 2-column grid layout (3 per column) */}
+              <div className="grid grid-cols-2 gap-6">
+                {Array.from({ length: tournament.num_groups }, (_, g) => {
+                  const rows = standingsByGroup[g] ?? [];
+                  return (
+                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-[380px]">
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
+                        {rows[0] && (
+                          <span className="flex items-center gap-1 text-xs font-display font-bold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-0.5">
+                            <Trophy size={11} /> {pairName(rows[0].pair, members)}
+                          </span>
+                        )}
                       </div>
-                    ))}
-                    {/* Invisible filler rows so every group's standings block is the same height */}
-                    {Array.from({ length: maxStandingsRows - (standingsByGroup[g]?.length ?? 0) }, (_, i) => (
-                      <div key={`filler-${i}`} className="h-6" aria-hidden="true" />
-                    ))}
-                  </div>
 
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-display font-bold text-gray-500 uppercase tracking-widest">Fixtures</h3>
-                    <div className="flex flex-col gap-2 max-h-96 overflow-y-auto pr-0.5">
-                      {fixtures
-                        .filter((f) => f.stage === "group" && f.group_index === g)
-                        .map((f) => <FixtureRow key={f.id} fixture={f} />)}
-                    </div>
-                  </div>
-                </section>
-              ))}
-            </div>
+                      <div className="overflow-x-auto -mx-1 px-1">
+                        <table className="border-collapse text-sm font-display w-full">
+                          <thead>
+                            <tr>
+                              <th className="sticky left-0 z-10 bg-white p-2 text-left text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-200">
+                                Pair
+                              </th>
+                              {rows.map((s) => (
+                                <th key={s.pair.join("-")} className="p-2 text-[10px] text-gray-500 font-bold border-b border-gray-200 min-w-[90px] whitespace-nowrap">
+                                  {pairName(s.pair, members)}
+                                </th>
+                              ))}
+                              <th className="p-2 text-[10px] text-gray-500 font-bold border-b border-gray-200 min-w-[80px]">Points Won</th>
+                              <th className="p-2 text-[10px] text-gray-500 font-bold border-b border-gray-200 min-w-[80px]">Average</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((rowS, ri) => {
+                              const played = rowS.wins + rowS.losses;
+                              const avg = played > 0 ? rowS.pointsFor / played : 0;
+                              const isLeader = ri === 0;
+                              return (
+                                <tr key={rowS.pair.join("-")} className={isLeader ? "bg-violet-50/60" : ""}>
+                                  <th scope="row" className="sticky left-0 z-10 bg-inherit p-2 text-left border-b border-gray-100 whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="flex -space-x-2 flex-shrink-0">
+                                        {rowS.pair.map((pid) => (
+                                          <Avatar key={pid} name={members[pid]?.name ?? "?"} size="xs" />
+                                        ))}
+                                      </div>
+                                      <span className="font-bold text-gray-800 text-xs">{pairName(rowS.pair, members)}</span>
+                                    </div>
+                                  </th>
+                                  {rows.map((colS, ci) => {
+                                    if (ri === ci) {
+                                      return (
+                                        <td key={ci} className="relative border-b border-gray-100 p-0 h-11 bg-gray-50">
+                                          <div
+                                            className="absolute inset-0"
+                                            style={{ background: "linear-gradient(to top right, transparent calc(50% - 1px), #d1d5db calc(50%), transparent calc(50% + 1px))" }}
+                                          />
+                                        </td>
+                                      );
+                                    }
+                                    const fixture = findGroupFixture(g, rowS.pair, colS.pair);
+                                    if (!fixture) {
+                                      return <td key={ci} className="border-b border-gray-100 text-center text-gray-300 text-xs">—</td>;
+                                    }
+                                    const rowIsTeamA = fixture.team_a ? pairEq(fixture.team_a, rowS.pair) : true;
+                                    const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
 
-            <section className="flex flex-col gap-3">
-              <h2 className="font-display font-black text-gray-900 text-base">Next: Knockout</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group).map((round) => (
-                  <div key={round.label} className="bg-white rounded-2xl border border-gray-200 p-3 flex flex-col gap-2">
-                    <h3 className="text-xs font-display font-bold text-gray-500 uppercase tracking-widest">{round.label}</h3>
-                    {round.matchups.map(([a, b], i) => (
-                      <div key={i} className="px-3 py-2 rounded-xl bg-gray-50 border border-gray-100 text-xs font-display font-bold text-gray-500">
-                        {a} <span className="text-gray-300">vs</span> {b}
+                                    if (fixture.status === "complete" && match?.score_a !== undefined && match?.score_b !== undefined) {
+                                      const own = rowIsTeamA ? match.score_a : match.score_b;
+                                      const opp = rowIsTeamA ? match.score_b : match.score_a;
+                                      const won = own > opp;
+                                      return (
+                                        <td key={ci} className="group relative border-b border-gray-100 text-center p-1.5">
+                                          <motion.button
+                                            key={`${fixture.id}-complete`}
+                                            initial={{ scale: 0.5, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                                            onClick={() => setScoringFixture(fixture)}
+                                            title="Tap to edit score"
+                                            className={`w-full rounded-lg py-1.5 font-display font-black text-xs tabular-nums border transition-colors
+                                              ${won
+                                                ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                                                : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"}`}
+                                          >
+                                            {own}/{opp}
+                                          </motion.button>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
+                                            title="Reset match"
+                                            className="absolute top-0 right-0 p-0.5 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+                                          >
+                                            <RotateCcw size={10} />
+                                          </button>
+                                        </td>
+                                      );
+                                    }
+
+                                    if (fixture.status === "active") {
+                                      return (
+                                        <td key={ci} className="group relative border-b border-gray-100 text-center p-1.5">
+                                          <button
+                                            onClick={() => setScoringFixture(fixture)}
+                                            title="Tap to enter score"
+                                            className="w-full flex items-center justify-center gap-1 rounded-lg py-1.5 bg-amber-100 border border-amber-300 text-amber-700 hover:bg-amber-200 transition-colors"
+                                          >
+                                            <motion.span
+                                              animate={{ opacity: [1, 0.3, 1] }}
+                                              transition={{ repeat: Infinity, duration: 1.2 }}
+                                              className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"
+                                            />
+                                            <span className="text-[10px] font-display font-black uppercase tracking-wide">Live</span>
+                                          </button>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
+                                            title="Reset match"
+                                            className="absolute top-0 right-0 p-0.5 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+                                          >
+                                            <RotateCcw size={10} />
+                                          </button>
+                                        </td>
+                                      );
+                                    }
+
+                                    const isBye = !fixture.team_b;
+                                    return (
+                                      <td key={ci} className="border-b border-gray-100 text-center p-1.5">
+                                        {isBye ? (
+                                          <span className="block py-1.5 text-[10px] text-gray-300 font-display font-bold">bye</span>
+                                        ) : (
+                                          <button
+                                            onClick={() => handlePlayGroupFixture(g, fixture)}
+                                            disabled={busy}
+                                            title={`Send to Group ${g + 1}'s court`}
+                                            className="w-full flex items-center justify-center gap-1 rounded-lg py-1.5 border border-dashed border-gray-300 text-gray-400
+                                                       hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 active:scale-95 transition-all disabled:opacity-50"
+                                          >
+                                            <Play size={10} className="flex-shrink-0" />
+                                            <span className="text-[10px] font-display font-bold">Play</span>
+                                          </button>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="border-b border-gray-100 text-center font-display font-black text-gray-800 tabular-nums text-sm">
+                                    {rowS.pointsFor}
+                                  </td>
+                                  <td className="border-b border-gray-100 text-center font-display font-black text-violet-600 tabular-nums text-sm">
+                                    {avg.toFixed(1)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                    ))}
-                  </div>
-                ))}
+                    </section>
+                  );
+                })}
               </div>
 
-              {!allGroupFixturesComplete && (
-                <p className="text-xs font-display font-bold text-amber-600">
-                  Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
-                </p>
+              {/* Knockout button after groups */}
+              {tournament.status === "groups" && (
+                <div className="self-start">
+                  {!allGroupFixturesComplete && (
+                    <p className="text-xs font-display font-bold text-amber-600 mb-2">
+                      Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
+                    </p>
+                  )}
+                  <Button size="lg" disabled={busy} onClick={handleGenerateKnockout}>
+                    ✅ Group Stage Completed — Generate Knockout
+                  </Button>
+                </div>
               )}
-              <Button size="lg" fullWidth disabled={busy} onClick={handleGenerateKnockout}>
-                ✅ Group Stage Completed — Generate Knockout
-              </Button>
-            </section>
-          </>
-        )}
+            </div>
 
-        {(tournament.status === "knockout" || tournament.status === "complete") && (
-          <KnockoutBracket
-            fixtures={fixtures.filter((f) => f.stage === "knockout")}
-            members={members}
-            busy={busy}
-            onAdvance={handleAdvanceRound}
-            renderFixture={(f) => <FixtureRow key={f.id} fixture={f} />}
-          />
-        )}
+            <div className="flex flex-col gap-4 w-[500px] flex-shrink-0">
+              {(tournament.status === "knockout" || tournament.status === "complete") && (
+                <section className="flex flex-col gap-3">
+                  <h2 className="font-display font-black text-gray-900 text-base">Knockout</h2>
+                  <KnockoutBracket
+                    fixtures={fixtures.filter((f) => f.stage === "knockout")}
+                    members={members}
+                    busy={busy}
+                    onAdvance={handleAdvanceRound}
+                    renderFixture={(f) => <FixtureRow key={f.id} fixture={f} />}
+                  />
+                </section>
+              )}
 
-        {tournament.status === "complete" && (
-          <div className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-center text-white shadow-xl">
-            <Trophy size={40} className="mx-auto mb-2" />
-            <p className="font-display font-black text-lg">Tournament complete! 🎉</p>
+              {tournament.status === "complete" && (
+                <div className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-center text-white shadow-xl">
+                  <Trophy size={40} className="mx-auto mb-2" />
+                  <p className="font-display font-black text-lg">Tournament complete! 🎉</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -374,6 +665,7 @@ export default function TournamentView() {
         />
       )}
 
+
       {showCheers && (
         <EndNightCheers
           matches={matches}
@@ -384,6 +676,62 @@ export default function TournamentView() {
           isGroup={!!session?.group_id}
         />
       )}
+    </div>
+  );
+}
+
+/** Shared bracket-tree grid: positions each round's matches via CSS Grid row
+ * spans (span = 2^round, so a match always centers exactly between its two
+ * feeder matches) and draws the connecting lines between rounds. Used by both
+ * the live KnockoutBracket and the pre-generation preview, so the bracket
+ * looks the same shape before and after "Generate Knockout" is clicked. */
+function BracketGrid({
+  roundCounts,
+  cell,
+  colWidth = 220,
+  rowHeight = 76,
+}: {
+  roundCounts: number[];
+  cell: (roundIndex: number, matchIndex: number) => React.ReactNode;
+  colWidth?: number;
+  rowHeight?: number;
+}) {
+  const colGap = 32; // px — matches gap-x-8 below
+  const rowCount = roundCounts[0] ?? 1;
+  return (
+    <div
+      className="grid gap-x-8"
+      style={{
+        gridTemplateColumns: `repeat(${roundCounts.length}, ${colWidth}px)`,
+        gridTemplateRows: `repeat(${rowCount}, ${rowHeight}px)`,
+      }}
+    >
+      {roundCounts.map((count, ri) => {
+        const span = 2 ** ri;
+        const isFirstRound = ri === 0;
+        const isLastRound = ri === roundCounts.length - 1;
+        return Array.from({ length: count }, (_, mi) => {
+          const rowStart = mi * span + 1;
+          return (
+            <div
+              key={`${ri}-${mi}`}
+              className="relative flex items-center"
+              style={{ gridColumn: ri + 1, gridRow: `${rowStart} / span ${span}` }}
+            >
+              {!isFirstRound && (
+                <>
+                  <div className="absolute w-px bg-gray-300" style={{ left: -colGap / 2, top: 0, bottom: 0 }} />
+                  <div className="absolute h-px bg-gray-300" style={{ left: -colGap / 2, top: "50%", width: colGap / 2 }} />
+                </>
+              )}
+              {!isLastRound && (
+                <div className="absolute h-px bg-gray-300" style={{ right: -colGap / 2, top: "50%", width: colGap / 2 }} />
+              )}
+              <div className="w-full">{cell(ri, mi)}</div>
+            </div>
+          );
+        });
+      })}
     </div>
   );
 }
@@ -401,26 +749,37 @@ function KnockoutBracket({
   renderFixture: (f: TournamentFixture) => React.ReactNode;
 }) {
   const rounds = Array.from(new Set(fixtures.map((f) => f.round))).sort((a, b) => a - b);
+  const roundFixturesByRound = rounds.map((round) => fixtures.filter((f) => f.round === round));
+  const roundCounts = roundFixturesByRound.map((rf) => rf.length);
+
   return (
-    <div className="flex flex-col gap-5">
-      {rounds.map((round) => {
-        const roundFixtures = fixtures.filter((f) => f.round === round);
-        const allComplete = roundFixtures.every((f) => f.status === "complete");
-        const isLastRound = round === Math.max(...rounds);
-        return (
-          <section key={round} className="flex flex-col gap-2">
-            <h2 className="text-xs font-display font-bold text-gray-500 uppercase tracking-widest">
-              {roundFixtures.length === 1 ? "Final" : `Round ${round}`}
-            </h2>
-            {roundFixtures.map(renderFixture)}
-            {allComplete && isLastRound && roundFixtures.length > 1 && (
-              <Button disabled={busy} onClick={() => onAdvance(round)}>
-                Advance to Next Round →
-              </Button>
-            )}
-          </section>
-        );
-      })}
+    <div className="overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, 220px)` }}>
+        {rounds.map((round, ri) => (
+          <h2 key={round} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
+            {knockoutRoundLabel(roundFixturesByRound[ri].length)}
+          </h2>
+        ))}
+      </div>
+
+      <BracketGrid roundCounts={roundCounts} cell={(ri, mi) => renderFixture(roundFixturesByRound[ri][mi])} />
+
+      <div className="grid gap-x-8 mt-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, 220px)` }}>
+        {rounds.map((round, ri) => {
+          const roundFixtures = roundFixturesByRound[ri];
+          const isLastRound = ri === rounds.length - 1;
+          const allComplete = roundFixtures.every((f) => f.status === "complete");
+          return (
+            <div key={round} className="flex justify-center">
+              {allComplete && isLastRound && roundFixtures.length > 1 && (
+                <Button size="sm" disabled={busy} onClick={() => onAdvance(round)}>
+                  Advance →
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

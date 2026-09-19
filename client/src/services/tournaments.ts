@@ -180,6 +180,37 @@ export const tournamentsApi = {
     if (error) throw new Error(error.message);
   },
 
+  /** Undo a launched or completed fixture — deletes its underlying match and
+   * puts it back to pending so it can be re-sent to a court. Caller is
+   * responsible for freeing the court locally (this only knows fixture rows). */
+  resetFixture: async (fixture: TournamentFixture): Promise<void> => {
+    if (fixture.match_id) {
+      const { error: mErr } = await supabase.from("matches").delete().eq("id", fixture.match_id);
+      if (mErr) throw new Error(mErr.message);
+    }
+    const { error } = await supabase
+      .from("tournament_fixtures")
+      .update({ match_id: null, status: "pending" })
+      .eq("id", fixture.id);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Abandon a bad draft entirely — deletes the tournament, which cascades to
+   * its players/fixtures and clears sessions.tournament_id (ON DELETE SET
+   * NULL), so the admin lands back on the setup screen to redraft groups. */
+  delete: async (tournamentId: string): Promise<void> => {
+    const { error } = await supabase.from("tournaments").delete().eq("id", tournamentId);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Stop treating this session as a tournament — detaches it without
+   * deleting the tournament's own data, so club night resumes the normal
+   * check-in/courts flow. */
+  unlinkSession: async (sessionId: string): Promise<void> => {
+    const { error } = await supabase.from("sessions").update({ tournament_id: null }).eq("id", sessionId);
+    if (error) throw new Error(error.message);
+  },
+
   /** Standings for one group, computed from its fixtures' underlying matches. */
   groupStandings: async (tournamentId: string, groupIndex: number): Promise<GroupStanding[]> => {
     const { players, fixtures } = await tournamentsApi.get(tournamentId);

@@ -19,8 +19,8 @@ export default function ScoreEntry({ matchId, onClose, onSaved }: Props) {
   const { members } = useMemberStore();
   const match = matches.find((m) => m.id === matchId);
 
-  const [scoreA, setScoreA] = useState(0);
-  const [scoreB, setScoreB] = useState(0);
+  const [scoreA, setScoreA] = useState(match?.score_a ?? 0);
+  const [scoreB, setScoreB] = useState(match?.score_b ?? 0);
   const [saving, setSaving] = useState(false);
 
   if (!match) return null;
