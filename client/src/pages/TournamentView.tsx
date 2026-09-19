@@ -20,7 +20,7 @@ const MIN_FIT_ZOOM = 0.4;
 const MAX_FIT_ZOOM = 1.6;
 // In the knockout stage the bracket may widen this much beyond its natural width to
 // use a big screen, but no further - wider than this the cards look stretched.
-const MAX_KNOCKOUT_STRETCH = 1.25;
+const MAX_KNOCKOUT_STRETCH = 1.6;
 
 // Champions from before the app kept records. Years the app has run are read from
 // completed tournaments and take precedence over these.
@@ -481,26 +481,81 @@ export default function TournamentView() {
     const scoreB = match?.score_b;
     const hasScore = fixture.status === "complete" && scoreA !== undefined && scoreB !== undefined;
     const aWon = hasScore && scoreA > scoreB;
-    const nameCls = (won: boolean) =>
-      `truncate font-body font-medium text-[15px] ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-700"}`;
     // First free court if there is one, otherwise just the first court — never blocked.
     const freeCourt = idleCourts[0] ?? sortedCourts[0];
 
+    // "QF 2", "SF 1", "Final" — position within its round, by seed order.
+    const roundFixtures = fixtures
+      .filter((f) => f.stage === "knockout" && f.round === fixture.round)
+      .sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0));
+    const roundLabel = knockoutRoundLabel(roundFixtures.length);
+    const shortRound = roundLabel === "Final" ? "Final" : roundLabel === "Semi-Final" ? "SF" : roundLabel === "Quarter-Final" ? "QF" : `R${roundFixtures.length * 2}`;
+    const matchTag = roundLabel === "Final" ? "Final" : `${shortRound} ${roundFixtures.findIndex((f) => f.id === fixture.id) + 1}`;
+
+    const edge = isBye
+      ? "border-l-gray-200"
+      : fixture.status === "active"
+        ? "border-l-amber-400"
+        : fixture.status === "complete"
+          ? "border-l-emerald-400"
+          : "border-l-violet-300";
+
+    const Team = ({ ids, score, won, lost }: { ids: [string, string] | null; score?: number; won: boolean; lost: boolean }) => (
+      <div className={`flex items-center gap-2 rounded-lg px-1.5 py-1 ${won ? "bg-emerald-50" : ""}`}>
+        {ids ? (
+          <div className="flex -space-x-2 flex-shrink-0">
+            {ids.map((id) => (
+              <Avatar key={id} name={members[id]?.name ?? "?"} url={members[id]?.avatar_url} memberType={members[id]?.member_type} size="xs" />
+            ))}
+          </div>
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-gray-100 border border-dashed border-gray-300 flex-shrink-0" />
+        )}
+        <span className={`flex-1 truncate font-body text-[15px] ${won ? "font-semibold text-emerald-800" : lost ? "font-normal text-gray-400 line-through decoration-gray-300" : "font-medium text-gray-700"}`}>
+          {pairName(ids, members)}
+        </span>
+        {score !== undefined && (
+          <span className={`font-display font-bold tabular-nums text-base ${won ? "text-emerald-700" : "text-gray-400"}`}>{score}</span>
+        )}
+        {won && <Trophy size={13} className="text-emerald-500 flex-shrink-0" />}
+      </div>
+    );
+
     return (
       <div
-        className={`flex flex-col gap-2 p-3 rounded-2xl border bg-white
+        className={`flex flex-col gap-1.5 p-2.5 pl-3 rounded-2xl border border-l-4 bg-white ${edge}
           ${fixture.status === "active" ? "border-amber-300 shadow-md shadow-amber-100" : "border-gray-200"}`}
       >
         <div className="flex items-center gap-2">
-          <span className={nameCls(aWon)}>{pairName(fixture.team_a, members)}</span>
-          {hasScore && <span className="ml-auto font-display font-bold tabular-nums text-sm text-gray-800">{scoreA}</span>}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={nameCls(hasScore && !aWon)}>{pairName(fixture.team_b, members)}</span>
-          {hasScore && <span className="ml-auto font-display font-bold tabular-nums text-sm text-gray-800">{scoreB}</span>}
+          <span className="text-[10px] font-display font-bold uppercase tracking-widest text-gray-400">{matchTag}</span>
+          {match && !isBye && (
+            <span className="text-[10px] font-display font-semibold text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Court {match.court_id}</span>
+          )}
+          <span className="ml-auto">
+            {isBye ? (
+              <span className="text-[10px] font-display font-semibold text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">Bye</span>
+            ) : fixture.status === "active" ? (
+              <span className="flex items-center gap-1 text-[10px] font-display font-bold uppercase text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.2 }} className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Live
+              </span>
+            ) : fixture.status === "complete" ? (
+              <span className="text-[10px] font-display font-bold uppercase text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">Done</span>
+            ) : (
+              <span className="text-[10px] font-display font-semibold uppercase text-violet-600 bg-violet-50 rounded-full px-2 py-0.5">Up next</span>
+            )}
+          </span>
         </div>
 
-        {isBye && <p className="text-[11px] font-display font-semibold text-gray-400">Bye — goes straight through</p>}
+        <Team ids={fixture.team_a} score={hasScore ? scoreA : undefined} won={hasScore && aWon} lost={hasScore && !aWon} />
+        <div className="flex items-center gap-2 -my-0.5">
+          <span className="flex-1 h-px bg-gray-100" />
+          <span className="text-[9px] font-display font-bold tracking-widest text-gray-300">VS</span>
+          <span className="flex-1 h-px bg-gray-100" />
+        </div>
+        <Team ids={fixture.team_b} score={hasScore ? scoreB : undefined} won={hasScore && !aWon} lost={hasScore && aWon} />
+
+        {isBye && <p className="text-[11px] font-body text-gray-400 px-1.5">Goes straight through to the next round</p>}
 
         {!isBye && fixture.status === "pending" && (
           <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
@@ -675,20 +730,20 @@ export default function TournamentView() {
           <div className="flex items-stretch gap-6 flex-1 min-h-0">
             {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
             {tournament.status !== "groups" && !showFullGroups && (
-              <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-max self-center">
+              <div className="grid grid-cols-2 gap-2 flex-shrink-0 w-max self-center">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
-                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-3 w-[270px]">
-                      <h2 className="font-display font-bold text-gray-900 text-sm mb-1.5">Group {g + 1}</h2>
-                      <ol className="flex flex-col gap-0.5">
+                    <section key={g} className="bg-white rounded-xl border border-gray-200 p-2 w-[200px]">
+                      <h2 className="font-display font-semibold text-gray-700 text-[11px] uppercase tracking-wider mb-1">Group {g + 1}</h2>
+                      <ol className="flex flex-col">
                         {rows.map((s, i) => (
                           <li
                             key={s.pair.join("-")}
-                            className={`flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-body
-                              ${i < tournament.advance_per_group ? "bg-violet-50 text-violet-800 font-semibold" : "text-gray-700 font-medium"}`}
+                            className={`flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-body
+                              ${i < tournament.advance_per_group ? "bg-violet-50 text-violet-800 font-semibold" : "text-gray-600 font-normal"}`}
                           >
-                            <span className="w-3 text-gray-400 tabular-nums">{i + 1}</span>
+                            <span className="w-3 text-gray-400 tabular-nums text-[10px]">{i + 1}</span>
                             <span className="flex-1 truncate">{pairName(s.pair, members)}</span>
                             <span className="tabular-nums text-gray-400">{s.wins}-{s.losses}</span>
                           </li>
@@ -1236,7 +1291,7 @@ function KnockoutBracket({
 
       <BracketGrid
         roundCounts={allCounts}
-        rowHeight={132}
+        rowHeight={164}
         fill
         cell={(ri, mi) => {
           const fixture = roundFixturesByRound[ri]?.[mi];
