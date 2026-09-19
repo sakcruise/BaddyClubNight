@@ -100,6 +100,8 @@ export default function TournamentView() {
   const [ending, setEnding] = useState(false);
   // During the knockout the groups collapse to a scoreboard; this flips them back to the full matrices.
   const [showFullGroups, setShowFullGroups] = useState(false);
+  // During the group stage the knockout preview can be shrunk to a narrow qualifiers list.
+  const [compactKnockout, setCompactKnockout] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -745,6 +747,19 @@ export default function TournamentView() {
               </button>
             )}
 
+            {tournament.status === "groups" && (
+              <button
+                onClick={() => setCompactKnockout((v) => !v)}
+                className="self-stretch flex-shrink-0 w-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
+                aria-label={compactKnockout ? "Show full knockout bracket" : "Compact the knockout bracket"}
+              >
+                {compactKnockout ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
+                <span className="text-[10px] font-display font-black uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                  {compactKnockout ? "Full knockout" : "Compact"}
+                </span>
+              </button>
+            )}
+
             <div
               ref={knockoutRef}
               className={`flex flex-col justify-center gap-4 flex-shrink-0 self-stretch scroll-mx-5
@@ -761,6 +776,35 @@ export default function TournamentView() {
                   livePairs.add(g * 10 + rank);
                   return pairName(s.pair, members);
                 });
+                if (compactKnockout) {
+                  const slots = previewRounds[0].matchups.flat();
+                  return (
+                    <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3 w-[250px]">
+                      <div>
+                        <h2 className="font-display font-black text-gray-900 text-base leading-tight">Knockout</h2>
+                        <p className="text-[11px] font-display text-gray-500 mt-0.5">Who's through if groups ended now</p>
+                      </div>
+                      <ol className="flex flex-col gap-1">
+                        {slots.map((label, i) => {
+                          const isReal = label !== "Bye" && !/^Group \d/.test(label);
+                          return (
+                            <li
+                              key={i}
+                              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-display font-bold
+                                ${label === "Bye" ? "text-gray-300" : isReal ? "bg-violet-50 text-violet-800" : "text-gray-400"}`}
+                            >
+                              <span className="w-3 text-gray-300 tabular-nums">{i + 1}</span>
+                              <span className="truncate">{label}</span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <Button size="md" fullWidth disabled={busy} onClick={handleGenerateKnockout}>
+                        <Trophy size={16} /> Generate
+                      </Button>
+                    </section>
+                  );
+                }
                 return (
                   <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 flex flex-col gap-5">
                     <div>
