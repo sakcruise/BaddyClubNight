@@ -171,7 +171,7 @@ export default function TournamentView() {
       // 1% margin so sub-pixel rounding never leaves a stray scrollbar.
       const fit = Math.min(availableH / naturalH, availableW / naturalW) * 0.995;
       const next = Math.max(MIN_FIT_ZOOM, Math.min(MAX_FIT_ZOOM, fit));
-      setFitZoom((z) => (Math.abs(z - next) > 0.005 ? next : z));
+      setFitZoom((z) => (Math.abs(z - next) > 0.0005 ? next : z));
       // Zoom fits the tighter axis; stretch the board to fill the other so there are no gaps.
       // Only the group sheets can absorb a stretch (their tables share the extra space).
       // The bracket can't, so in the knockout stage the board keeps its shape and is centred.
@@ -569,7 +569,7 @@ export default function TournamentView() {
         ref={fitOuterRef}
         className={`flex-1 min-h-0 w-full flex ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
       >
-       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max m-auto">
+       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max shrink-0 m-auto">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
 
         {(() => {
