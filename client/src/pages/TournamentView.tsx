@@ -58,7 +58,7 @@ function knockoutPreviewRounds(
 
   const round1: [string, string][] = [];
   for (let i = 0; i < bracketSize / 2; i++) {
-    round1.push([slots[i] ?? "TBD", slots[bracketSize - 1 - i] ?? "TBD"]);
+    round1.push([slots[i] ?? "Bye", slots[bracketSize - 1 - i] ?? "Bye"]);
   }
 
   const rounds = [{ label: knockoutRoundLabel(round1.length), matchups: round1 }];
@@ -681,7 +681,8 @@ export default function TournamentView() {
                 const livePairs = new Set<number>();
                 const previewRounds = knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group, (g, rank) => {
                   const s = standingsByGroup[g]?.[rank - 1];
-                  if (!s || s.wins + s.losses === 0) return qualifierLabel(g, rank, tournament.advance_per_group);
+                  const groupHasResult = fixtures.some((f) => f.stage === "group" && f.group_index === g && f.status === "complete");
+                  if (!s || !groupHasResult) return qualifierLabel(g, rank, tournament.advance_per_group);
                   livePairs.add(g * 10 + rank);
                   return pairName(s.pair, members);
                 });
