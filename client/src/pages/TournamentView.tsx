@@ -10,6 +10,7 @@ import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
 import EndNightCheers from "../components/shared/EndNightCheers";
+import TournamentTicker from "../components/tournament/TournamentTicker";
 import { Trophy, LogOut, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight } from "lucide-react";
 
 function pairName(ids: [string, string] | null, members: ReturnType<typeof useMemberStore.getState>["members"]) {
@@ -397,6 +398,15 @@ export default function TournamentView() {
           <LogOut size={14} /> End Night
         </button>
       </header>
+
+      <TournamentTicker
+        tournament={tournament}
+        fixtures={fixtures}
+        standingsByGroup={standingsByGroup}
+        matches={matches}
+        members={members}
+        courts={courts}
+      />
 
       <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 w-full">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
