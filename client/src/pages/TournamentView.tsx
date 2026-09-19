@@ -468,7 +468,7 @@ export default function TournamentView() {
     const hasScore = fixture.status === "complete" && scoreA !== undefined && scoreB !== undefined;
     const aWon = hasScore && scoreA > scoreB;
     const nameCls = (won: boolean) =>
-      `truncate font-display font-bold text-sm ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-800"}`;
+      `truncate font-display font-semibold text-sm ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-800"}`;
     // First free court if there is one, otherwise just the first court — never blocked.
     const freeCourt = idleCourts[0] ?? sortedCourts[0];
 
@@ -479,14 +479,14 @@ export default function TournamentView() {
       >
         <div className="flex items-center gap-2">
           <span className={nameCls(aWon)}>{pairName(fixture.team_a, members)}</span>
-          {hasScore && <span className="ml-auto font-display font-black tabular-nums text-sm text-gray-800">{scoreA}</span>}
+          {hasScore && <span className="ml-auto font-display font-bold tabular-nums text-sm text-gray-800">{scoreA}</span>}
         </div>
         <div className="flex items-center gap-2">
           <span className={nameCls(hasScore && !aWon)}>{pairName(fixture.team_b, members)}</span>
-          {hasScore && <span className="ml-auto font-display font-black tabular-nums text-sm text-gray-800">{scoreB}</span>}
+          {hasScore && <span className="ml-auto font-display font-bold tabular-nums text-sm text-gray-800">{scoreB}</span>}
         </div>
 
-        {isBye && <p className="text-[11px] font-display font-bold text-gray-400">Bye — goes straight through</p>}
+        {isBye && <p className="text-[11px] font-display font-semibold text-gray-400">Bye — goes straight through</p>}
 
         {!isBye && fixture.status === "pending" && (
           <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
@@ -534,14 +534,14 @@ export default function TournamentView() {
           <Trophy size={18} className="text-white" />
         </div>
         <div className="min-w-[120px]">
-          <h1 className="font-display font-black text-gray-900 text-lg leading-tight">{tournament.name}</h1>
+          <h1 className="font-display font-bold text-gray-900 text-lg leading-tight">{tournament.name}</h1>
           <p className="text-gray-500 text-xs font-display capitalize">{tournament.status} stage</p>
         </div>
         <div className="flex-1 flex flex-wrap items-center gap-2 px-2">
           {championsByYear.map((c) => (
             <span
               key={c.year}
-              className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-display font-bold text-amber-800"
+              className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-display font-semibold text-amber-800"
             >
               <Trophy size={12} className="text-amber-500" />
               <span className="text-amber-500">{c.year}</span> {c.winners}
@@ -552,7 +552,7 @@ export default function TournamentView() {
           onClick={handleResetGroups}
           disabled={busy}
           title="Delete this draft and re-pick players"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-bold hover:bg-gray-100 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-semibold hover:bg-gray-100 transition-all disabled:opacity-50"
         >
           <RotateCcw size={14} /> Reset Groups
         </button>
@@ -560,7 +560,7 @@ export default function TournamentView() {
           onClick={handleEndTournament}
           disabled={busy}
           title="Stop the tournament, keep club night running"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-display font-bold hover:bg-amber-100 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-display font-semibold hover:bg-amber-100 transition-all disabled:opacity-50"
         >
           <Flag size={14} /> End Tournament
         </button>
@@ -580,7 +580,7 @@ export default function TournamentView() {
         className={`flex-1 min-h-0 w-full flex ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
       >
        <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max shrink-0 m-auto">
-        {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
+        {error && <p className="text-sm font-display font-semibold text-red-600">{error}</p>}
 
         {(() => {
           const liveFixtures = fixtures.filter((f) => f.status === "active");
@@ -593,7 +593,7 @@ export default function TournamentView() {
                   transition={{ repeat: Infinity, duration: 1.4 }}
                   className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"
                 />
-                <h2 className="text-xs font-display font-black text-amber-700 uppercase tracking-widest">
+                <h2 className="text-xs font-display font-bold text-amber-700 uppercase tracking-widest">
                   Now Playing ({liveFixtures.length})
                 </h2>
               </div>
@@ -607,11 +607,11 @@ export default function TournamentView() {
                       className="flex items-center gap-2 bg-white border border-amber-300 rounded-xl pl-3 pr-2 py-1.5 hover:bg-amber-100 transition-colors"
                     >
                       {match && (
-                        <span className="text-[10px] font-display font-black text-amber-600 bg-amber-100 rounded-md px-1.5 py-0.5">
+                        <span className="text-[10px] font-display font-bold text-amber-600 bg-amber-100 rounded-md px-1.5 py-0.5">
                           Court {match.court_id}
                         </span>
                       )}
-                      <span className="text-xs font-display font-bold text-gray-800">
+                      <span className="text-xs font-display font-semibold text-gray-800">
                         {pairName(f.team_a, members)} <span className="text-gray-300">vs</span> {pairName(f.team_b, members)}
                       </span>
                     </button>
@@ -623,7 +623,7 @@ export default function TournamentView() {
         })()}
 
         {fixtures.some((f) => f.stage === "group") && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-bold text-gray-400 px-1">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-semibold text-gray-400 px-1">
             <span className="flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 rounded-lg bg-violet-100 border border-violet-300 text-violet-800 px-1.5 py-0.5">
                 <Play size={9} /> Play
@@ -653,7 +653,7 @@ export default function TournamentView() {
                   const rows = standingsByGroup[g] ?? [];
                   return (
                     <section key={g} className="bg-white rounded-2xl border border-gray-200 p-3 w-[270px]">
-                      <h2 className="font-display font-black text-gray-900 text-sm mb-1.5">Group {g + 1}</h2>
+                      <h2 className="font-display font-bold text-gray-900 text-sm mb-1.5">Group {g + 1}</h2>
                       <ol className="flex flex-col gap-0.5">
                         {rows.map((s, i) => (
                           <li
@@ -704,9 +704,9 @@ export default function TournamentView() {
                   return (
                     <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-full h-full min-w-0">
                       <div className="flex items-center gap-2">
-                        <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
+                        <h2 className="font-display font-bold text-gray-900 text-sm">Group {g + 1}</h2>
                         {leader && (
-                          <span className="flex items-center gap-1 text-xs font-display font-bold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-0.5">
+                          <span className="flex items-center gap-1 text-xs font-display font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-0.5">
                             <Trophy size={11} /> {pairName(leader.pair, members)}
                           </span>
                         )}
@@ -716,7 +716,7 @@ export default function TournamentView() {
                         <table className="border-collapse text-sm font-display w-full flex-1">
                           <thead>
                             <tr>
-                              <th className="sticky left-0 z-10 bg-white p-2 text-left text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-200">
+                              <th className="sticky left-0 z-10 bg-white p-2 text-left text-[10px] text-gray-400 font-semibold uppercase tracking-wider border-b border-gray-200">
                                 Pair
                               </th>
                               {rows.map((s) => (
@@ -724,8 +724,8 @@ export default function TournamentView() {
                                   {pairName(s.pair, members)}
                                 </th>
                               ))}
-                              <th className="p-2 text-[10px] text-gray-500 font-bold border-b border-gray-200 min-w-[80px]">Points Won</th>
-                              <th className="p-2 text-[10px] text-gray-500 font-bold border-b border-gray-200 min-w-[80px]">Average</th>
+                              <th className="p-2 text-[10px] text-gray-500 font-semibold border-b border-gray-200 min-w-[80px]">Points Won</th>
+                              <th className="p-2 text-[10px] text-gray-500 font-semibold border-b border-gray-200 min-w-[80px]">Average</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -776,7 +776,7 @@ export default function TournamentView() {
                                             transition={{ type: "spring", stiffness: 400, damping: 20 }}
                                             onClick={() => setScoringFixture(fixture)}
                                             title="Tap to edit score"
-                                            className={`w-full min-h-[44px] rounded-lg py-2 font-display font-black text-sm tabular-nums border transition-colors
+                                            className={`w-full min-h-[44px] rounded-lg py-2 font-display font-bold text-sm tabular-nums border transition-colors
                                               ${won
                                                 ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                                                 : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"}`}
@@ -807,7 +807,7 @@ export default function TournamentView() {
                                               transition={{ repeat: Infinity, duration: 1.2 }}
                                               className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"
                                             />
-                                            <span className="text-[10px] font-display font-black uppercase tracking-wide">Live</span>
+                                            <span className="text-[10px] font-display font-bold uppercase tracking-wide">Live</span>
                                           </button>
                                           <button
                                             onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
@@ -824,7 +824,7 @@ export default function TournamentView() {
                                     return (
                                       <td key={ci} className="border-b border-gray-100 text-center p-1.5">
                                         {isBye ? (
-                                          <span className="block py-1.5 text-[10px] text-gray-300 font-display font-bold">bye</span>
+                                          <span className="block py-1.5 text-[10px] text-gray-300 font-display font-semibold">bye</span>
                                         ) : (
                                           <button
                                             onClick={() => handlePlayGroupFixture(g, fixture)}
@@ -833,16 +833,16 @@ export default function TournamentView() {
                                                        active:bg-violet-200 active:scale-95 transition-all disabled:opacity-50"
                                           >
                                             <Play size={10} className="flex-shrink-0" />
-                                            <span className="text-[10px] font-display font-bold">Play</span>
+                                            <span className="text-[10px] font-display font-semibold">Play</span>
                                           </button>
                                         )}
                                       </td>
                                     );
                                   })}
-                                  <td className="border-b border-gray-100 text-center font-display font-black text-gray-800 tabular-nums text-sm">
+                                  <td className="border-b border-gray-100 text-center font-display font-bold text-gray-800 tabular-nums text-sm">
                                     {rowS.pointsFor}
                                   </td>
-                                  <td className="border-b border-gray-100 text-center font-display font-black text-violet-600 tabular-nums text-sm">
+                                  <td className="border-b border-gray-100 text-center font-display font-bold text-violet-600 tabular-nums text-sm">
                                     {avg.toFixed(1)}
                                   </td>
                                 </tr>
@@ -871,7 +871,7 @@ export default function TournamentView() {
                 aria-label={showFullGroups ? "Back to compact groups" : "Show full group scores"}
               >
                 {showFullGroups ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
-                <span className="text-[10px] font-display font-black uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                <span className="text-[10px] font-display font-bold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
                   {showFullGroups ? "Compact" : "Full groups"}
                 </span>
               </button>
@@ -888,7 +888,7 @@ export default function TournamentView() {
                 aria-label={compactKnockout ? "Show full knockout bracket" : "Compact the knockout bracket"}
               >
                 {compactKnockout ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
-                <span className="text-[10px] font-display font-black uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                <span className="text-[10px] font-display font-bold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
                   {compactKnockout ? "Full knockout" : "Compact"}
                 </span>
               </button>
@@ -915,7 +915,7 @@ export default function TournamentView() {
                   return (
                     <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3 w-[250px]">
                       <div>
-                        <h2 className="font-display font-black text-gray-900 text-base leading-tight">Knockout</h2>
+                        <h2 className="font-display font-bold text-gray-900 text-base leading-tight">Knockout</h2>
                         <p className="text-[11px] font-display text-gray-500 mt-0.5">Who's through if groups ended now</p>
                       </div>
                       <ol className="flex flex-col gap-1">
@@ -924,7 +924,7 @@ export default function TournamentView() {
                           return (
                             <li
                               key={i}
-                              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-display font-bold
+                              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-display font-semibold
                                 ${label === "Bye" ? "text-gray-300" : isReal ? "bg-violet-50 text-violet-800" : "text-gray-400"}`}
                             >
                               <span className="w-3 text-gray-300 tabular-nums">{i + 1}</span>
@@ -942,7 +942,7 @@ export default function TournamentView() {
                 return (
                   <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 flex flex-col gap-5">
                     <div>
-                      <h2 className="font-display font-black text-gray-900 text-lg leading-tight">Knockout</h2>
+                      <h2 className="font-display font-bold text-gray-900 text-lg leading-tight">Knockout</h2>
                       <p className="text-xs font-display text-gray-500 mt-0.5">
                         Names fill in as each group's leader changes — this is who'd go through if the groups ended now.
                       </p>
@@ -950,7 +950,7 @@ export default function TournamentView() {
                     <div>
                       <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${previewRounds.length}, 220px)` }}>
                         {previewRounds.map((r) => (
-                          <h3 key={r.label} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
+                          <h3 key={r.label} className="text-[10px] font-display font-semibold text-gray-400 uppercase tracking-widest text-center">
                             {r.label}
                           </h3>
                         ))}
@@ -961,7 +961,7 @@ export default function TournamentView() {
                           const [a, b] = previewRounds[ri].matchups[mi];
                           const isLive = ri === 0 && livePairs.size > 0;
                           return (
-                            <div className={`px-3 py-3 rounded-xl border text-xs font-display font-bold text-center leading-snug
+                            <div className={`px-3 py-3 rounded-xl border text-xs font-display font-semibold text-center leading-snug
                               ${isLive ? "bg-violet-50 border-violet-200 text-violet-800" : "bg-gray-50 border-gray-100 text-gray-400"}`}>
                               <div className="truncate">{a}</div>
                               <div className="text-[10px] text-gray-300 my-0.5">vs</div>
@@ -973,7 +973,7 @@ export default function TournamentView() {
                       />
                     </div>
                     {!allGroupFixturesComplete && (
-                      <p className="text-xs font-display font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      <p className="text-xs font-display font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                         Some group matches are still to play — generating now seeds the bracket from the current standings.
                       </p>
                     )}
@@ -987,7 +987,7 @@ export default function TournamentView() {
               {(tournament.status === "knockout" || tournament.status === "complete") && (
                 <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 flex flex-col gap-4">
                   <div>
-                    <h2 className="font-display font-black text-gray-900 text-lg leading-tight">Knockout</h2>
+                    <h2 className="font-display font-bold text-gray-900 text-lg leading-tight">Knockout</h2>
                     <p className="text-xs font-display text-gray-500 mt-0.5">Tap Play to send a match to the next free court, then tap it again to enter the score.</p>
                   </div>
                   <KnockoutBracket
@@ -1006,8 +1006,8 @@ export default function TournamentView() {
                   className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-center text-white shadow-xl active:scale-[0.98] transition-transform"
                 >
                   <Trophy size={40} className="mx-auto mb-2" />
-                  <p className="font-display font-black text-lg">Tournament complete! 🎉</p>
-                  <p className="text-xs font-display font-bold text-violet-100 mt-1">Tap to crown the champions</p>
+                  <p className="font-display font-bold text-lg">Tournament complete! 🎉</p>
+                  <p className="text-xs font-display font-semibold text-violet-100 mt-1">Tap to crown the champions</p>
                 </button>
               )}
             </div>
@@ -1037,7 +1037,7 @@ export default function TournamentView() {
               <Flag size={26} className="text-amber-600" />
             </div>
             <div>
-              <h2 className="font-display font-black text-xl text-gray-900">Exit the tournament?</h2>
+              <h2 className="font-display font-bold text-xl text-gray-900">Exit the tournament?</h2>
               <p className="text-sm font-display text-gray-500 mt-1">
                 The final hasn't been played, so no champions will be recorded. Exiting ends tonight's session and takes you back to the home page.
               </p>
@@ -1081,8 +1081,8 @@ export default function TournamentView() {
               <Trophy size={48} className="text-white" />
             </motion.div>
             <div>
-              <p className="text-xs font-display font-black uppercase tracking-[0.3em] text-amber-500">{thisChampion.year} Champions</p>
-              <h2 className="font-display font-black text-3xl text-gray-900 leading-tight mt-1">
+              <p className="text-xs font-display font-bold uppercase tracking-[0.3em] text-amber-500">{thisChampion.year} Champions</p>
+              <h2 className="font-display font-bold text-3xl text-gray-900 leading-tight mt-1">
                 {thisChampion.pair.map((id) => members[id]?.name ?? "?").join(" & ")}
               </h2>
             </div>
@@ -1094,7 +1094,7 @@ export default function TournamentView() {
               ))}
             </div>
             {thisChampion.runnersUp && (
-              <p className="text-sm font-display font-bold text-gray-500">
+              <p className="text-sm font-display font-semibold text-gray-500">
                 Runners-up: {pairName(thisChampion.runnersUp, members)}
                 {thisChampion.score && <span className="text-gray-400"> · {thisChampion.score[0]}-{thisChampion.score[1]} in the final</span>}
               </p>
@@ -1201,7 +1201,7 @@ function KnockoutBracket({
     <div className="overflow-x-auto pb-2 -mx-1 px-1">
       <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: columns }}>
         {allCounts.map((count, ri) => (
-          <h2 key={ri} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
+          <h2 key={ri} className="text-[10px] font-display font-semibold text-gray-400 uppercase tracking-widest text-center">
             {knockoutRoundLabel(count)}
           </h2>
         ))}
@@ -1216,7 +1216,7 @@ function KnockoutBracket({
           if (fixture) return renderFixture(fixture);
           const feeder = knockoutRoundLabel(allCounts[ri - 1]);
           return (
-            <div className="p-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 text-xs font-display font-bold text-gray-400 flex flex-col gap-2">
+            <div className="p-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 text-xs font-display font-semibold text-gray-400 flex flex-col gap-2">
               <span>Winner · {feeder} {mi * 2 + 1}</span>
               <span>Winner · {feeder} {mi * 2 + 2}</span>
             </div>
