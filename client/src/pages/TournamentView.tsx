@@ -735,7 +735,10 @@ export default function TournamentView() {
                 onClick={() => {
                   const next = !showFullGroups;
                   setShowFullGroups(next);
-                  if (!next) setTimeout(() => knockoutRef.current?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" }), 50);
+                  setTimeout(() => {
+                    if (next) fitOuterRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+                    else knockoutRef.current?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+                  }, 50);
                 }}
                 className="self-stretch flex-shrink-0 w-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
                 aria-label={showFullGroups ? "Back to compact groups" : "Show full group scores"}
@@ -749,7 +752,11 @@ export default function TournamentView() {
 
             {tournament.status === "groups" && (
               <button
-                onClick={() => setCompactKnockout((v) => !v)}
+                onClick={() => {
+                  setCompactKnockout((v) => !v);
+                  // Layout width changes underneath the scroll position; go back to the start.
+                  setTimeout(() => fitOuterRef.current?.scrollTo({ left: 0, behavior: "smooth" }), 50);
+                }}
                 className="self-stretch flex-shrink-0 w-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
                 aria-label={compactKnockout ? "Show full knockout bracket" : "Compact the knockout bracket"}
               >
