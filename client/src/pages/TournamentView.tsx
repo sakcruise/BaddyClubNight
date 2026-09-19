@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessionArchiveStore } from "../store";
@@ -44,10 +44,14 @@ function knockoutRoundLabel(matchCount: number): string {
  * order buildKnockoutBracket uses (rank asc, then group asc; top seed vs
  * bottom seed), but with "Group N Winner"-style placeholders instead of real
  * pairs. Only round 1 names real groups; later rounds are TBD vs TBD. */
-function knockoutPreviewRounds(numGroups: number, advancePerGroup: number): Array<{ label: string; matchups: [string, string][] }> {
+function knockoutPreviewRounds(
+  numGroups: number,
+  advancePerGroup: number,
+  labelFor: (groupIndex: number, rank: number) => string = (g, r) => qualifierLabel(g, r, advancePerGroup)
+): Array<{ label: string; matchups: [string, string][] }> {
   const labels: string[] = [];
   for (let rank = 1; rank <= advancePerGroup; rank++) {
-    for (let g = 0; g < numGroups; g++) labels.push(qualifierLabel(g, rank, advancePerGroup));
+    for (let g = 0; g < numGroups; g++) labels.push(labelFor(g, rank));
   }
   const bracketSize = nextPowerOfTwo(labels.length);
   const slots: Array<string | null> = Array.from({ length: bracketSize }, (_, i) => labels[i] ?? null);
@@ -92,19 +96,26 @@ export default function TournamentView() {
     setPlayers(bundle.players);
     setFixtures(bundle.fixtures);
 
-    if (bundle.tournament.status === "groups") {
-      const entries = await Promise.all(
-        Array.from({ length: bundle.tournament.num_groups }, (_, g) =>
-          tournamentsApi.groupStandings(id, g).then((s) => [g, s] as const)
-        )
-      );
-      setStandingsByGroup(Object.fromEntries(entries));
-    }
+    const entries = await Promise.all(
+      Array.from({ length: bundle.tournament.num_groups }, (_, g) =>
+        tournamentsApi.groupStandings(id, g).then((s) => [g, s] as const)
+      )
+    );
+    setStandingsByGroup(Object.fromEntries(entries));
   }, [id]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Once the bracket exists, slide it into view so the operator lands on the knockout, not the group scores.
+  const knockoutRef = useRef<HTMLDivElement>(null);
+  const status = tournament?.status;
+  useEffect(() => {
+    if (status === "knockout" || status === "complete") {
+      knockoutRef.current?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+    }
+  }, [status]);
 
   if (!tournament || !id) {
     return (
@@ -283,70 +294,67 @@ export default function TournamentView() {
     }
   }
 
-  function FixtureRow({ fixture, isKnockout = false }: { fixture: TournamentFixture; isKnockout?: boolean }) {
-    const [courtChoice, setCourtChoice] = useState<number | "">("");
+  // One knockout match card. Names stacked, then a single full-width action so it's
+  // thumb-sized on a touch screen: Play (auto-picks the first free court) → Enter Score → Edit.
+  function FixtureRow({ fixture }: { fixture: TournamentFixture }) {
     const isBye = !fixture.team_b;
     const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
+    const scoreA = match?.score_a;
+    const scoreB = match?.score_b;
+    const hasScore = fixture.status === "complete" && scoreA !== undefined && scoreB !== undefined;
+    const aWon = hasScore && scoreA > scoreB;
+    const nameCls = (won: boolean) =>
+      `truncate font-display font-bold text-sm ${hasScore ? (won ? "text-emerald-700" : "text-gray-400 line-through decoration-gray-300") : "text-gray-800"}`;
+    const freeCourt = idleCourts[0];
+
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200">
-        <div className="flex-1 min-w-0">
-          <p className="font-display font-bold text-gray-800 text-sm truncate">
-            {pairName(fixture.team_a, members)} <span className="text-gray-300">vs</span> {pairName(fixture.team_b, members)}
-          </p>
-          {fixture.status === "complete" && match?.score_a !== undefined && match?.score_b !== undefined ? (
-            <p className="text-xs font-display font-bold text-violet-600">{match.score_a} - {match.score_b}</p>
-          ) : (
-            <p className="text-xs font-display text-gray-400 capitalize">{isBye ? "bye — auto-advanced" : fixture.status}</p>
-          )}
+      <div
+        className={`flex flex-col gap-2 p-3 rounded-2xl border bg-white
+          ${fixture.status === "active" ? "border-amber-300 shadow-md shadow-amber-100" : "border-gray-200"}`}
+      >
+        <div className="flex items-center gap-2">
+          <span className={nameCls(aWon)}>{pairName(fixture.team_a, members)}</span>
+          {hasScore && <span className="ml-auto font-display font-black tabular-nums text-sm text-gray-800">{scoreA}</span>}
         </div>
-        {!isBye && !isKnockout && fixture.status === "pending" && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <select
-              value={courtChoice}
-              onChange={(e) => setCourtChoice(e.target.value ? Number(e.target.value) : "")}
-              className="text-xs font-display font-bold border border-gray-200 rounded-lg px-2 py-1.5"
-            >
-              <option value="">Court…</option>
-              {idleCourts.map((c) => (
-                <option key={c.id} value={c.id}>Court {c.id}</option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              disabled={!courtChoice || busy}
-              onClick={() => courtChoice && handleLaunch(fixture, courtChoice)}
-            >
-              Send
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className={nameCls(hasScore && !aWon)}>{pairName(fixture.team_b, members)}</span>
+          {hasScore && <span className="ml-auto font-display font-black tabular-nums text-sm text-gray-800">{scoreB}</span>}
+        </div>
+
+        {isBye && <p className="text-[11px] font-display font-bold text-gray-400">Bye — goes straight through</p>}
+
+        {!isBye && fixture.status === "pending" && (
+          <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
+            <Play size={14} /> {freeCourt ? `Play on Court ${freeCourt.id}` : "Waiting for a free court"}
+          </Button>
         )}
         {!isBye && fixture.status === "active" && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button size="sm" variant="secondary" onClick={() => setScoringFixture(fixture)}>
-              Enter Score
+          <div className="flex gap-2">
+            <Button size="md" fullWidth onClick={() => setScoringFixture(fixture)}>
+              <Radio size={14} /> Enter Score
             </Button>
             <button
               onClick={() => handleResetFixture(fixture)}
               disabled={busy}
-              title="Reset match"
-              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              aria-label="Reset match"
+              className="min-w-[44px] rounded-xl border border-gray-200 text-gray-400 active:bg-red-50 active:text-red-500 flex items-center justify-center"
             >
-              <RotateCcw size={14} />
+              <RotateCcw size={16} />
             </button>
           </div>
         )}
         {!isBye && fixture.status === "complete" && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button size="sm" variant="secondary" onClick={() => setScoringFixture(fixture)}>
+          <div className="flex gap-2">
+            <Button size="md" fullWidth variant="secondary" onClick={() => setScoringFixture(fixture)}>
               Edit Score
             </Button>
             <button
               onClick={() => handleResetFixture(fixture)}
               disabled={busy}
-              title="Reset match"
-              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              aria-label="Reset match"
+              className="min-w-[44px] rounded-xl border border-gray-200 text-gray-400 active:bg-red-50 active:text-red-500 flex items-center justify-center"
             >
-              <RotateCcw size={14} />
+              <RotateCcw size={16} />
             </button>
           </div>
         )}
@@ -456,7 +464,35 @@ export default function TournamentView() {
 
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex items-start gap-6 overflow-x-auto pb-2 -mx-1 px-1">
+            {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
+            {tournament.status !== "groups" && (
+              <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-max self-center">
+                {Array.from({ length: tournament.num_groups }, (_, g) => {
+                  const rows = standingsByGroup[g] ?? [];
+                  return (
+                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-3 w-[230px]">
+                      <h2 className="font-display font-black text-gray-900 text-xs mb-1.5">Group {g + 1}</h2>
+                      <ol className="flex flex-col gap-0.5">
+                        {rows.map((s, i) => (
+                          <li
+                            key={s.pair.join("-")}
+                            className={`flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] font-display
+                              ${i < tournament.advance_per_group ? "bg-violet-50 text-violet-700 font-black" : "text-gray-600 font-bold"}`}
+                          >
+                            <span className="w-3 text-gray-400 tabular-nums">{i + 1}</span>
+                            <span className="flex-1 truncate">{pairName(s.pair, members)}</span>
+                            <span className="tabular-nums text-gray-400">{s.wins}-{s.losses}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Groups in 2-column grid layout (3 per column) */}
+            {tournament.status === "groups" && (
             <div className="grid grid-cols-2 gap-6 flex-shrink-0 w-max">
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
@@ -535,7 +571,7 @@ export default function TournamentView() {
                                             transition={{ type: "spring", stiffness: 400, damping: 20 }}
                                             onClick={() => setScoringFixture(fixture)}
                                             title="Tap to edit score"
-                                            className={`w-full rounded-lg py-1.5 font-display font-black text-xs tabular-nums border transition-colors
+                                            className={`w-full min-h-[44px] rounded-lg py-2 font-display font-black text-sm tabular-nums border transition-colors
                                               ${won
                                                 ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                                                 : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"}`}
@@ -545,7 +581,7 @@ export default function TournamentView() {
                                           <button
                                             onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
                                             title="Reset match"
-                                            className="absolute top-0 right-0 p-0.5 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+                                            className="absolute -top-1 -right-1 p-1.5 rounded-full bg-white border border-gray-200 text-gray-400 shadow-sm active:bg-red-50 active:text-red-500 transition-all"
                                           >
                                             <RotateCcw size={10} />
                                           </button>
@@ -559,7 +595,7 @@ export default function TournamentView() {
                                           <button
                                             onClick={() => setScoringFixture(fixture)}
                                             title="Tap to enter score"
-                                            className="w-full flex items-center justify-center gap-1 rounded-lg py-1.5 bg-amber-100 border border-amber-300 text-amber-700 hover:bg-amber-200 transition-colors"
+                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2bg-amber-100 border border-amber-300 text-amber-700 hover:bg-amber-200 transition-colors"
                                           >
                                             <motion.span
                                               animate={{ opacity: [1, 0.3, 1] }}
@@ -571,7 +607,7 @@ export default function TournamentView() {
                                           <button
                                             onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
                                             title="Reset match"
-                                            className="absolute top-0 right-0 p-0.5 rounded text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+                                            className="absolute -top-1 -right-1 p-1.5 rounded-full bg-white border border-gray-200 text-gray-400 shadow-sm active:bg-red-50 active:text-red-500 transition-all"
                                           >
                                             <RotateCcw size={10} />
                                           </button>
@@ -589,7 +625,7 @@ export default function TournamentView() {
                                             onClick={() => handlePlayGroupFixture(g, fixture)}
                                             disabled={busy}
                                             title={`Send to Group ${g + 1}'s court`}
-                                            className="w-full flex items-center justify-center gap-1 rounded-lg py-1.5 border border-dashed border-gray-300 text-gray-400
+                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2border border-dashed border-gray-300 text-gray-400
                                                        hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 active:scale-95 transition-all disabled:opacity-50"
                                           >
                                             <Play size={10} className="flex-shrink-0" />
@@ -615,58 +651,76 @@ export default function TournamentView() {
                   );
                 })}
             </div>
+            )}
 
-            <div className="flex flex-col gap-4 flex-shrink-0 w-max">
-              {tournament.status === "groups" && (
-                <section className="flex flex-col gap-3">
-                  <h2 className="font-display font-black text-gray-900 text-base">Knockout</h2>
-                  {(() => {
-                    const previewRounds = knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group);
-                    return (
-                      <div>
-                        <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${previewRounds.length}, 220px)` }}>
-                          {previewRounds.map((r) => (
-                            <h3 key={r.label} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
-                              {r.label}
-                            </h3>
-                          ))}
-                        </div>
-                        <BracketGrid
-                          roundCounts={previewRounds.map((r) => r.matchups.length)}
-                          cell={(ri, mi) => {
-                            const [a, b] = previewRounds[ri].matchups[mi];
-                            return (
-                              <div className="px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs font-display font-bold text-gray-500 text-center">
-                                {a} <span className="text-gray-300">vs</span> {b}
-                              </div>
-                            );
-                          }}
-                        />
+            <div ref={knockoutRef} className="flex flex-col justify-center gap-4 flex-shrink-0 w-max self-stretch scroll-mx-5">
+              {tournament.status === "groups" && (() => {
+                // Round 1 slots track the live standings: whoever leads each group right now is
+                // named in the bracket, and the name updates as scores come in.
+                const livePairs = new Set<number>();
+                const previewRounds = knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group, (g, rank) => {
+                  const s = standingsByGroup[g]?.[rank - 1];
+                  if (!s || s.wins + s.losses === 0) return qualifierLabel(g, rank, tournament.advance_per_group);
+                  livePairs.add(g * 10 + rank);
+                  return pairName(s.pair, members);
+                });
+                return (
+                  <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 flex flex-col gap-5">
+                    <div>
+                      <h2 className="font-display font-black text-gray-900 text-lg leading-tight">Knockout</h2>
+                      <p className="text-xs font-display text-gray-500 mt-0.5">
+                        Names fill in as each group's leader changes — this is who'd go through if the groups ended now.
+                      </p>
+                    </div>
+                    <div>
+                      <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${previewRounds.length}, 220px)` }}>
+                        {previewRounds.map((r) => (
+                          <h3 key={r.label} className="text-[10px] font-display font-bold text-gray-400 uppercase tracking-widest text-center">
+                            {r.label}
+                          </h3>
+                        ))}
                       </div>
-                    );
-                  })()}
-                  {!allGroupFixturesComplete && (
-                    <p className="text-xs font-display font-bold text-amber-600 max-w-md">
-                      Not every group fixture is finished yet — completing the group stage now will seed the bracket from the current standings.
-                    </p>
-                  )}
-                  <div>
-                    <Button size="lg" disabled={busy} onClick={handleGenerateKnockout}>
-                      ✅ Group Stage Completed — Generate Knockout
+                      <BracketGrid
+                        roundCounts={previewRounds.map((r) => r.matchups.length)}
+                        cell={(ri, mi) => {
+                          const [a, b] = previewRounds[ri].matchups[mi];
+                          const isLive = ri === 0 && livePairs.size > 0;
+                          return (
+                            <div className={`px-3 py-3 rounded-xl border text-xs font-display font-bold text-center leading-snug
+                              ${isLive ? "bg-violet-50 border-violet-200 text-violet-800" : "bg-gray-50 border-gray-100 text-gray-400"}`}>
+                              <div className="truncate">{a}</div>
+                              <div className="text-[10px] text-gray-300 my-0.5">vs</div>
+                              <div className="truncate">{b}</div>
+                            </div>
+                          );
+                        }}
+                        rowHeight={92}
+                      />
+                    </div>
+                    {!allGroupFixturesComplete && (
+                      <p className="text-xs font-display font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                        Some group matches are still to play — generating now seeds the bracket from the current standings.
+                      </p>
+                    )}
+                    <Button size="lg" fullWidth disabled={busy} onClick={handleGenerateKnockout}>
+                      <Trophy size={18} /> Generate Knockout
                     </Button>
-                  </div>
-                </section>
-              )}
+                  </section>
+                );
+              })()}
 
               {(tournament.status === "knockout" || tournament.status === "complete") && (
-                <section className="flex flex-col gap-3">
-                  <h2 className="font-display font-black text-gray-900 text-base">Knockout</h2>
+                <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 flex flex-col gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-gray-900 text-lg leading-tight">Knockout</h2>
+                    <p className="text-xs font-display text-gray-500 mt-0.5">Tap Play to send a match to the next free court, then tap it again to enter the score.</p>
+                  </div>
                   <KnockoutBracket
                     fixtures={fixtures.filter((f) => f.stage === "knockout")}
                     members={members}
                     busy={busy}
                     onAdvance={handleAdvanceRound}
-                    renderFixture={(f) => <FixtureRow key={f.id} fixture={f} isKnockout={true} />}
+                    renderFixture={(f) => <FixtureRow key={f.id} fixture={f} />}
                   />
                 </section>
               )}
@@ -787,7 +841,7 @@ function KnockoutBracket({
         ))}
       </div>
 
-      <BracketGrid roundCounts={roundCounts} cell={(ri, mi) => renderFixture(roundFixturesByRound[ri][mi])} />
+      <BracketGrid roundCounts={roundCounts} cell={(ri, mi) => renderFixture(roundFixturesByRound[ri][mi])} rowHeight={132} />
 
       <div className="grid gap-x-8 mt-3" style={{ gridTemplateColumns: `repeat(${rounds.length}, 220px)` }}>
         {rounds.map((round, ri) => {
@@ -797,8 +851,8 @@ function KnockoutBracket({
           return (
             <div key={round} className="flex justify-center">
               {allComplete && isLastRound && roundFixtures.length > 1 && (
-                <Button size="sm" disabled={busy} onClick={() => onAdvance(round)}>
-                  Advance →
+                <Button size="lg" fullWidth disabled={busy} onClick={() => onAdvance(round)}>
+                  Next round →
                 </Button>
               )}
             </div>
