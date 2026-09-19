@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Court, Match, Member, Tournament, TournamentFixture } from "../../types";
 import type { GroupStanding } from "../../utils/tournament";
@@ -171,12 +171,14 @@ function buildLines(p: Props, tick: number): string[] {
   return lines;
 }
 
-type Mood = "trophy" | "fire" | "live" | "cheer" | "ouch" | "wink" | "banter";
+type Mood = "trophy" | "crown" | "fire" | "live" | "cheer" | "ouch" | "wink" | "banter";
 
 // Lines are plain strings; the mood (and so the emoji/colour/animation) is read off the wording.
 function moodOf(line: string): Mood {
   if (/champion|trophy|🏆/i.test(line)) return "trophy";
+  if (/new leader|new boss|overtake|first blood/i.test(line)) return "crown";
   if (/nailbiter|final time|demolition|heating up/i.test(line)) return "fire";
+  if (/^result|take it \d|full time|beat /i.test(line)) return "cheer";
   if (/^court \d|on court|popcorn|going home/i.test(line)) return "live";
   if (/unbeaten|cruising|belongs to|lead group|latest result|win \d/i.test(line)) return "cheer";
   if (/thoughts and prayers|character building|chop chop|haven't hit|all talk/i.test(line)) return "ouch";
@@ -186,6 +188,7 @@ function moodOf(line: string): Mood {
 
 const MOOD_STYLE: Record<Mood, { emoji: string; text: string; sweep: string }> = {
   trophy: { emoji: "🏆", text: "text-amber-700", sweep: "from-amber-200/0 via-amber-200/70 to-amber-200/0" },
+  crown: { emoji: "👑", text: "text-amber-700", sweep: "from-amber-200/0 via-amber-200/70 to-amber-200/0" },
   fire: { emoji: "🔥", text: "text-red-600", sweep: "from-red-200/0 via-red-200/60 to-red-200/0" },
   live: { emoji: "🏸", text: "text-violet-900", sweep: "from-violet-200/0 via-violet-200/70 to-violet-200/0" },
   cheer: { emoji: "🎉", text: "text-emerald-700", sweep: "from-emerald-200/0 via-emerald-200/60 to-emerald-200/0" },
@@ -214,21 +217,142 @@ function elapsedLabel(from: string, now: Date) {
 }
 
 export default function TournamentTicker(props: Props) {
+  const { fixtures, matches, standingsByGroup, members } = props;
   const now = useClock();
-  const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), ROTATE_MS);
-    return () => clearInterval(t);
-  }, []);
+  // What's on screen: the text plus a counter that keys the animations.
+  const [current, setCurrent] = useState<{ text: string; n: number }>({ text: "", n: 0 });
+  const tick = current.n;
 
-  // Rebuild the pool only when state changes; the tick just walks through it.
+  // Rebuild the pool only when state changes; rotation just walks through it.
   const pool = useMemo(
     () => buildLines(props, Math.floor(tick / 5)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [props.fixtures, props.standingsByGroup, props.matches, props.courts, props.tournament.status, Math.floor(tick / 5)]
   );
-  const line = pool.length > 0 ? pool[tick % pool.length] : "";
+  const poolRef = useRef(pool);
+  poolRef.current = pool;
+  const poolIdx = useRef(0);
+
+  // Event lines (results, leader changes) jump the queue and show immediately.
+  const queue = useRef<string[]>([]);
+  const timer = useRef<number>();
+
+  const advance = useCallback(() => {
+    const q = queue.current;
+    const p = poolRef.current;
+    const text = q.length > 0 ? q.shift()! : p.length > 0 ? p[poolIdx.current++ % p.length] : "";
+    setCurrent((c) => ({ text, n: c.n + 1 }));
+  }, []);
+
+  const restartTimer = useCallback(() => {
+    window.clearInterval(timer.current);
+    timer.current = window.setInterval(advance, ROTATE_MS);
+  }, [advance]);
+
+  useEffect(() => {
+    advance();
+    restartTimer();
+    return () => window.clearInterval(timer.current);
+  }, [advance, restartTimer]);
+
+  const announce = useCallback(
+    (text: string) => {
+      queue.current.push(text);
+      advance();
+      restartTimer();
+    },
+    [advance, restartTimer]
+  );
+
+  const pairLabel = (pair: [string, string] | null) => (pair ? firstNames(pair, members) : "?");
+
+  // Results: announce each fixture the moment it turns complete (skipping what was
+  // already complete when the ticker mounted, and re-announcing if a match is reset and replayed).
+  const seenComplete = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const done = fixtures.filter((f) => f.status === "complete" && f.team_a && f.team_b);
+    if (seenComplete.current === null) {
+      seenComplete.current = new Set(done.map((f) => f.id));
+      return;
+    }
+    const seen = seenComplete.current;
+    const doneIds = new Set(done.map((f) => f.id));
+    for (const id of Array.from(seen)) if (!doneIds.has(id)) seen.delete(id);
+
+    for (const f of done) {
+      if (seen.has(f.id)) continue;
+      const m = matches.find((x) => x.id === f.match_id);
+      if (!m || m.score_a == null || m.score_b == null) continue; // score not in yet; try on next update
+      seen.add(f.id);
+      const aWon = m.score_a > m.score_b;
+      const winner = pairLabel(aWon ? f.team_a : f.team_b);
+      const loser = pairLabel(aWon ? f.team_b : f.team_a);
+      const hi = Math.max(m.score_a, m.score_b);
+      const lo = Math.min(m.score_a, m.score_b);
+      const where = f.stage === "group" && f.group_index != null ? ` in Group ${f.group_index + 1}` : f.stage === "knockout" ? " in the knockout" : "";
+      const diff = hi - lo;
+      const line =
+        diff <= 2
+          ? `Nailbiter${where}! ${winner} edge ${loser} ${hi}-${lo}. Breathe.`
+          : diff >= 8
+            ? `Demolition${where}! ${winner} crush ${loser} ${hi}-${lo}. Brutal.`
+            : pick(
+                [
+                  `Result${where}: ${winner} beat ${loser} ${hi}-${lo}.`,
+                  `${winner} take it ${hi}-${lo} over ${loser}${where}. Handshakes all round.`,
+                  `Full time${where}: ${winner} ${hi}, ${loser} ${lo}. Better luck next game.`,
+                ],
+                f.id.length + hi
+              );
+      announce(line);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixtures, matches]);
+
+  // Leader changes: announce when the pair at the top of a group changes hands.
+  const leaders = useRef<Record<number, string> | null>(null);
+  useEffect(() => {
+    const nowLeaders: Record<number, string> = {};
+    const nameOf: Record<string, string> = {};
+    for (const [g, rows] of Object.entries(standingsByGroup)) {
+      const top = rows[0];
+      if (top && top.wins + top.losses > 0) {
+        const key = [...top.pair].sort().join("|");
+        nowLeaders[Number(g)] = key;
+        nameOf[key] = pairLabel(top.pair);
+      }
+      for (const r of rows) nameOf[[...r.pair].sort().join("|")] = pairLabel(r.pair);
+    }
+    if (leaders.current === null) {
+      leaders.current = nowLeaders;
+      return;
+    }
+    for (const gStr of Object.keys(nowLeaders)) {
+      const g = Number(gStr);
+      const prev = leaders.current[g];
+      const next = nowLeaders[g];
+      if (prev === next) continue;
+      if (!prev) {
+        announce(`First blood in Group ${g + 1}: ${nameOf[next]} are top of the table.`);
+      } else {
+        announce(
+          pick(
+            [
+              `New leader in Group ${g + 1}! ${nameOf[next]} take over from ${nameOf[prev] ?? "the old guard"}.`,
+              `Group ${g + 1} has a new boss: ${nameOf[next]}. ${nameOf[prev] ?? "Someone"} slips to second.`,
+              `Plot twist in Group ${g + 1} — ${nameOf[next]} overtake ${nameOf[prev] ?? "the leaders"}.`,
+            ],
+            g + next.length
+          )
+        );
+      }
+    }
+    leaders.current = nowLeaders;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standingsByGroup]);
+
+  const line = current.text;
   const mood = moodOf(line);
   const style = MOOD_STYLE[mood];
   const reduceMotion = useReducedMotion();
@@ -262,7 +386,7 @@ export default function TournamentTicker(props: Props) {
           />
         )}
         {/* Confetti for the big moments */}
-        {!reduceMotion && (mood === "trophy" || mood === "fire") && (
+        {!reduceMotion && (mood === "trophy" || mood === "crown" || mood === "fire") && (
           <div key={`confetti-${tick}`} className="pointer-events-none absolute inset-0">
             {CONFETTI.map((c, i) => (
               <motion.span
