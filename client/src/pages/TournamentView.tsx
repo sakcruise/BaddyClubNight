@@ -155,6 +155,9 @@ export default function TournamentView() {
       // Real rendered height divided by the zoom currently applied gives the height at zoom 1,
       // whatever the browser's offset/scrollHeight semantics are under CSS zoom.
       const applied = parseFloat(inner.style.zoom || "1") || 1;
+      // Switch the stretch off while measuring so we see the board's natural size.
+      inner.style.minWidth = "0px";
+      inner.style.minHeight = "0px";
       const rect = inner.getBoundingClientRect();
       const naturalH = rect.height / applied;
       const naturalW = rect.width / applied;
@@ -163,9 +166,12 @@ export default function TournamentView() {
       if (naturalH <= 0 || naturalW <= 0 || availableH <= 0 || availableW <= 0) return;
       // Fit both axes: whichever is tighter wins, so nothing scrolls in either direction.
       // 1% margin so sub-pixel rounding never leaves a stray scrollbar.
-      const fit = Math.min(availableH / naturalH, availableW / naturalW) * 0.99;
+      const fit = Math.min(availableH / naturalH, availableW / naturalW) * 0.995;
       const next = Math.max(MIN_FIT_ZOOM, Math.min(MAX_FIT_ZOOM, fit));
       setFitZoom((z) => (Math.abs(z - next) > 0.005 ? next : z));
+      // Zoom fits the tighter axis; stretch the board to fill the other so there are no gaps.
+      inner.style.minWidth = `${Math.floor(availableW / next)}px`;
+      inner.style.minHeight = `${Math.floor(availableH / next)}px`;
 
       // Would a different number of group columns fit larger? Estimate each candidate's
       // board size from one sheet's size and swap only for a clear (>3%) improvement.
@@ -230,7 +236,28 @@ export default function TournamentView() {
     );
   }
 
-  const thisChampion = champions.find((c) => c.tournamentId === tournament.id) ?? null;
+  // Prefer the saved record; otherwise derive it from the final on screen so the
+  // overlay works the instant the final is scored.
+  const thisChampion: TournamentChampion | null = (() => {
+    const saved = champions.find((c) => c.tournamentId === tournament.id);
+    if (saved) return saved;
+    const ko = fixtures.filter((f) => f.stage === "knockout" && f.team_a);
+    if (ko.length === 0) return null;
+    const maxRound = Math.max(...ko.map((f) => f.round));
+    const finals = ko.filter((f) => f.round === maxRound);
+    if (finals.length !== 1 || finals[0].status !== "complete") return null;
+    const final = finals[0];
+    const m = final.match_id ? matches.find((x) => x.id === final.match_id) : undefined;
+    if (final.team_b && (!m || m.score_a === undefined || m.score_b === undefined)) return null;
+    const aWon = !final.team_b || m!.score_a! > m!.score_b!;
+    return {
+      tournamentId: tournament.id,
+      year: new Date(tournament.created_at).getFullYear(),
+      pair: (aWon ? final.team_a : final.team_b) as [string, string],
+      runnersUp: final.team_b ? (aWon ? final.team_b : final.team_a) : null,
+      score: m && m.score_a !== undefined && m.score_b !== undefined ? (aWon ? [m.score_a, m.score_b] : [m.score_b, m.score_a]) : null,
+    };
+  })();
 
   const allGroupFixturesComplete = fixtures
     .filter((f) => f.stage === "group")
@@ -289,6 +316,16 @@ export default function TournamentView() {
       updateCourtStatus(match.court_id, "idle");
       await tournamentsApi.completeFixture(fixture.id);
       setScoringFixture(null);
+      // Knockout rounds advance themselves once their last score is in; after the final
+      // this is what marks the tournament complete.
+      if (fixture.stage === "knockout" && id) {
+        const { fixtures: fresh } = await tournamentsApi.get(id);
+        const round = fresh.filter((f) => f.stage === "knockout" && f.round === fixture.round);
+        const hasNext = fresh.some((f) => f.stage === "knockout" && f.round > fixture.round);
+        if (!hasNext && round.every((f) => f.status === "complete")) {
+          await tournamentsApi.advanceRound(id, fixture.round);
+        }
+      }
       await load();
     } finally {
       setBusy(false);
@@ -332,10 +369,27 @@ export default function TournamentView() {
 
   // Ending a finished tournament crowns the champions first; the result stays saved
   // (the tournament row is complete) and only the session link is dropped afterwards.
-  function handleEndTournament() {
+  async function handleEndTournament() {
     if (!tournament || !session) return;
     if (tournament.status === "complete") {
       setShowWinners(true);
+      return;
+    }
+    // Final scored but not yet flagged complete (older data) — flag it now, then crown.
+    const ko = fixtures.filter((f) => f.stage === "knockout" && f.team_a);
+    const maxRound = ko.length ? Math.max(...ko.map((f) => f.round)) : 0;
+    const finals = ko.filter((f) => f.round === maxRound);
+    if (finals.length === 1 && finals[0].status === "complete") {
+      setBusy(true);
+      try {
+        await tournamentsApi.advanceRound(tournament.id, maxRound);
+        await load();
+        setShowWinners(true);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not record the champions");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     if (!confirm("The final hasn't been played, so no champions will be recorded. End the tournament anyway? Club night carries on as normal.")) return;
@@ -504,7 +558,7 @@ export default function TournamentView() {
 
       <main
         ref={fitOuterRef}
-        className={`flex-1 min-h-0 overflow-x-auto w-full ${fitZoom <= MIN_FIT_ZOOM ? "overflow-y-auto" : "overflow-y-hidden"}`}
+        className={`flex-1 min-h-0 w-full ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
       >
        <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max mx-auto">
         {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
@@ -572,7 +626,7 @@ export default function TournamentView() {
         )}
 
         {fixtures.some((f) => f.stage === "group") && (
-          <div className="flex items-start gap-6 overflow-x-auto pb-2 -mx-1 px-1">
+          <div className="flex items-stretch gap-6 flex-1 min-h-0">
             {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
             {tournament.status !== "groups" && !showFullGroups && (
               <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-max self-center">
@@ -604,8 +658,8 @@ export default function TournamentView() {
             {(tournament.status === "groups" || showFullGroups) && (
             <div
               ref={groupsGridRef}
-              className="grid gap-6 flex-shrink-0 w-max"
-              style={{ gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)` }}
+              className="grid gap-6 flex-1 min-w-0"
+              style={{ gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, minmax(0, 1fr))`, gridAutoRows: "1fr" }}
             >
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   // Rows/columns stay in drafted pair order so the sheet doesn't reshuffle after
@@ -625,7 +679,7 @@ export default function TournamentView() {
                     .filter((s): s is GroupStanding => !!s);
                   const leader = ranked[0];
                   return (
-                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-max">
+                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-full h-full min-w-0">
                       <div className="flex items-center gap-2">
                         <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
                         {leader && (
@@ -635,8 +689,8 @@ export default function TournamentView() {
                         )}
                       </div>
 
-                      <div className="w-full">
-                        <table className="border-collapse text-sm font-display w-full">
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <table className="border-collapse text-sm font-display w-full flex-1">
                           <thead>
                             <tr>
                               <th className="sticky left-0 z-10 bg-white p-2 text-left text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-200">
