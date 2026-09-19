@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useSessionStore, useMemberStore, useMatchStore } from "../store";
+import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessionArchiveStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
 import type { TournamentChampion } from "../services/tournaments";
-import { matchesApi } from "../services/api";
+import { matchesApi, sessionsApi } from "../services/api";
 import type { GroupStanding } from "../utils/tournament";
 import type { Tournament, TournamentFixture, TournamentPlayer } from "../types";
 import Avatar from "../components/shared/Avatar";
@@ -90,8 +90,10 @@ export default function TournamentView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { members } = useMemberStore();
-  const { courts, updateCourtStatus, session, setSession } = useSessionStore();
-  const { matches, addMatch } = useMatchStore();
+  const { courts, updateCourtStatus, session, setSession, endSession } = useSessionStore();
+  const { matches, addMatch, setMatches } = useMatchStore();
+  const { setQueue, setActiveMemberIds } = useQueueStore();
+  const { archiveSession } = useSessionArchiveStore();
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
@@ -102,6 +104,7 @@ export default function TournamentView() {
   const [error, setError] = useState<string | null>(null);
   const [champions, setChampions] = useState<TournamentChampion[]>([]);
   const [showWinners, setShowWinners] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   // During the knockout the groups collapse to a scoreboard; this flips them back to the full matrices.
   const [showFullGroups, setShowFullGroups] = useState(false);
   // During the group stage the knockout preview can be shrunk to a narrow qualifiers list.
@@ -400,21 +403,28 @@ export default function TournamentView() {
       }
       return;
     }
-    if (!confirm("The final hasn't been played, so no champions will be recorded. End the tournament anyway? Club night carries on as normal.")) return;
-    finishTournament();
+    setShowExitConfirm(true);
   }
 
+  // Leaving the tournament ends the night too, so the app lands on the home page.
+  // The tournament row itself is kept (complete or not) - only the session closes.
   async function finishTournament() {
     if (!session) return;
     setBusy(true);
     setError(null);
     try {
       await tournamentsApi.unlinkSession(session.id);
-      setSession({ ...session, tournament_id: undefined });
-      navigate("/");
+      archiveSession({ ...session, tournament_id: undefined, status: "ended" }, matches);
+      await sessionsApi.end(session.id);
+      endSession();
+      setMatches([]);
+      setQueue([]);
+      setActiveMemberIds(new Set());
+      navigate("/", { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not end the tournament");
       setShowWinners(false);
+      setShowExitConfirm(false);
     } finally {
       setBusy(false);
     }
@@ -1015,6 +1025,35 @@ export default function TournamentView() {
       )}
 
 
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-7 flex flex-col gap-4"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center">
+              <Flag size={26} className="text-amber-600" />
+            </div>
+            <div>
+              <h2 className="font-display font-black text-xl text-gray-900">Exit the tournament?</h2>
+              <p className="text-sm font-display text-gray-500 mt-1">
+                The final hasn't been played, so no champions will be recorded. Exiting ends tonight's session and takes you back to the home page.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-2">
+              <Button variant="ghost" size="lg" fullWidth onClick={() => setShowExitConfirm(false)}>
+                Keep playing
+              </Button>
+              <Button size="lg" fullWidth disabled={busy} onClick={finishTournament}>
+                Yes, exit
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {showWinners && thisChampion && (
         <div className="fixed inset-0 z-50 bg-violet-950/80 backdrop-blur-sm flex items-center justify-center p-6">
           {/* Confetti */}
@@ -1060,13 +1099,13 @@ export default function TournamentView() {
                 {thisChampion.score && <span className="text-gray-400"> · {thisChampion.score[0]}-{thisChampion.score[1]} in the final</span>}
               </p>
             )}
-            <p className="text-xs font-display text-gray-400">Saved to the club's honours board — they'll show in the header next year.</p>
+            <p className="text-xs font-display text-gray-400">Saved to the club's honours board — they'll show in the header next year. Finishing ends tonight's session.</p>
             <div className="flex gap-3 w-full mt-2">
               <Button variant="ghost" size="lg" onClick={() => setShowWinners(false)}>
                 Back
               </Button>
               <Button size="lg" fullWidth disabled={busy} onClick={finishTournament}>
-                Finish · Back to Club Night
+                Finish · Back to Home
               </Button>
             </div>
           </motion.div>
