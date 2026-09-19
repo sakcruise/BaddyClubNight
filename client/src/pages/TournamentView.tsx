@@ -652,14 +652,14 @@ export default function TournamentView() {
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
-                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-3 w-[230px]">
-                      <h2 className="font-display font-black text-gray-900 text-xs mb-1.5">Group {g + 1}</h2>
+                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-3 w-[270px]">
+                      <h2 className="font-display font-black text-gray-900 text-sm mb-1.5">Group {g + 1}</h2>
                       <ol className="flex flex-col gap-0.5">
                         {rows.map((s, i) => (
                           <li
                             key={s.pair.join("-")}
-                            className={`flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] font-display
-                              ${i < tournament.advance_per_group ? "bg-violet-50 text-violet-700 font-black" : "text-gray-600 font-bold"}`}
+                            className={`flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-body
+                              ${i < tournament.advance_per_group ? "bg-violet-50 text-violet-800 font-semibold" : "text-gray-700 font-medium"}`}
                           >
                             <span className="w-3 text-gray-400 tabular-nums">{i + 1}</span>
                             <span className="flex-1 truncate">{pairName(s.pair, members)}</span>
@@ -720,7 +720,7 @@ export default function TournamentView() {
                                 Pair
                               </th>
                               {rows.map((s) => (
-                                <th key={s.pair.join("-")} className="p-2 text-[10px] text-gray-500 font-bold border-b border-gray-200 min-w-[90px] whitespace-nowrap">
+                                <th key={s.pair.join("-")} className="p-2 font-body font-medium text-[13px] text-gray-600 border-b border-gray-200 min-w-[110px] whitespace-nowrap">
                                   {pairName(s.pair, members)}
                                 </th>
                               ))}
@@ -742,7 +742,7 @@ export default function TournamentView() {
                                           <Avatar key={pid} name={members[pid]?.name ?? "?"} size="xs" />
                                         ))}
                                       </div>
-                                      <span className="font-bold text-gray-800 text-xs">{pairName(rowS.pair, members)}</span>
+                                      <span className="font-body font-semibold text-gray-900 text-[15px] tracking-tight">{pairName(rowS.pair, members)}</span>
                                     </div>
                                   </th>
                                   {rows.map((colS, ci) => {
