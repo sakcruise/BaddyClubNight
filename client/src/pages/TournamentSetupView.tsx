@@ -192,9 +192,9 @@ export default function TournamentSetupView() {
   const playingCount = isOdd && sitOut ? count - 1 : count;
   const canDraft = numGroups >= 1 && (!isOdd || !!sitOut) && playingCount >= numGroups * 2;
 
-  function runDraft() {
+  function runDraft(reshuffle = false) {
     const participantIds = Array.from(selected).filter((id) => id !== sitOut);
-    const { pairsByGroup: drafted, reserves: draftedReserves } = tournamentsApi.draft(participantIds, numGroups, pairingMode);
+    const { pairsByGroup: drafted, reserves: draftedReserves } = tournamentsApi.draft(participantIds, numGroups, pairingMode, { reshuffle });
     setPairsByGroup(drafted);
     setReserves(sitOut ? [...draftedReserves, sitOut] : draftedReserves);
     setSelectedSlot(null);
@@ -691,11 +691,15 @@ export default function TournamentSetupView() {
           </div>
 
           <div className="flex gap-3">
-            {pairingMode === "club" && (
-              <Button size="lg" variant="secondary" disabled={creating} onClick={runDraft}>
-                <RotateCcw size={16} /> Reshuffle
-              </Button>
-            )}
+            <Button
+              size="lg"
+              variant="secondary"
+              disabled={creating}
+              onClick={() => runDraft(true)}
+              title={pairingMode === "balanced" ? "New partners among players on the same level - pair totals stay identical" : "Re-deal the tiers"}
+            >
+              <RotateCcw size={16} /> Reshuffle
+            </Button>
             <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
               <Trophy size={18} /> {creating ? "Starting…" : "Confirm & Start Tournament"}
             </Button>

@@ -238,11 +238,14 @@ export const tournamentsApi = {
   /** Draft the roster into level-balanced, pairable groups (snake draft +
    * strongest-with-weakest pairing) WITHOUT persisting anything — a preview
    * the admin can hand-tweak before `create` commits it. */
-  draft: (participantIds: string[], numGroups: number, mode: PairingMode = "balanced") => {
+  draft: (participantIds: string[], numGroups: number, mode: PairingMode = "balanced", opts: { reshuffle?: boolean } = {}) => {
     const members = useMemberStore.getState().members;
     if (mode === "club") return clubRulesDraft(participantIds, members, numGroups);
-    const { groups, reserves } = snakeDraftGroups(participantIds, members, numGroups);
-    const pairsByGroup = groups.map((groupMemberIds) => pairStrongestWithWeakest(groupMemberIds, members));
+    // Balanced: a reshuffle randomises order only among players on the same level, so
+    // partners change but every pair's combined level stays exactly the same.
+    const randomTies = !!opts.reshuffle;
+    const { groups, reserves } = snakeDraftGroups(participantIds, members, numGroups, { randomTies });
+    const pairsByGroup = groups.map((groupMemberIds) => pairStrongestWithWeakest(groupMemberIds, members, { randomTies }));
     return { pairsByGroup, reserves };
   },
 

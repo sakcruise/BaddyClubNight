@@ -3,10 +3,23 @@ import { computeLeaderboard } from "./scoring";
 
 const lvl = (id: string, members: Record<string, Member>) => members[id]?.level ?? 2;
 
-function byStrength(members: Record<string, Member>) {
+export function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Strongest first. With `randomTies`, players on the same level keep their (pre-shuffled)
+ * input order instead of rank/name order — so a reshuffle varies partners without
+ * changing any pair's combined level. */
+function byStrength(members: Record<string, Member>, randomTies = false) {
   return (aId: string, bId: string) => {
     const diff = lvl(bId, members) - lvl(aId, members);
     if (diff !== 0) return diff;
+    if (randomTies) return 0;
     // Same level: club rank decides (1 = strongest); unranked players sort after ranked ones.
     const rA = members[aId]?.rank ?? Number.POSITIVE_INFINITY;
     const rB = members[bId]?.rank ?? Number.POSITIVE_INFINITY;
@@ -32,11 +45,13 @@ export function rankParticipants(participantIds: string[], members: Record<strin
 export function snakeDraftGroups(
   participantIds: string[],
   members: Record<string, Member>,
-  numGroups: number
+  numGroups: number,
+  opts: { randomTies?: boolean } = {}
 ): { groups: string[][]; reserves: string[] } {
   if (numGroups < 1) throw new Error("numGroups must be at least 1");
 
-  const sorted = [...participantIds].sort(byStrength(members));
+  const input = opts.randomTies ? shuffleArray(participantIds) : [...participantIds];
+  const sorted = input.sort(byStrength(members, !!opts.randomTies));
   const reserves: string[] = [];
   if (sorted.length % 2 === 1) {
     // Odd overall — the single weakest participant sits out as a reserve so
@@ -79,12 +94,14 @@ export function snakeDraftGroups(
  */
 export function pairStrongestWithWeakest(
   groupMemberIds: string[],
-  members: Record<string, Member>
+  members: Record<string, Member>,
+  opts: { randomTies?: boolean } = {}
 ): Array<[string, string]> {
   if (groupMemberIds.length % 2 !== 0) {
     throw new Error("pairStrongestWithWeakest requires an even-sized group");
   }
-  const sorted = [...groupMemberIds].sort(byStrength(members));
+  const input = opts.randomTies ? shuffleArray(groupMemberIds) : [...groupMemberIds];
+  const sorted = input.sort(byStrength(members, !!opts.randomTies));
   const pairs: Array<[string, string]> = [];
   let i = 0;
   let j = sorted.length - 1;
