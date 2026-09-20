@@ -120,6 +120,9 @@ export default function TournamentView() {
   const [showRoster, setShowRoster] = useState(false);
   // Per-court dropdown choice, keyed by court id, before "Send to court" is tapped.
   const [courtChoice, setCourtChoice] = useState<Record<number, string>>({});
+  // Knockout card whose pairs are being edited (pending fixtures only).
+  const [editingKoFixture, setEditingKoFixture] = useState<string | null>(null);
+  const [showResetKnockout, setShowResetKnockout] = useState(false);
   // Which group-stage cell has its court chooser open.
   const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
   const [showKnockoutConfig, setShowKnockoutConfig] = useState(false);
@@ -520,6 +523,41 @@ export default function TournamentView() {
     return cfg.qf;
   }
 
+  async function handleSetKoTeams(fixture: TournamentFixture, teamA: [string, string], teamB: [string, string]) {
+    setBusy(true);
+    setError(null);
+    try {
+      await tournamentsApi.setFixtureTeams(fixture.id, teamA, teamB);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not change that pairing");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetKnockout() {
+    if (!id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const ko = fixtures.filter((f) => f.stage === "knockout" && f.match_id);
+      await tournamentsApi.resetKnockout(id);
+      ko.forEach((f) => {
+        const m = matches.find((x) => x.id === f.match_id);
+        if (m) updateCourtStatus(m.court_id, "idle");
+      });
+      setMatches(matches.filter((m) => !ko.some((f) => f.match_id === m.id)));
+      setShowResetKnockout(false);
+      setEditingKoFixture(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reset the knockout");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleResetFixture(fixture: TournamentFixture) {
     if (!confirm("Reset this match? The court will be freed and any score entered will be lost.")) return;
     setBusy(true);
@@ -721,10 +759,50 @@ export default function TournamentView() {
 
         {isBye && <p className="text-[11px] font-body text-gray-400 px-1.5">Goes straight through to the next round</p>}
 
-        {!isBye && fixture.status === "pending" && (
-          <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
-            <Play size={14} /> Play
-          </Button>
+        {!isBye && fixture.status === "pending" && editingKoFixture === fixture.id && (() => {
+          const allPairs = Object.entries(standingsByGroup).flatMap(([g, st]) =>
+            st.map((s, i) => ({ key: s.pair.join("-"), pair: s.pair, label: `G${Number(g) + 1} #${i + 1} · ${pairName(s.pair, members)}` }))
+          );
+          const usedElsewhere = new Set(
+            fixtures
+              .filter((f) => f.stage === "knockout" && f.round === fixture.round && f.id !== fixture.id)
+              .flatMap((f) => [f.team_a?.join("-"), f.team_b?.join("-")])
+          );
+          const Sel = ({ value, onPick }: { value: [string, string] | null; onPick: (p: [string, string]) => void }) => (
+            <select
+              value={value?.join("-") ?? ""}
+              onChange={(e) => { const p = allPairs.find((x) => x.key === e.target.value); if (p) onPick(p.pair); }}
+              className="w-full h-9 text-xs font-display font-semibold bg-white border-2 border-orange-200 rounded-xl px-1.5"
+            >
+              {allPairs.map((p) => (
+                <option key={p.key} value={p.key} disabled={usedElsewhere.has(p.key)}>{p.label}</option>
+              ))}
+            </select>
+          );
+          return (
+            <div className="flex flex-col gap-1.5 rounded-xl bg-orange-50 border border-orange-200 p-2">
+              <Sel value={fixture.team_a} onPick={(p) => fixture.team_b && handleSetKoTeams(fixture, p, fixture.team_b)} />
+              <Sel value={fixture.team_b} onPick={(p) => fixture.team_a && handleSetKoTeams(fixture, fixture.team_a, p)} />
+              <Button size="sm" variant="ghost" fullWidth onClick={() => setEditingKoFixture(null)}>Done</Button>
+            </div>
+          );
+        })()}
+        {!isBye && fixture.status === "pending" && editingKoFixture !== fixture.id && (
+          <div className="flex gap-2">
+            <Button size="md" fullWidth disabled={busy || !freeCourt} onClick={() => freeCourt && handleLaunch(fixture, freeCourt.id)}>
+              <Play size={14} /> Play
+            </Button>
+            {fixture.round === 1 && (
+              <button
+                onClick={() => setEditingKoFixture(fixture.id)}
+                disabled={busy}
+                title="Change the pairs in this match"
+                className="min-w-[44px] rounded-xl border-2 border-orange-200 text-orange-600 text-[11px] font-display font-bold active:bg-orange-50"
+              >
+                Edit
+              </button>
+            )}
+          </div>
         )}
         {!isBye && fixture.status === "active" && (
           <div className="flex gap-2">
@@ -1395,9 +1473,16 @@ export default function TournamentView() {
 
               {(tournament.status === "knockout" || tournament.status === "complete") && (
                 <section className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 flex flex-col gap-4">
-                  <div>
-                    <h2 className="font-display font-bold text-gray-900 text-lg leading-tight">Knockout</h2>
-                    <p className="text-xs font-display text-gray-500 mt-0.5">Tap Play to send a match to the next free court, then tap it again to enter the score.</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-display font-bold text-gray-900 text-lg leading-tight">Knockout</h2>
+                      <p className="text-xs font-display text-gray-500 mt-0.5">Tap Play to send a match to the next free court, then tap it again to enter the score. Edit on a round-1 card swaps its pairs.</p>
+                    </div>
+                    {tournament.status === "knockout" && (
+                      <Button size="sm" variant="ghost" onClick={() => setShowResetKnockout(true)} disabled={busy}>
+                        <RotateCcw size={14} /> Reset knockout
+                      </Button>
+                    )}
                   </div>
                   <KnockoutBracket
                     fixtures={fixtures.filter((f) => f.stage === "knockout")}
@@ -1544,6 +1629,24 @@ export default function TournamentView() {
               <Button size="lg" fullWidth disabled={busy} onClick={finishTournament}>
                 Finish · Back to Home
               </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showResetKnockout && (
+        <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-7 flex flex-col gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center"><RotateCcw size={26} className="text-red-600" /></div>
+            <div>
+              <h2 className="font-display font-bold text-xl text-gray-900">Reset the knockout?</h2>
+              <p className="text-sm font-display text-gray-500 mt-1">
+                Every knockout match — including any already played — is deleted and you go back to the group stage, where you can generate the bracket again. Group results are kept.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-2">
+              <Button variant="ghost" size="lg" fullWidth onClick={() => setShowResetKnockout(false)}>Keep it</Button>
+              <Button variant="danger" size="lg" fullWidth disabled={busy} onClick={handleResetKnockout}>Reset knockout</Button>
             </div>
           </motion.div>
         </div>

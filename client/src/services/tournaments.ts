@@ -412,6 +412,36 @@ export const tournamentsApi = {
     if (error) throw new Error(error.message);
   },
 
+  /** Swap the pairs on a not-yet-started knockout fixture (a wrongly generated
+   * bracket, or a tie-break played off after the draw). */
+  setFixtureTeams: async (fixtureId: string, teamA: [string, string], teamB: [string, string]): Promise<void> => {
+    if (isOffline()) {
+      useTournamentStore.getState().patchFixture(fixtureId, { team_a: teamA, team_b: teamB });
+      return;
+    }
+    const { error } = await supabase
+      .from("tournament_fixtures")
+      .update({ team_a_1: teamA[0], team_a_2: teamA[1], team_b_1: teamB[0], team_b_2: teamB[1] })
+      .eq("id", fixtureId);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Throw the whole bracket away and go back to the group stage so it can be
+   * generated again. Deletes every knockout fixture and any match they started. */
+  resetKnockout: async (tournamentId: string): Promise<void> => {
+    const { fixtures } = await tournamentsApi.get(tournamentId);
+    const ko = fixtures.filter((f) => f.stage === "knockout");
+    for (const f of ko) if (f.match_id) await matchesApi.delete(f.match_id);
+    if (isOffline()) {
+      useTournamentStore.getState().removeFixtures(ko.map((f) => f.id));
+      useTournamentStore.getState().patchTournament(tournamentId, { status: "groups" });
+      return;
+    }
+    const { error } = await supabase.from("tournament_fixtures").delete().eq("tournament_id", tournamentId).eq("stage", "knockout");
+    if (error) throw new Error(error.message);
+    await setTournamentStatus(tournamentId, "groups");
+  },
+
   /** Abandon a bad draft entirely — deletes the tournament, which cascades to
    * its players/fixtures and clears sessions.tournament_id, so the admin lands
    * back on the setup screen to redraft groups. */

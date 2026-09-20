@@ -474,6 +474,7 @@ interface TournamentStore {
   addPlayers: (ps: TournamentPlayer[]) => void;
   addFixtures: (fs: TournamentFixture[]) => void;
   patchFixture: (id: string, patch: Partial<TournamentFixture>) => void;
+  removeFixtures: (ids: string[]) => void;
 }
 
 export const useTournamentStore = create<TournamentStore>()(
@@ -498,6 +499,7 @@ export const useTournamentStore = create<TournamentStore>()(
       addFixtures: (fs) => set((s) => ({ fixtures: [...s.fixtures, ...fs] })),
       patchFixture: (id, patch) =>
         set((s) => ({ fixtures: s.fixtures.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+      removeFixtures: (ids) => set((s) => ({ fixtures: s.fixtures.filter((f) => !ids.includes(f.id)) })),
     }),
     { name: "tournament-store" }
   )
