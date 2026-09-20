@@ -23,6 +23,16 @@ const MAX_FIT_ZOOM = 1.6;
 // use a big screen, but no further - wider than this the cards look stretched.
 const MAX_KNOCKOUT_STRETCH = 1.6;
 
+// One accent per group so the sheets are telling apart at a glance; cycles past six.
+const GROUP_ACCENTS = [
+  { header: "bg-violet-50 border-violet-100", badge: "bg-violet-600", bar: "bg-violet-500", text: "text-violet-600" },
+  { header: "bg-sky-50 border-sky-100", badge: "bg-sky-600", bar: "bg-sky-500", text: "text-sky-600" },
+  { header: "bg-emerald-50 border-emerald-100", badge: "bg-emerald-600", bar: "bg-emerald-500", text: "text-emerald-600" },
+  { header: "bg-amber-50 border-amber-100", badge: "bg-amber-500", bar: "bg-amber-500", text: "text-amber-600" },
+  { header: "bg-rose-50 border-rose-100", badge: "bg-rose-500", bar: "bg-rose-500", text: "text-rose-600" },
+  { header: "bg-teal-50 border-teal-100", badge: "bg-teal-600", bar: "bg-teal-500", text: "text-teal-600" },
+];
+
 // Champions from before the app kept records. Years the app has run are read from
 // completed tournaments and take precedence over these.
 const PAST_CHAMPIONS: Array<{ year: number; winners: string }> = [
@@ -827,30 +837,63 @@ export default function TournamentView() {
                     .filter((s): s is GroupStanding => !!s);
                   const leader = ranked[0];
                   return (
-                    <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-3 w-full h-full min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h2 className="font-display font-bold text-gray-900 text-base">Group {g + 1}</h2>
-                        {leader && (
-                          <span className="flex items-center gap-1.5 text-[15px] font-body font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3 py-0.5">
-                            <Trophy size={13} className="text-violet-500" /> {pairName(leader.pair, members)}
-                          </span>
-                        )}
-                      </div>
+                    <section key={g} className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col w-full h-full min-w-0 overflow-hidden">
+                      {(() => {
+                        const accent = GROUP_ACCENTS[g % GROUP_ACCENTS.length];
+                        const gf = fixtures.filter((f) => f.stage === "group" && f.group_index === g && f.team_a && f.team_b);
+                        const gDone = gf.filter((f) => f.status === "complete").length;
+                        const gLive = gf.filter((f) => f.status === "active").length;
+                        const pct = gf.length ? (gDone / gf.length) * 100 : 0;
+                        return (
+                          <div className={`flex items-center gap-3 px-4 py-2.5 border-b ${accent.header}`}>
+                            <span className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-sm text-white ${accent.badge}`}>
+                              G{g + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <h2 className="font-display font-bold text-gray-900 text-base leading-tight">Group {g + 1}</h2>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <div className="w-24 h-1.5 rounded-full bg-black/10 overflow-hidden">
+                                  <motion.div animate={{ width: `${pct}%` }} className={`h-full rounded-full ${accent.bar}`} />
+                                </div>
+                                <span className="text-[11px] font-body text-gray-500 tabular-nums">
+                                  {gDone}/{gf.length} played{gLive > 0 ? ` · ${gLive} live` : ""}
+                                </span>
+                              </div>
+                            </div>
+                            {leader && (
+                              <span className="ml-auto flex items-center gap-2 bg-white/80 border border-white rounded-full pl-1 pr-3 py-0.5 shadow-sm">
+                                <span className="flex -space-x-2">
+                                  {leader.pair.map((pid) => (
+                                    <Avatar key={pid} name={members[pid]?.name ?? "?"} url={members[pid]?.avatar_url} memberType={members[pid]?.member_type} size="xs" />
+                                  ))}
+                                </span>
+                                <span className="text-[13px] font-body font-medium text-gray-700">{pairName(leader.pair, members)}</span>
+                                <span className={`text-[10px] font-display font-bold uppercase tracking-wider ${accent.text}`}>
+                                  {leader.wins + leader.losses > 0 ? "Leading" : "Top seed"}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
-                      <div className="flex-1 flex flex-col min-h-0 overflow-x-auto">
+                      <div className="flex-1 flex flex-col min-h-0 overflow-x-auto px-2 pb-2">
                         <table className="border-collapse text-sm font-display w-full flex-1">
                           <thead>
                             <tr>
-                              <th className="sticky left-0 z-10 bg-white p-2 text-left text-[10px] text-gray-400 font-semibold uppercase tracking-wider border-b border-gray-200">
+                              <th className="sticky left-0 z-10 bg-white px-2 py-2 text-left text-[10px] text-gray-400 font-semibold uppercase tracking-wider border-b-2 border-gray-100">
                                 Pair
                               </th>
                               {rows.map((s) => (
-                                <th key={s.pair.join("-")} className="p-2 font-body font-normal text-[13px] text-gray-600 border-b border-gray-200 min-w-[110px] whitespace-nowrap">
-                                  {pairName(s.pair, members)}
+                                <th key={s.pair.join("-")} className="px-1 py-2 font-body font-normal text-[12px] text-gray-500 border-b-2 border-gray-100 min-w-[104px] leading-tight">
+                                  {pairName(s.pair, members).replace(" & ", "\n& ").split("\n").map((l, i) => (
+                                    <span key={i} className="block">{l}</span>
+                                  ))}
                                 </th>
                               ))}
-                              <th className="p-2 font-body font-normal text-[13px] text-gray-600 border-b border-gray-200 min-w-[96px] whitespace-nowrap">Points Won</th>
-                              <th className="p-2 font-body font-normal text-[13px] text-gray-600 border-b border-gray-200 min-w-[80px]">Average</th>
+                              <th className="px-2 py-2 font-body font-normal text-[11px] uppercase tracking-wider text-gray-400 border-b-2 border-gray-100 min-w-[56px]">W–L</th>
+                              <th className="px-2 py-2 font-body font-normal text-[11px] uppercase tracking-wider text-gray-400 border-b-2 border-gray-100 min-w-[56px]">Pts</th>
+                              <th className="px-2 py-2 font-body font-normal text-[11px] uppercase tracking-wider text-gray-400 border-b-2 border-gray-100 min-w-[56px]">Avg</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -859,24 +902,27 @@ export default function TournamentView() {
                               const avg = played > 0 ? rowS.pointsFor / played : 0;
                               const isLeader = !!leader && pairEq(leader.pair, rowS.pair);
                               return (
-                                <tr key={rowS.pair.join("-")} className={isLeader ? "bg-violet-50/60" : ""}>
-                                  <th scope="row" className="sticky left-0 z-10 bg-inherit p-2 text-left border-b border-gray-100 whitespace-nowrap">
-                                    <div className="flex items-center gap-1.5">
+                                <tr key={rowS.pair.join("-")} className={isLeader ? "bg-violet-50/70" : ri % 2 === 1 ? "bg-gray-50/60" : "bg-white"}>
+                                  <th scope="row" className={`sticky left-0 z-10 bg-inherit pl-2 pr-3 py-1.5 text-left border-b border-gray-100 whitespace-nowrap ${isLeader ? "shadow-[inset_3px_0_0_0_#7c3aed]" : ""}`}>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-5 text-center text-[11px] font-display font-bold tabular-nums ${isLeader ? "text-violet-600" : "text-gray-300"}`}>
+                                        {ranked.findIndex((s) => pairEq(s.pair, rowS.pair)) + 1}
+                                      </span>
                                       <div className="flex -space-x-2 flex-shrink-0">
                                         {rowS.pair.map((pid) => (
-                                          <Avatar key={pid} name={members[pid]?.name ?? "?"} size="xs" />
+                                          <Avatar key={pid} name={members[pid]?.name ?? "?"} url={members[pid]?.avatar_url} memberType={members[pid]?.member_type} size="xs" />
                                         ))}
                                       </div>
-                                      <span className="font-body font-medium text-gray-700 text-[15px] tracking-tight">{pairName(rowS.pair, members)}</span>
+                                      <span className={`font-body text-[15px] tracking-tight ${isLeader ? "font-semibold text-gray-900" : "font-medium text-gray-700"}`}>{pairName(rowS.pair, members)}</span>
                                     </div>
                                   </th>
                                   {rows.map((colS, ci) => {
                                     if (ri === ci) {
                                       return (
-                                        <td key={ci} className="relative border-b border-gray-100 p-0 h-11 bg-gray-50">
+                                        <td key={ci} className="border-b border-gray-100 p-0 h-11">
                                           <div
-                                            className="absolute inset-0"
-                                            style={{ background: "linear-gradient(to top right, transparent calc(50% - 1px), #d1d5db calc(50%), transparent calc(50% + 1px))" }}
+                                            className="w-full h-full opacity-70"
+                                            style={{ backgroundImage: "radial-gradient(#d1d5db 1px, transparent 1.2px)", backgroundSize: "7px 7px" }}
                                           />
                                         </td>
                                       );
@@ -901,12 +947,13 @@ export default function TournamentView() {
                                             transition={{ type: "spring", stiffness: 400, damping: 20 }}
                                             onClick={() => setScoringFixture(fixture)}
                                             title="Tap to edit score"
-                                            className={`w-full min-h-[44px] rounded-lg py-2 font-display font-bold text-sm tabular-nums border transition-colors
+                                            className={`w-full min-h-[44px] rounded-lg py-1.5 px-2 flex items-center justify-center gap-1.5 font-display font-bold text-sm tabular-nums border transition-colors
                                               ${won
-                                                ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                                                : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"}`}
+                                                ? "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                                                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
                                           >
-                                            {own}/{opp}
+                                            <span className={`text-[9px] font-black uppercase rounded px-1 py-0.5 ${won ? "bg-emerald-500 text-white" : "bg-gray-200 text-gray-600"}`}>{won ? "W" : "L"}</span>
+                                            {own}<span className="text-gray-300 font-normal">–</span>{opp}
                                           </motion.button>
                                           <button
                                             onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
@@ -925,7 +972,7 @@ export default function TournamentView() {
                                           <button
                                             onClick={() => setScoringFixture(fixture)}
                                             title="Tap to enter score"
-                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2bg-amber-100 border border-amber-300 text-amber-700 hover:bg-amber-200 transition-colors"
+                                            className="w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-lg py-2 bg-amber-100 border border-amber-300 text-amber-800 hover:bg-amber-200 transition-colors"
                                           >
                                             <motion.span
                                               animate={{ opacity: [1, 0.3, 1] }}
@@ -954,20 +1001,27 @@ export default function TournamentView() {
                                           <button
                                             onClick={() => handlePlayGroupFixture(g, fixture)}
                                             disabled={busy}
-                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2 bg-violet-100 border border-violet-300 text-violet-800
-                                                       active:bg-violet-200 active:scale-95 transition-all disabled:opacity-50"
+                                            className="w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-lg py-2 bg-white border border-dashed border-violet-300 text-violet-700
+                                                       active:bg-violet-100 active:scale-95 transition-all disabled:opacity-50"
                                           >
-                                            <Play size={10} className="flex-shrink-0" />
-                                            <span className="text-[10px] font-display font-semibold">Play</span>
+                                            <span className="w-5 h-5 rounded-full bg-violet-600 text-white flex items-center justify-center flex-shrink-0">
+                                              <Play size={9} className="ml-px" />
+                                            </span>
+                                            <span className="text-[11px] font-display font-semibold">Play</span>
                                           </button>
                                         )}
                                       </td>
                                     );
                                   })}
-                                  <td className="border-b border-gray-100 text-center font-body font-semibold text-gray-700 tabular-nums text-base">
+                                  <td className="border-b border-gray-100 text-center font-body tabular-nums text-[15px]">
+                                    <span className={`font-semibold ${rowS.wins > 0 ? "text-emerald-700" : "text-gray-500"}`}>{rowS.wins}</span>
+                                    <span className="text-gray-300">–</span>
+                                    <span className={`font-semibold ${rowS.losses > 0 ? "text-gray-500" : "text-gray-500"}`}>{rowS.losses}</span>
+                                  </td>
+                                  <td className="border-b border-gray-100 text-center font-body font-semibold text-gray-700 tabular-nums text-[15px]">
                                     {rowS.pointsFor}
                                   </td>
-                                  <td className="border-b border-gray-100 text-center font-body font-semibold text-violet-600 tabular-nums text-base">
+                                  <td className="border-b border-gray-100 text-center font-body font-semibold text-violet-600 tabular-nums text-[15px]">
                                     {avg.toFixed(1)}
                                   </td>
                                 </tr>
