@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { membersApi, syncApi } from "../../services/api";
 import { useMemberStore } from "../../store";
 import Avatar from "../shared/Avatar";
-import { UserPlus, Archive, Check, X, Pencil, CloudDownload, RotateCcw } from "lucide-react";
+import { UserPlus, Archive, Check, X, Pencil, CloudDownload, RotateCcw, Search } from "lucide-react";
 import type { MemberType } from "../../types";
 import { LEVEL_LABELS, LEVELS } from "../../types";
 
@@ -63,6 +63,29 @@ export default function MemberManagement() {
   const archived = Object.values(members)
     .filter((m) => m.member_type !== "guest" && m.active === false)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Filters / sort for the list
+  const [query, setQuery] = useState("");
+  const [genderFilter, setGenderFilter] = useState<"all" | MemberType>("all");
+  const [levelFilter, setLevelFilter] = useState<Set<number>>(new Set());
+  const [sortBy, setSortBy] = useState<"name" | "rank" | "level">("name");
+  const toggleLevelFilter = (lvl: number) =>
+    setLevelFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(lvl)) next.delete(lvl);
+      else next.add(lvl);
+      return next;
+    });
+  const visible = roster
+    .filter((m) => !query || m.name.toLowerCase().includes(query.toLowerCase()))
+    .filter((m) => genderFilter === "all" || m.member_type === genderFilter)
+    .filter((m) => levelFilter.size === 0 || levelFilter.has(m.level ?? 2))
+    .sort((a, b) => {
+      if (sortBy === "rank") return (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.name.localeCompare(b.name);
+      if (sortBy === "level") return (b.level ?? 2) - (a.level ?? 2) || (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name);
+    });
+  const filtersActive = !!query || genderFilter !== "all" || levelFilter.size > 0;
 
   // Members can't be hard-deleted once they've played (matches reference them), so
   // "remove" archives: hidden from every roster, still named in old results.
@@ -193,9 +216,81 @@ export default function MemberManagement() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex flex-col gap-2">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search names…"
+              className="w-full pl-8 pr-8 py-2 rounded-xl border-2 border-gray-200 text-sm font-body focus:outline-none focus:border-orange-400"
+            />
+            {query && (
+              <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400" aria-label="Clear search">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="rounded-xl border-2 border-gray-200 text-xs font-display font-bold px-2 bg-white focus:outline-none focus:border-orange-400"
+            aria-label="Sort by"
+          >
+            <option value="name">A–Z</option>
+            <option value="rank">By rank</option>
+            <option value="level">By level</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {([
+            { key: "all", label: "All" },
+            { key: "male", label: "♂ Male" },
+            { key: "female", label: "♀ Female" },
+          ] as const).map((g) => (
+            <button
+              key={g.key}
+              onClick={() => setGenderFilter(g.key)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-display font-bold border-2 transition-colors
+                ${genderFilter === g.key ? "bg-gray-900 border-gray-900 text-white" : "bg-white border-gray-200 text-gray-500"}`}
+            >
+              {g.label}
+            </button>
+          ))}
+          <span className="w-px h-5 bg-gray-200 mx-1" />
+          {LEVEL_OPTIONS.map((lvl) => (
+            <button
+              key={lvl}
+              onClick={() => toggleLevelFilter(lvl)}
+              title={LEVEL_LABELS[lvl]}
+              className={`px-2 py-1 rounded-lg text-xs font-display font-bold border-2 transition-colors
+                ${levelFilter.has(lvl) ? LEVEL_COLORS[lvl] + " border-current" : "bg-white border-gray-200 text-gray-400"}`}
+            >
+              L{lvl}
+            </button>
+          ))}
+          {filtersActive && (
+            <button
+              onClick={() => { setQuery(""); setGenderFilter("all"); setLevelFilter(new Set()); }}
+              className="ml-auto text-xs font-display font-bold text-orange-600"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {filtersActive && (
+          <p className="text-[11px] font-body text-gray-400">Showing {visible.length} of {roster.length}</p>
+        )}
+      </div>
+
       {/* Member list */}
       <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
-        {roster.map((member) => {
+        {visible.length === 0 && roster.length > 0 && (
+          <p className="text-sm font-body text-gray-400 text-center py-6">No members match these filters.</p>
+        )}
+        {visible.map((member) => {
           const isEditing = editingId === member.id;
           const isDeleting = deletingId === member.id;
 
