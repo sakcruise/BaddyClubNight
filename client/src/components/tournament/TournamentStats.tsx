@@ -66,7 +66,7 @@ export default function TournamentStats({ tournament, fixtures, players, standin
   return (
     <div className="flex items-stretch gap-2 px-5 py-2 bg-white border-b border-gray-100 overflow-x-auto flex-shrink-0">
       {tiles.map((t) => (
-        <div key={t.label} className="flex items-center gap-2.5 min-w-0 flex-1 rounded-xl border border-gray-100 px-3 py-1.5">
+        <div key={t.label} className="flex items-center gap-2.5 min-w-[170px] flex-1 rounded-xl border border-gray-100 px-3 py-1.5">
           <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${t.tone}`}>{t.icon}</span>
           <div className="min-w-0 leading-tight">
             <div className="text-[10px] font-display font-semibold uppercase tracking-widest text-gray-400 truncate">{t.label}</div>

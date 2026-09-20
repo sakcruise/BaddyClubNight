@@ -515,7 +515,7 @@ export default function TournamentSetupView() {
           {/* Two equal rows across the full width: 6 groups → 3 + 3, 4 → 2 + 2, 5 → 3 + 2. */}
           <div
             className="grid gap-4 items-start"
-            style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.ceil(pairsByGroup.length / 2))}, minmax(0, 1fr))` }}
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 560px), 1fr))" }}
           >
             {pairsByGroup.map((pairs, g) => {
               const groupMemberIds = pairs.flat();

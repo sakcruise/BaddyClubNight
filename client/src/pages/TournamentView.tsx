@@ -181,10 +181,24 @@ export default function TournamentView() {
   const fitOuterRef = useRef<HTMLElement>(null);
   const fitInnerRef = useRef<HTMLDivElement>(null);
   const [fitZoom, setFitZoom] = useState(1);
+  // Phones/small tablets get a stacked, scrollable layout instead of the fit-to-screen board.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 900px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   useEffect(() => {
     const outer = fitOuterRef.current;
     const inner = fitInnerRef.current;
     if (!outer || !inner) return;
+    if (isMobile) {
+      inner.style.minWidth = "0px";
+      inner.style.minHeight = "0px";
+      setFitZoom(1);
+      return;
+    }
     const recompute = () => {
       // Real rendered height divided by the zoom currently applied gives the height at zoom 1,
       // whatever the browser's offset/scrollHeight semantics are under CSS zoom.
@@ -249,7 +263,7 @@ export default function TournamentView() {
     ro.observe(outer);
     ro.observe(inner);
     return () => ro.disconnect();
-  }, [tournament?.id, tournament?.status, groupCols]);
+  }, [tournament?.id, tournament?.status, groupCols, isMobile]);
 
   // Once the bracket exists, slide it into view so the operator lands on the knockout, not the group scores.
   const knockoutRef = useRef<HTMLDivElement>(null);
@@ -682,9 +696,13 @@ export default function TournamentView() {
 
       <main
         ref={fitOuterRef}
-        className={`flex-1 min-h-0 w-full flex ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
+        className={`flex-1 min-h-0 w-full flex ${isMobile ? "overflow-y-auto overflow-x-hidden" : fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
       >
-       <div ref={fitInnerRef} style={{ zoom: fitZoom }} className="px-5 py-5 flex flex-col gap-4 w-max shrink-0 m-auto">
+       <div
+         ref={fitInnerRef}
+         style={{ zoom: isMobile ? 1 : fitZoom }}
+         className={`flex flex-col gap-4 shrink-0 ${isMobile ? "w-full px-3 py-3" : "w-max px-5 py-5 m-auto"}`}
+       >
         {error && <p className="text-sm font-display font-semibold text-red-600">{error}</p>}
 
         {(() => {
@@ -750,10 +768,10 @@ export default function TournamentView() {
         )}
 
         {fixtures.some((f) => f.stage === "group") && (
-          <div className="flex items-stretch gap-6 flex-1 min-h-0">
+          <div className={`flex gap-6 flex-1 min-h-0 ${isMobile ? "flex-col gap-4" : "items-stretch"}`}>
             {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
             {tournament.status !== "groups" && !showFullGroups && (
-              <div className="grid grid-cols-2 gap-2 flex-shrink-0 w-max self-center" style={{ zoom: groupsScale }}>
+              <div className={`grid grid-cols-2 gap-2 flex-shrink-0 ${isMobile ? "w-full" : "w-max self-center"}`} style={{ zoom: isMobile ? 1 : groupsScale }}>
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
@@ -782,11 +800,13 @@ export default function TournamentView() {
             {(tournament.status === "groups" || showFullGroups) && (
             <div
               ref={groupsGridRef}
-              className={`grid gap-6 ${tournament.status === "groups" ? "flex-1 min-w-0" : "flex-shrink-0 w-max"}`}
+              className={`grid gap-6 ${isMobile ? "w-full gap-4" : tournament.status === "groups" ? "flex-1 min-w-0" : "flex-shrink-0 w-max"}`}
               style={
-                tournament.status === "groups"
-                  ? { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, minmax(0, 1fr))`, gridAutoRows: "1fr" }
-                  : { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)`, zoom: groupsScale }
+                isMobile
+                  ? { gridTemplateColumns: "minmax(0, 1fr)" }
+                  : tournament.status === "groups"
+                    ? { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, minmax(0, 1fr))`, gridAutoRows: "1fr" }
+                    : { gridTemplateColumns: `repeat(${Math.min(groupCols, tournament.num_groups)}, max-content)`, zoom: groupsScale }
               }
             >
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
@@ -817,7 +837,7 @@ export default function TournamentView() {
                         )}
                       </div>
 
-                      <div className="flex-1 flex flex-col min-h-0">
+                      <div className="flex-1 flex flex-col min-h-0 overflow-x-auto">
                         <table className="border-collapse text-sm font-display w-full flex-1">
                           <thead>
                             <tr>
@@ -963,7 +983,7 @@ export default function TournamentView() {
             )}
 
             {tournament.status !== "groups" && (
-              <div className="self-stretch flex-shrink-0 w-14 flex flex-col gap-2">
+              <div className={`flex-shrink-0 flex gap-2 ${isMobile ? "w-full flex-row h-12" : "self-stretch w-14 flex-col"}`}>
                 <button
                   onClick={() => nudgeGroupsScale(0.1)}
                   disabled={groupsScale >= 2}
@@ -985,7 +1005,7 @@ export default function TournamentView() {
                   aria-label={showFullGroups ? "Back to compact groups" : "Show full group scores"}
                 >
                   {showFullGroups ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
-                  <span className="text-[10px] font-display font-bold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                  <span className={`text-[10px] font-display font-bold uppercase tracking-widest ${isMobile ? "" : "[writing-mode:vertical-rl] rotate-180"}`}>
                     {showFullGroups ? "Compact" : "Full groups"}
                   </span>
                 </button>
@@ -1007,11 +1027,11 @@ export default function TournamentView() {
                   // Layout width changes underneath the scroll position; go back to the start.
                   setTimeout(() => fitOuterRef.current?.scrollTo({ left: 0, behavior: "smooth" }), 50);
                 }}
-                className="self-stretch flex-shrink-0 w-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-2 text-violet-600 active:bg-violet-50"
+                className={`flex-shrink-0 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center gap-2 text-violet-600 active:bg-violet-50 ${isMobile ? "w-full h-12 flex-row" : "self-stretch w-14 flex-col"}`}
                 aria-label={compactKnockout ? "Show full knockout bracket" : "Compact the knockout bracket"}
               >
                 {compactKnockout ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
-                <span className="text-[10px] font-display font-bold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">
+                <span className={`text-[10px] font-display font-bold uppercase tracking-widest ${isMobile ? "" : "[writing-mode:vertical-rl] rotate-180"}`}>
                   {compactKnockout ? "Full knockout" : "Compact"}
                 </span>
               </button>
@@ -1020,7 +1040,7 @@ export default function TournamentView() {
             <div
               ref={knockoutRef}
               className={`flex flex-col justify-center gap-4 flex-shrink-0 self-stretch scroll-mx-5
-                ${tournament.status === "groups" ? "w-max" : "flex-1 min-w-[760px]"}`}
+                ${isMobile ? "w-full min-w-0" : tournament.status === "groups" ? "w-max" : "flex-1 min-w-[760px]"}`}
             >
               {tournament.status === "groups" && (() => {
                 // Round 1 slots track the live standings: whoever leads each group right now is
