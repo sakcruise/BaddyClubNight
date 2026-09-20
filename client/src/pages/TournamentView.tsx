@@ -120,6 +120,8 @@ export default function TournamentView() {
   const [showWinners, setShowWinners] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
+  // Which group-stage cell has its court chooser open.
+  const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
   const [showKnockoutConfig, setShowKnockoutConfig] = useState(false);
   const [knockoutConfig, setKnockoutConfig] = useState({ qf: 11, sf: 13, f: 15 });
   // Operator-reviewed knockout field. Seeded from selectQualifiers when the dialog opens;
@@ -346,8 +348,6 @@ export default function TournamentView() {
   const KNOCKOUT_COURTS = 3;
   const stageCourts = tournament?.status === "groups" ? courts : courts.filter((c) => c.id <= KNOCKOUT_COURTS);
   const idleCourts = stageCourts.filter((c) => c.status === "idle");
-  // Which group-stage cell has its court chooser open.
-  const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
 
   // Send as many pending group matches to free courts as possible: one court at a
   // time, cycling through the groups so no group hogs the hall, never putting a
