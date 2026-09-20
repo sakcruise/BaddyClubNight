@@ -10,6 +10,7 @@ export interface Member {
   member_type: MemberType;
   level: number;          // 1..MAX_LEVEL, see LEVEL_LABELS
   active?: boolean;       // false = archived: hidden from rosters, kept for history
+  rank?: number | null;   // club strength order, 1 = strongest; breaks ties within a level
   created_at: string;
 }
 

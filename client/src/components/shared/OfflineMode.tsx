@@ -76,6 +76,7 @@ export default function OfflineMode() {
           member_type: m.member_type ?? "male",
           level: m.level ?? 2,
           active: m.active ?? true,
+          rank: m.rank ?? null,
           created_at: m.created_at,
         })));
       }

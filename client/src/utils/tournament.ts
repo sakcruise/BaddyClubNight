@@ -7,6 +7,10 @@ function byStrength(members: Record<string, Member>) {
   return (aId: string, bId: string) => {
     const diff = lvl(bId, members) - lvl(aId, members);
     if (diff !== 0) return diff;
+    // Same level: club rank decides (1 = strongest); unranked players sort after ranked ones.
+    const rA = members[aId]?.rank ?? Number.POSITIVE_INFINITY;
+    const rB = members[bId]?.rank ?? Number.POSITIVE_INFINITY;
+    if (rA !== rB) return rA - rB;
     const nameA = members[aId]?.name ?? aId;
     const nameB = members[bId]?.name ?? bId;
     return nameA === nameB ? aId.localeCompare(bId) : nameA.localeCompare(nameB);

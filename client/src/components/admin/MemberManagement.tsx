@@ -32,6 +32,7 @@ export default function MemberManagement() {
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState<MemberType>("male");
   const [editLevel, setEditLevel] = useState(2);
+  const [editRank, setEditRank] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
@@ -88,17 +89,20 @@ export default function MemberManagement() {
     }
   }
 
-  function startEdit(id: string, name: string, type: MemberType, level: number) {
+  function startEdit(id: string, name: string, type: MemberType, level: number, rank: number | null | undefined) {
     setEditingId(id);
     setEditName(name);
     setEditType(type);
     setEditLevel(level);
+    setEditRank(rank == null ? "" : String(rank));
   }
 
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
-    await membersApi.update(id, { name: editName.trim(), member_type: editType, level: editLevel });
-    updateMember(id, { name: editName.trim(), member_type: editType, level: editLevel });
+    const rank = editRank.trim() === "" ? null : Math.max(1, parseInt(editRank, 10) || 1);
+    const patch = { name: editName.trim(), member_type: editType, level: editLevel, rank };
+    await membersApi.update(id, patch);
+    updateMember(id, patch);
     setEditingId(null);
   }
 
@@ -242,6 +246,22 @@ export default function MemberManagement() {
                     </div>
                     <p className="text-[10px] text-gray-400 font-display mt-0.5 text-center">{LEVEL_LABELS[editLevel]}</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-display font-bold text-gray-500 uppercase tracking-wider mb-1">Club rank</p>
+                      <input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={editRank}
+                        onChange={(e) => setEditRank(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && saveEdit(member.id)}
+                        placeholder="Unranked"
+                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-1.5 font-body text-sm tabular-nums focus:outline-none focus:border-orange-400"
+                      />
+                    </div>
+                    <p className="flex-1 text-[10px] font-body text-gray-400 leading-snug">1 = strongest. Breaks ties between players on the same level when drafting.</p>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => saveEdit(member.id)}
@@ -272,12 +292,16 @@ export default function MemberManagement() {
                       </span>
                       <span className={`text-[10px] font-display font-bold px-1.5 py-0.5 rounded-md border
                         ${LEVEL_COLORS[member.level ?? 2]}`}>
-                        L{member.level ?? 2}
+                        L{member.level ?? 2} · {LEVEL_LABELS[member.level ?? 2]}
+                      </span>
+                      <span className={`text-[10px] font-display font-bold px-1.5 py-0.5 rounded-md border tabular-nums
+                        ${member.rank != null ? "bg-gray-100 text-gray-700 border-gray-200" : "bg-white text-gray-300 border-dashed border-gray-200"}`}>
+                        {member.rank != null ? `#${member.rank}` : "unranked"}
                       </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => startEdit(member.id, member.name, member.member_type, member.level ?? 2)}
+                    onClick={() => startEdit(member.id, member.name, member.member_type, member.level ?? 2, member.rank)}
                     className="p-2 rounded-xl text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors"
                   >
                     <Pencil size={14} />
