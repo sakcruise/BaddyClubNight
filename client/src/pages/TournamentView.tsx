@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import MemberManagement from "../components/admin/MemberManagement";
 import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessionArchiveStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
 import type { TournamentChampion } from "../services/tournaments";
@@ -12,7 +13,7 @@ import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
 import TournamentTicker from "../components/tournament/TournamentTicker";
 import TournamentStats from "../components/tournament/TournamentStats";
-import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight, Maximize2, Minimize2, WifiOff } from "lucide-react";
+import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight, Maximize2, Minimize2, WifiOff, Users, X } from "lucide-react";
 import { isOffline } from "../services/api";
 
 // Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
@@ -117,6 +118,7 @@ export default function TournamentView() {
   const [champions, setChampions] = useState<TournamentChampion[]>([]);
   const [showWinners, setShowWinners] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showRoster, setShowRoster] = useState(false);
 
   // Browser full-screen for the wall/touch display.
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -660,6 +662,13 @@ export default function TournamentView() {
             <WifiOff size={14} /> Offline — saved on this device
           </span>
         )}
+        <button
+          onClick={() => setShowRoster(true)}
+          title="Club roster - levels, ranks, archive"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-semibold hover:bg-gray-100 transition-all"
+        >
+          <Users size={14} /> Roster
+        </button>
         <button
           onClick={toggleFullscreen}
           title={isFullscreen ? "Exit full screen" : "Full screen"}
@@ -1219,6 +1228,33 @@ export default function TournamentView() {
         />
       )}
 
+
+      <AnimatePresence>
+        {showRoster && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/40 z-40"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowRoster(false)}
+            />
+            <motion.div
+              className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl flex flex-col"
+              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <span className="font-display font-bold text-gray-900 text-lg">Club Roster</span>
+                <button onClick={() => setShowRoster(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500" aria-label="Close roster">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <MemberManagement />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {showExitConfirm && (
         <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-6">
