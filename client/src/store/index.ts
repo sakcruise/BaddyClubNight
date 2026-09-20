@@ -4,6 +4,7 @@ import type {
   Session, Court, QueuePosition, Match, Member, PickerState, SyncState,
   Group, GroupMember, MemberType, PitstopState,
   Tournament, TournamentPlayer, TournamentFixture,
+  MembershipDue, SessionFee,
 } from "../types";
 import { normalisePositions } from "../utils/queueLogic";
 import { v4 as uuid } from "uuid";
@@ -53,6 +54,8 @@ export interface ClubConfig {
   shuttleBudgetTubes: number;  // tubes budgeted per night, e.g. 10
   autoPickEnabled: boolean;    // auto-pick players when court is free
   autoPickMode: "balanced" | "competitive"; // balanced = mix levels, competitive = group levels
+  membershipFeeDefault: number; // £ per billing period, prefilled when creating a period
+  sessionFeeDefault: number;    // £ per player per night, prefilled when generating session fees
 }
 
 interface SessionStore {
@@ -80,6 +83,8 @@ const defaultClubConfig: ClubConfig = {
   shuttleBudgetTubes: 10,
   autoPickEnabled: false,
   autoPickMode: "balanced",
+  membershipFeeDefault: 30,
+  sessionFeeDefault: 5,
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -495,5 +500,34 @@ export const useTournamentStore = create<TournamentStore>()(
         set((s) => ({ fixtures: s.fixtures.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
     }),
     { name: "tournament-store" }
+  )
+);
+
+// ─── Payment Store ────────────────────────────────────────────────────────────
+// Cache of Supabase rows only — payments has no offline mode, Supabase is the
+// source of truth and PaymentsPanel reloads on open.
+
+interface PaymentStore {
+  dues: Record<string, MembershipDue>;
+  sessionFees: Record<string, SessionFee>;
+  setDues: (rows: MembershipDue[]) => void;
+  upsertDues: (rows: MembershipDue[]) => void;
+  setSessionFees: (rows: SessionFee[]) => void;
+  upsertSessionFees: (rows: SessionFee[]) => void;
+}
+
+const byId = <T extends { id: string }>(rows: T[]) => Object.fromEntries(rows.map((r) => [r.id, r]));
+
+export const usePaymentStore = create<PaymentStore>()(
+  persist(
+    (set) => ({
+      dues: {},
+      sessionFees: {},
+      setDues: (rows) => set({ dues: byId(rows) }),
+      upsertDues: (rows) => set((s) => ({ dues: { ...s.dues, ...byId(rows) } })),
+      setSessionFees: (rows) => set({ sessionFees: byId(rows) }),
+      upsertSessionFees: (rows) => set((s) => ({ sessionFees: { ...s.sessionFees, ...byId(rows) } })),
+    }),
+    { name: "payment-store" }
   )
 );

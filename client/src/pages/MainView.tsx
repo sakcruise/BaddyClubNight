@@ -13,14 +13,15 @@ import LiveCommentary from "../components/shared/LiveCommentary";
 import EndNightCheers from "../components/shared/EndNightCheers";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
+import PaymentsPanel from "../components/admin/PaymentsPanel";
 import GroupSettings from "../components/groups/GroupSettings";
 import GroupMemberManager from "../components/groups/GroupMemberManager";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
 import { groupsApi } from "../services/groups";
-import { X, Users, Cog, LogOut, History, LayoutGrid, Trophy, Menu, Maximize2, Minimize2 } from "lucide-react";
+import { X, Users, Cog, LogOut, History, LayoutGrid, Trophy, Menu, Maximize2, Minimize2, Wallet } from "lucide-react";
 
-type Drawer = "members" | "settings" | "menu" | null;
+type Drawer = "members" | "settings" | "payments" | "menu" | null;
 type MobileTab = "live" | "checkins" | "leaderboard";
 
 export default function MainView() {
@@ -309,6 +310,13 @@ export default function MainView() {
                 ${drawer === "settings" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
               <Cog size={13} /> Settings
             </button>
+            {!session.group_id && (
+              <button onClick={() => setDrawer(drawer === "payments" ? null : "payments")}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-display font-bold transition-all
+                  ${drawer === "payments" ? "bg-white text-orange-600" : "bg-white/15 text-white hover:bg-white/25 border border-white/20"}`}>
+                <Wallet size={13} /> Payments
+              </button>
+            )}
             <button onClick={toggleFullscreen}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/15 border border-white/20
                 text-white text-xs font-display font-bold hover:bg-white/25 active:scale-95 transition-all"
@@ -536,7 +544,10 @@ export default function MainView() {
 
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <span className="font-display font-black text-gray-900 text-lg">
-                  {drawer === "members" ? (session.group_id ? "Members" : "Club Roster") : drawer === "settings" ? (session.group_id ? "Settings" : "Club Settings") : "Menu"}
+                  {drawer === "members" ? (session.group_id ? "Members" : "Club Roster")
+                    : drawer === "settings" ? (session.group_id ? "Settings" : "Club Settings")
+                    : drawer === "payments" ? "Payments"
+                    : "Menu"}
                 </span>
                 <button onClick={() => setDrawer(null)}
                   className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
@@ -566,6 +577,12 @@ export default function MainView() {
                     className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
                     <Cog size={18} className="text-orange-500" /> Settings
                   </button>
+                  {!session.group_id && (
+                    <button onClick={() => setDrawer("payments")}
+                      className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                      <Wallet size={18} className="text-orange-500" /> Payments
+                    </button>
+                  )}
                   <button onClick={handleEndNight} disabled={ending}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-display font-bold text-sm">
                     <LogOut size={18} /> {ending ? "Ending…" : session.group_id ? "End Session" : "End Night"}
@@ -584,6 +601,7 @@ export default function MainView() {
                 {drawer === "settings" && (session.group_id
                   ? <GroupSettings groupId={session.group_id} />
                   : <ClubSettings />)}
+                {drawer === "payments" && !session.group_id && <PaymentsPanel />}
               </div>
             </motion.div>
           </>

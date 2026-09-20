@@ -190,3 +190,36 @@ export interface SyncState {
   status: "idle" | "syncing" | "error";
   error?: string;
 }
+
+// ─── Payments (manual tracking — money moves outside the app) ─────────────────
+
+export type PaymentStatus = "unpaid" | "paid" | "waived";
+export type PaidMethod = "cash" | "bank_transfer" | "upi" | "other";
+
+export interface MembershipDue {
+  id: string;
+  club_id: string;
+  member_id: string;
+  period_label: string;   // admin-defined, e.g. "2026 Q1" or "Sep 2026"
+  period_start: string;   // ISO date
+  period_end: string;     // ISO date
+  amount_due: number;
+  status: PaymentStatus;
+  paid_method: PaidMethod | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface SessionFee {
+  id: string;
+  club_id: string;
+  session_id: string;
+  member_id: string;
+  amount_due: number;
+  status: PaymentStatus;
+  paid_method: PaidMethod | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSessionStore } from "../../store";
-import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag, Zap } from "lucide-react";
+import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag, Zap, Wallet } from "lucide-react";
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
 import OfflineMode from "../shared/OfflineMode";
@@ -230,6 +230,47 @@ export default function ClubSettings() {
             🏸 Budget: {(form as any).shuttleBudgetTubes} tubes × £{parseFloat((form as any).shuttleTubePrice).toFixed(2)} = £{(parseFloat((form as any).shuttleTubePrice) * parseInt((form as any).shuttleBudgetTubes)).toFixed(2)}/night
           </div>
         )}
+      </div>
+
+      {/* Fees */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-emerald-600">
+          <Wallet size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Membership &amp; Session Fees</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Membership Fee (£)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.50"
+              value={form.membershipFeeDefault ?? 30}
+              onChange={(e) => handleChange("membershipFeeDefault", e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                         focus:outline-none focus:border-emerald-400 w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Session Fee (£/player)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.50"
+              value={form.sessionFeeDefault ?? 5}
+              onChange={(e) => handleChange("sessionFeeDefault", e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                         focus:outline-none focus:border-emerald-400 w-full"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 font-body">
+          Prefilled when you create a billing period or generate a night's fees in Payments.
+        </p>
       </div>
 
       {/* Auto-Pick */}

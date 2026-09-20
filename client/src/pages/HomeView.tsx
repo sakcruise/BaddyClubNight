@@ -6,9 +6,15 @@ import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
-import { History, Users, Cog, LogOut, Play, X, BarChart2, Zap, Info, Trophy } from "lucide-react";
+import PaymentsPanel from "../components/admin/PaymentsPanel";
+import { History, Users, Cog, LogOut, Play, X, BarChart2, Zap, Info, Trophy, Wallet } from "lucide-react";
 
-type Panel = "start" | "members" | "settings" | null;
+type Panel = "start" | "members" | "settings" | "payments" | null;
+const PANEL_TITLES: Record<Exclude<Panel, "start" | null>, string> = {
+  members: "Club Roster",
+  settings: "Club Settings",
+  payments: "Payments",
+};
 
 export default function HomeView() {
   const navigate = useNavigate();
@@ -282,11 +288,12 @@ export default function HomeView() {
           </motion.button>
 
           {/* Secondary options */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {[
               { icon: History,   label: "History",   action: () => navigate("/history") },
               { icon: BarChart2, label: "Analytics", action: () => navigate("/analytics") },
               { icon: Users,     label: "Members",   action: () => setPanel(panel === "members" ? null : "members") },
+              { icon: Wallet,    label: "Payments",  action: () => setPanel(panel === "payments" ? null : "payments") },
               { icon: Cog,       label: "Settings",  action: () => setPanel(panel === "settings" ? null : "settings") },
             ].map(({ icon: Icon, label, action }) => (
               <motion.button
@@ -306,7 +313,7 @@ export default function HomeView() {
 
       {/* Slide-over for Members / Settings */}
       <AnimatePresence>
-        {(panel === "members" || panel === "settings") && (
+        {panel && panel !== "start" && (
           <>
             <motion.div className="fixed inset-0 bg-black/40 z-40"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -318,7 +325,7 @@ export default function HomeView() {
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <span className="font-display font-black text-gray-900 text-lg">
-                  {panel === "members" ? "Club Roster" : "Club Settings"}
+                  {PANEL_TITLES[panel]}
                 </span>
                 <button onClick={() => setPanel(null)}
                   className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
@@ -328,6 +335,7 @@ export default function HomeView() {
               <div className="flex-1 overflow-y-auto p-4">
                 {panel === "members" && <MemberManagement />}
                 {panel === "settings" && <ClubSettings />}
+                {panel === "payments" && <PaymentsPanel />}
               </div>
             </motion.div>
           </>

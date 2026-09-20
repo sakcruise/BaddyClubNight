@@ -21,7 +21,7 @@ export function isOffline(): boolean {
 }
 
 // ─── Helper: get current club's user id ───────────────────────────────────────
-async function getClubId(): Promise<string> {
+export async function getClubId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   return user.id;
@@ -40,7 +40,7 @@ async function ownerScope(): Promise<{ group_id: string } | { club_id: string }>
 }
 
 // ─── Helper: throw on Supabase error ─────────────────────────────────────────
-function check<T>(data: T | null, error: any): T {
+export function check<T>(data: T | null, error: any): T {
   if (error) throw new Error(error.message ?? "Supabase error");
   if (data === null) throw new Error("No data returned");
   return data;
