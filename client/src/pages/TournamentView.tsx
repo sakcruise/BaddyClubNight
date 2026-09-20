@@ -289,12 +289,20 @@ export default function TournamentView() {
         if (bestCols !== groupCols && bestFit > currentFit * 1.03) setGroupCols(bestCols);
       }
     };
-    recompute();
-    const ro = new ResizeObserver(recompute);
+    // Coalesce to one measurement per frame. The observer only watches the viewport
+    // (outer): watching the board itself fed back into the zoom/min-width it sets,
+    // which oscillated visibly when a card changed size (e.g. Play on a knockout match).
+    let raf = 0;
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(recompute);
+    };
+    schedule();
+    const ro = new ResizeObserver(schedule);
     ro.observe(outer);
-    ro.observe(inner);
-    return () => ro.disconnect();
-  }, [tournament?.id, tournament?.status, groupCols, isMobile]);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+    // Content changes (fixtures/matches/standings) re-run this via the deps below.
+  }, [tournament?.id, tournament?.status, groupCols, isMobile, fixtures, matches, standingsByGroup, compactKnockout, showFullGroups, groupsScale]);
 
   // Once the bracket exists, slide it into view so the operator lands on the knockout, not the group scores.
   const knockoutRef = useRef<HTMLDivElement>(null);
