@@ -209,7 +209,7 @@ export const membersApi = {
   list: async () => {
     if (isOffline()) {
       const members = Object.values(useMemberStore.getState().members).filter(
-        (m) => m.member_type !== "guest"
+        (m) => m.member_type !== "guest" && m.active !== false
       );
       return { members };
     }
