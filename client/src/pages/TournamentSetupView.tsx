@@ -63,6 +63,14 @@ export default function TournamentSetupView() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
+  // Rank order (1 = strongest) is the default on the door so the organiser can see the
+  // field's strength at a glance; toggle off for plain A–Z with no numbers showing.
+  const [showRanks, setShowRanks] = useState(() => localStorage.getItem("checkin-show-ranks") !== "0");
+  function toggleShowRanks() {
+    setShowRanks((v) => { localStorage.setItem("checkin-show-ranks", v ? "0" : "1"); return !v; });
+  }
+  const byRankThenName = (a: { rank?: number | null; name: string }, b: { rank?: number | null; name: string }) =>
+    (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.name.localeCompare(b.name);
   const [guestName, setGuestName] = useState("");
   const [guestLevel, setGuestLevel] = useState(2);
   const [showGuestForm, setShowGuestForm] = useState(false);
@@ -83,8 +91,8 @@ export default function TournamentSetupView() {
 
   const selected = useMemo(() => new Set(queue.map((q) => q.member_id).filter((id) => members[id])), [queue, members]);
   const checkedIn = useMemo(
-    () => Array.from(selected).map((id) => members[id]).sort((a, b) => a.name.localeCompare(b.name)),
-    [selected, members]
+    () => Array.from(selected).map((id) => members[id]).sort(showRanks ? byRankThenName : (a, b) => a.name.localeCompare(b.name)),
+    [selected, members, showRanks]
   );
   const notYet = useMemo(
     () =>
@@ -92,8 +100,8 @@ export default function TournamentSetupView() {
         .filter((m) => !selected.has(m.id) && m.member_type !== "guest" && m.active !== false)
         .filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
         .filter((m) => !letter || m.name.trim().toUpperCase().startsWith(letter))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [members, selected, search, letter]
+        .sort(showRanks ? byRankThenName : (a, b) => a.name.localeCompare(b.name)),
+    [members, selected, search, letter, showRanks]
   );
   const activeTotal = useMemo(
     () => Object.values(members).filter((m) => m.member_type !== "guest" && m.active !== false).length + checkedIn.filter((m) => m.member_type === "guest").length,
@@ -420,6 +428,13 @@ export default function TournamentSetupView() {
                   <UserCheck size={14} className="text-emerald-600" />
                   <p className="text-[11px] font-display font-black text-emerald-600 uppercase tracking-widest">Checked in</p>
                   <span className="text-[11px] font-display text-gray-400">— tap to check out</span>
+                  <button
+                    onClick={toggleShowRanks}
+                    className={`ml-auto h-8 px-3 rounded-lg text-[11px] font-display font-bold transition-colors
+                      ${showRanks ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"}`}
+                  >
+                    {showRanks ? "Ranks on" : "Ranks off"}
+                  </button>
                 </div>
                 <motion.div layout className="grid gap-2 min-h-[56px] p-2 rounded-2xl bg-emerald-50/60 border border-emerald-100" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
                   <AnimatePresence initial={false}>
@@ -443,6 +458,9 @@ export default function TournamentSetupView() {
                           </span>
                         </span>
                         <span>{m.name}</span>
+                        {showRanks && m.rank != null && (
+                          <span className="ml-auto text-[11px] font-display font-bold tabular-nums text-gray-400">#{m.rank}</span>
+                        )}
                       </motion.button>
                     ))}
                   </AnimatePresence>
@@ -495,6 +513,9 @@ export default function TournamentSetupView() {
                       >
                         <Avatar name={m.name} url={m.avatar_url} memberType={m.member_type} size="sm" />
                         <span>{m.name}</span>
+                        {showRanks && m.rank != null && (
+                          <span className="ml-auto text-[11px] font-display font-bold tabular-nums text-gray-400">#{m.rank}</span>
+                        )}
                       </motion.button>
                     ))}
                   </AnimatePresence>
