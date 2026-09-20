@@ -261,6 +261,29 @@ export const membersApi = {
     return { member: rowToMember(check(data, error)) };
   },
 
+  /** Put a member at `rank` in the club order and close the gap: everyone from
+   * that position down moves one place (or up, if they were moving down the
+   * list). Ranks stay a clean 1..n with no duplicates. `null` unranks them. */
+  setRank: async (id: string, rank: number | null) => {
+    const all = Object.values(useMemberStore.getState().members);
+    const ranked = all
+      .filter((m) => m.id !== id && m.rank != null && m.member_type !== "guest" && m.active !== false)
+      .sort((a, b) => (a.rank as number) - (b.rank as number));
+    const order = ranked.map((m) => m.id);
+    if (rank != null) order.splice(Math.min(Math.max(1, rank), order.length + 1) - 1, 0, id);
+    const next = new Map(order.map((mid, i) => [mid, i + 1]));
+    if (rank == null) next.set(id, null as unknown as number);
+    const changes = all
+      .filter((m) => next.has(m.id) && (m.rank ?? null) !== (next.get(m.id) ?? null))
+      .map((m) => ({ id: m.id, rank: next.get(m.id) ?? null }));
+    if (isOffline()) {
+      changes.forEach((c) => useMemberStore.getState().updateMember(c.id, { rank: c.rank }));
+      return { changes };
+    }
+    await Promise.all(changes.map((c) => supabase.from("members").update({ rank: c.rank }).eq("id", c.id)));
+    return { changes };
+  },
+
   delete: async (id: string) => {
     if (isOffline()) {
       useMemberStore.getState().deleteMember(id);

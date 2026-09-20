@@ -127,9 +127,14 @@ export default function MemberManagement() {
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
     const rank = editRank.trim() === "" ? null : Math.max(1, parseInt(editRank, 10) || 1);
-    const patch = { name: editName.trim(), member_type: editType, level: editLevel, rank };
+    const patch = { name: editName.trim(), member_type: editType, level: editLevel };
     await membersApi.update(id, patch);
     updateMember(id, patch);
+    if ((members[id]?.rank ?? null) !== rank) {
+      // Re-sequence the whole club order so nobody shares a rank.
+      const { changes } = await membersApi.setRank(id, rank);
+      changes.forEach((c) => updateMember(c.id, { rank: c.rank }));
+    }
     setEditingId(null);
   }
 
