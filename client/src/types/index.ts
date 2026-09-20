@@ -77,6 +77,12 @@ export type TournamentStatus = "groups" | "knockout" | "complete";
 export type FixtureStage = "group" | "knockout";
 export type FixtureStatus = "pending" | "active" | "complete";
 
+export interface KnockoutRoundConfig {
+  qf: number; // Quarter-Final points to play
+  sf: number; // Semi-Final points to play
+  f: number;  // Final points to play
+}
+
 export interface Tournament {
   id: string;
   session_id: string;
@@ -84,6 +90,7 @@ export interface Tournament {
   num_groups: number;
   advance_per_group: number;
   status: TournamentStatus;
+  knockout_config?: KnockoutRoundConfig;
   created_at: string;
 }
 

@@ -119,6 +119,8 @@ export default function TournamentView() {
   const [showWinners, setShowWinners] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
+  const [showKnockoutConfig, setShowKnockoutConfig] = useState(false);
+  const [knockoutConfig, setKnockoutConfig] = useState({ qf: 11, sf: 13, f: 15 });
 
   // Browser full-screen for the wall/touch display.
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -328,7 +330,55 @@ export default function TournamentView() {
   const allGroupFixturesComplete = fixtures
     .filter((f) => f.stage === "group")
     .every((f) => f.status === "complete");
-  const idleCourts = courts.filter((c) => c.status === "idle");
+  // Round robin spreads over all six courts; the knockout is played on courts 1–3 only.
+  const KNOCKOUT_COURTS = 3;
+  const stageCourts = tournament?.status === "groups" ? courts : courts.filter((c) => c.id <= KNOCKOUT_COURTS);
+  const idleCourts = stageCourts.filter((c) => c.status === "idle");
+  // Which group-stage cell has its court chooser open.
+  const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
+
+  // Live matches can be moved to another court (someone's already on the one we sent them to).
+  async function handleMoveCourt(fixture: TournamentFixture, courtId: number) {
+    const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
+    if (!match || match.court_id === courtId) { setCourtPickerFor(null); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      const { match: moved } = await matchesApi.moveCourt(match.id, courtId);
+      updateCourtStatus(match.court_id, "idle");
+      updateCourtStatus(courtId, "playing", moved.id);
+      setCourtPickerFor(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not move that match");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Compact court chooser shown inside a group cell: one chip per court, free ones bold.
+  function CourtChips({ current, onPick }: { current?: number; onPick: (courtId: number) => void }) {
+    return (
+      <div className="flex flex-wrap justify-center gap-1 py-1">
+        {[...stageCourts].sort((a, b) => a.id - b.id).map((c) => {
+          const free = c.status === "idle";
+          const isCurrent = c.id === current;
+          return (
+            <button
+              key={c.id}
+              onClick={(e) => { e.stopPropagation(); onPick(c.id); }}
+              disabled={busy || isCurrent}
+              title={free ? `Court ${c.id} — free` : `Court ${c.id} — in use`}
+              className={`min-w-[34px] h-8 px-1.5 rounded-lg font-display font-bold text-xs tabular-nums transition-all active:scale-95
+                ${isCurrent ? "bg-violet-600 text-white" : free ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+            >
+              C{c.id}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   function findGroupFixture(g: number, a: [string, string], b: [string, string]) {
     return fixtures.find(
@@ -341,20 +391,11 @@ export default function TournamentView() {
     );
   }
 
-  // Each group plays out on its own court for the whole tournament (Group 1 ->
-  // court 1, Group 2 -> court 2, ...), so group-stage fixtures never need a
-  // court picker — wrapping if there are fewer courts than groups.
+  // Group N's "home" court (Group 1 -> court 1, ...) is only a hint on the Play
+  // button; the operator picks the actual court per match.
   const sortedCourts = [...courts].sort((a, b) => a.id - b.id);
   function courtForGroup(g: number) {
     return sortedCourts.length > 0 ? sortedCourts[g % sortedCourts.length] : undefined;
-  }
-
-  // Always launches: the group's own court, no busy check. Courts here are just labels —
-  // the operator decides who's actually on which court.
-  function handlePlayGroupFixture(g: number, fixture: TournamentFixture) {
-    const court = courtForGroup(g);
-    if (!court) { setError("No courts are set up for this session."); return; }
-    handleLaunch(fixture, court.id);
   }
 
   async function handleLaunch(fixture: TournamentFixture, courtId: number) {
@@ -395,6 +436,17 @@ export default function TournamentView() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Group matches are sudden death to 11. Knockout rounds play to whatever the
+  // operator set when generating the bracket (QF / SF / Final).
+  function targetPointsFor(fixture: TournamentFixture): number {
+    if (fixture.stage === "group") return 11;
+    const cfg = tournament?.knockout_config ?? { qf: 11, sf: 13, f: 15 };
+    const roundSize = fixtures.filter((f) => f.stage === "knockout" && f.round === fixture.round).length;
+    if (roundSize === 1) return cfg.f;
+    if (roundSize === 2) return cfg.sf;
+    return cfg.qf;
   }
 
   async function handleResetFixture(fixture: TournamentFixture) {
@@ -488,8 +540,9 @@ export default function TournamentView() {
     if (!id) return;
     setBusy(true);
     setError(null);
+    setShowKnockoutConfig(false);
     try {
-      await tournamentsApi.generateKnockout(id);
+      await tournamentsApi.generateKnockout(id, knockoutConfig);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not generate the bracket");
@@ -963,6 +1016,7 @@ export default function TournamentView() {
                                           >
                                             <span className={`text-[9px] font-black uppercase rounded px-1 py-0.5 ${won ? "bg-emerald-500 text-white" : "bg-gray-200 text-gray-600"}`}>{won ? "W" : "L"}</span>
                                             {own}<span className="text-gray-300 font-normal">–</span>{opp}
+                                            <span className="text-[9px] font-body font-normal text-gray-400">C{match.court_id}</span>
                                           </motion.button>
                                           <button
                                             onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
@@ -976,20 +1030,38 @@ export default function TournamentView() {
                                     }
 
                                     if (fixture.status === "active") {
+                                      const pickingCourt = courtPickerFor === fixture.id;
                                       return (
                                         <td key={ci} className="group relative border-b border-gray-100 text-center p-1.5">
-                                          <button
-                                            onClick={() => setScoringFixture(fixture)}
-                                            title="Tap to enter score"
-                                            className="w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-lg py-2 bg-amber-100 border border-amber-300 text-amber-800 hover:bg-amber-200 transition-colors"
-                                          >
-                                            <motion.span
-                                              animate={{ opacity: [1, 0.3, 1] }}
-                                              transition={{ repeat: Infinity, duration: 1.2 }}
-                                              className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"
-                                            />
-                                            <span className="text-[10px] font-display font-bold uppercase tracking-wide">Live</span>
-                                          </button>
+                                          {pickingCourt ? (
+                                            <div className="rounded-lg border border-violet-200 bg-violet-50 px-1">
+                                              <span className="block text-[9px] font-display font-bold uppercase tracking-wide text-violet-500 pt-1">Move to</span>
+                                              <CourtChips current={match?.court_id} onPick={(cid) => handleMoveCourt(fixture, cid)} />
+                                              <button onClick={() => setCourtPickerFor(null)} className="text-[10px] font-display font-semibold text-gray-400 pb-1">Cancel</button>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-stretch gap-1">
+                                              <button
+                                                onClick={() => setScoringFixture(fixture)}
+                                                title="Tap to enter score"
+                                                className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-lg py-2 bg-amber-100 border border-amber-300 text-amber-800 hover:bg-amber-200 transition-colors"
+                                              >
+                                                <motion.span
+                                                  animate={{ opacity: [1, 0.3, 1] }}
+                                                  transition={{ repeat: Infinity, duration: 1.2 }}
+                                                  className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"
+                                                />
+                                                <span className="text-[10px] font-display font-bold uppercase tracking-wide">Live</span>
+                                              </button>
+                                              <button
+                                                onClick={() => setCourtPickerFor(fixture.id)}
+                                                title="Change court"
+                                                className="min-w-[34px] rounded-lg border border-amber-300 bg-white text-amber-800 font-display font-bold text-xs tabular-nums hover:bg-amber-50"
+                                              >
+                                                C{match?.court_id ?? "?"}
+                                              </button>
+                                            </div>
+                                          )}
                                           <button
                                             onClick={(e) => { e.stopPropagation(); handleResetFixture(fixture); }}
                                             title="Reset match"
@@ -1006,15 +1078,25 @@ export default function TournamentView() {
                                       <td key={ci} className="border-b border-gray-100 text-center p-1.5">
                                         {isBye ? (
                                           <span className="block py-1.5 text-[10px] text-gray-300 font-display font-semibold">bye</span>
+                                        ) : courtPickerFor === fixture.id ? (
+                                          <div className="rounded-lg border border-violet-200 bg-violet-50 px-1">
+                                            <span className="block text-[9px] font-display font-bold uppercase tracking-wide text-violet-500 pt-1">Send to</span>
+                                            <CourtChips onPick={(cid) => { setCourtPickerFor(null); handleLaunch(fixture, cid); }} />
+                                            <button onClick={() => setCourtPickerFor(null)} className="text-[10px] font-display font-semibold text-gray-400 pb-1">Cancel</button>
+                                          </div>
                                         ) : (
                                           <button
-                                            onClick={() => handlePlayGroupFixture(g, fixture)}
+                                            onClick={() => setCourtPickerFor(fixture.id)}
                                             disabled={busy}
+                                            title={courtForGroup(g) ? `Usually court ${courtForGroup(g)!.id}` : undefined}
                                             className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2 bg-violet-100 border border-violet-300 text-violet-800
                                                        active:bg-violet-200 active:scale-95 transition-all disabled:opacity-50"
                                           >
                                             <Play size={10} className="flex-shrink-0" />
                                             <span className="text-[10px] font-display font-semibold">Play</span>
+                                            {idleCourts.length > 0 && (
+                                              <span className="text-[9px] font-body text-violet-500">· {idleCourts.length} free</span>
+                                            )}
                                           </button>
                                         )}
                                       </td>
@@ -1181,7 +1263,7 @@ export default function TournamentView() {
                         Some group matches are still to play — generating now seeds the bracket from the current standings.
                       </p>
                     )}
-                    <Button size="lg" fullWidth disabled={busy} onClick={handleGenerateKnockout}>
+                    <Button size="lg" fullWidth disabled={busy} onClick={() => setShowKnockoutConfig(true)}>
                       <Trophy size={18} /> Generate Knockout
                     </Button>
                   </section>
@@ -1223,6 +1305,7 @@ export default function TournamentView() {
       {scoringFixture?.match_id && (
         <ScoreEntry
           matchId={scoringFixture.match_id}
+          targetPoints={targetPointsFor(scoringFixture)}
           onClose={() => setScoringFixture(null)}
           onSaved={() => handleScoreSaved(scoringFixture)}
         />
@@ -1337,6 +1420,53 @@ export default function TournamentView() {
               </Button>
               <Button size="lg" fullWidth disabled={busy} onClick={finishTournament}>
                 Finish · Back to Home
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showKnockoutConfig && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 flex flex-col gap-6"
+          >
+            <div>
+              <h2 className="font-display font-black text-2xl text-gray-900">Knockout Rounds</h2>
+              <p className="text-sm text-gray-500 mt-1">How many points to play for each round?</p>
+            </div>
+
+            <div className="grid gap-4">
+              {[
+                { key: "qf", label: "Quarter-Final", icon: "🥉" },
+                { key: "sf", label: "Semi-Final", icon: "🥈" },
+                { key: "f", label: "Final", icon: "🥇" },
+              ].map(({ key, label, icon }) => (
+                <div key={key} className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{icon}</span>
+                    <span className="font-display font-bold text-gray-800">{label}</span>
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    max={21}
+                    value={knockoutConfig[key as keyof typeof knockoutConfig]}
+                    onChange={(e) => setKnockoutConfig((prev) => ({ ...prev, [key]: parseInt(e.target.value, 10) || 11 }))}
+                    className="w-16 text-center font-display font-black text-lg border border-gray-200 rounded-xl py-2 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="ghost" fullWidth onClick={() => setShowKnockoutConfig(false)}>
+                Cancel
+              </Button>
+              <Button fullWidth disabled={busy} onClick={handleGenerateKnockout}>
+                Start Knockout →
               </Button>
             </div>
           </motion.div>

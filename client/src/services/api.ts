@@ -704,6 +704,21 @@ export const matchesApi = {
     return { match: rowToMatch(check(data, error)) };
   },
 
+  moveCourt: async (matchId: string, court_id: number) => {
+    if (isOffline()) {
+      useMatchStore.getState().updateMatch(matchId, { court_id });
+      const match = useMatchStore.getState().matches.find((m) => m.id === matchId)!;
+      return { match };
+    }
+    const { data, error } = await supabase
+      .from("matches")
+      .update({ court_id })
+      .eq("id", matchId)
+      .select()
+      .single();
+    return { match: rowToMatch(check(data, error)) };
+  },
+
   updateTeams: async (matchId: string, team_a: [string, string], team_b: [string, string]) => {
     if (isOffline()) {
       useMatchStore.getState().updateMatch(matchId, { team_a, team_b });

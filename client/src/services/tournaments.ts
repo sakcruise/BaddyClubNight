@@ -51,6 +51,7 @@ function rowToTournament(t: any): Tournament {
     num_groups: t.num_groups,
     advance_per_group: t.advance_per_group,
     status: t.status,
+    knockout_config: t.knockout_config ?? { qf: 11, sf: 13, f: 15 },
     created_at: t.created_at,
   };
 }
@@ -458,7 +459,7 @@ export const tournamentsApi = {
 
   /** Once every group fixture is complete, build the round-1 knockout bracket
    * from the top `advance_per_group` pair(s) of each group. */
-  generateKnockout: async (tournamentId: string): Promise<TournamentFixture[]> => {
+  generateKnockout: async (tournamentId: string, knockoutConfig?: { qf: number; sf: number; f: number }): Promise<TournamentFixture[]> => {
     const { tournament } = await tournamentsApi.get(tournamentId);
     const qualifiers: Array<{ groupIndex: number; rankInGroup: number; pair: [string, string] }> = [];
     for (let g = 0; g < tournament.num_groups; g++) {
@@ -469,7 +470,13 @@ export const tournamentsApi = {
     }
     const bracket = buildKnockoutBracket(qualifiers);
     const fixtures = await insertKnockoutFixtures(tournamentId, 1, bracket);
-    await setTournamentStatus(tournamentId, "knockout");
+    const updateData: any = { status: "knockout" };
+    if (knockoutConfig) updateData.knockout_config = knockoutConfig;
+    if (isOffline()) {
+      useTournamentStore.getState().patchTournament(tournamentId, { status: "knockout", knockout_config: knockoutConfig ?? { qf: 11, sf: 13, f: 15 } });
+    } else {
+      await supabase.from("tournaments").update(updateData).eq("id", tournamentId);
+    }
     return fixtures;
   },
 

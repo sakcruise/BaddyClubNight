@@ -56,13 +56,16 @@ export default function HomeView() {
     if (!displayName.trim()) return;
     setStartingTournament(true);
     try {
+      // Tournament nights always run on six courts for the round robin (the knockout
+      // then uses courts 1–3), regardless of the club-night court count.
+      const tournamentCourts = 6;
       const [{ session }, membersRes] = await Promise.all([
-        sessionsApi.start({ club_name: displayName.trim(), num_courts: numCourts }),
+        sessionsApi.start({ club_name: displayName.trim(), num_courts: tournamentCourts }),
         membersApi.list(),
       ]);
       setMembers(membersRes.members);
       setSession(session);
-      setCourts(Array.from({ length: numCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
+      setCourts(Array.from({ length: tournamentCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
       useSessionStore.getState().setTournamentSetupSession(session.id);
       navigate(`/tournament-setup/${session.id}`);
     } finally {
