@@ -1001,13 +1001,11 @@ export default function TournamentView() {
                                           <button
                                             onClick={() => handlePlayGroupFixture(g, fixture)}
                                             disabled={busy}
-                                            className="w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-lg py-2 bg-white border border-dashed border-violet-300 text-violet-700
-                                                       active:bg-violet-100 active:scale-95 transition-all disabled:opacity-50"
+                                            className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2 bg-violet-100 border border-violet-300 text-violet-800
+                                                       active:bg-violet-200 active:scale-95 transition-all disabled:opacity-50"
                                           >
-                                            <span className="w-5 h-5 rounded-full bg-violet-600 text-white flex items-center justify-center flex-shrink-0">
-                                              <Play size={9} className="ml-px" />
-                                            </span>
-                                            <span className="text-[11px] font-display font-semibold">Play</span>
+                                            <Play size={10} className="flex-shrink-0" />
+                                            <span className="text-[10px] font-display font-semibold">Play</span>
                                           </button>
                                         )}
                                       </td>

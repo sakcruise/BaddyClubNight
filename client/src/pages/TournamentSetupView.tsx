@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
@@ -8,6 +8,16 @@ import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
 import { Trophy, ChevronLeft, Search, UserPlus, Check, UserCheck, X, PartyPopper } from "lucide-react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+
+// Same per-group accents as the tournament board, so a group looks the same here and there.
+const GROUP_ACCENTS = [
+  { header: "bg-violet-50 border-violet-100", badge: "bg-violet-600", bar: "bg-violet-500", text: "text-violet-600" },
+  { header: "bg-sky-50 border-sky-100", badge: "bg-sky-600", bar: "bg-sky-500", text: "text-sky-600" },
+  { header: "bg-emerald-50 border-emerald-100", badge: "bg-emerald-600", bar: "bg-emerald-500", text: "text-emerald-600" },
+  { header: "bg-amber-50 border-amber-100", badge: "bg-amber-500", bar: "bg-amber-500", text: "text-amber-600" },
+  { header: "bg-rose-50 border-rose-100", badge: "bg-rose-500", bar: "bg-rose-500", text: "text-rose-600" },
+  { header: "bg-teal-50 border-teal-100", badge: "bg-teal-600", bar: "bg-teal-500", text: "text-teal-600" },
+];
 
 // Chip border follows the avatar colour scheme: blue = male, pink = female, purple = guest.
 const GENDER_BORDER: Record<string, string> = {
@@ -507,77 +517,118 @@ export default function TournamentSetupView() {
       {step === "review" && (
         <main className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4 w-full">
           {error && <p className="text-sm font-display font-bold text-red-600">{error}</p>}
-          <p className="text-xs font-display text-gray-500">
-            {selectedSlot
-              ? <>Now tap who <strong>{name(pairsByGroup[selectedSlot.groupIndex][selectedSlot.pairIndex][selectedSlot.slot])}</strong> should swap with — any group. Tap them again to cancel.</>
-              : "Tap a player, then tap another (same group or a different one) to swap them. Everyone stays paired, nothing gets lost."}
-          </p>
 
-          {/* Two equal rows across the full width: 6 groups → 3 + 3, 4 → 2 + 2, 5 → 3 + 2. */}
+          {(() => {
+            const groupAvgs = pairsByGroup.map((pairs) => avgLevel(pairs.flat()));
+            const spread = groupAvgs.length ? Math.max(...groupAvgs) - Math.min(...groupAvgs) : 0;
+            const totalPairs = pairsByGroup.reduce((n, p) => n + p.length, 0);
+            const balanced = spread <= 0.3;
+            return (
+              <div className="flex flex-wrap items-stretch gap-3">
+                <div className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 px-4 py-3">
+                  <span className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center"><Trophy size={18} /></span>
+                  <div className="leading-tight">
+                    <div className="font-display font-bold text-gray-900">{pairsByGroup.length} groups · {totalPairs} pairs</div>
+                    <div className="text-xs font-body text-gray-500">{totalPairs * 2} playing{reserves.length ? ` · ${reserves.map(name).join(", ")} sitting out` : ""}</div>
+                  </div>
+                </div>
+                <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${balanced ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}><Check size={18} /></span>
+                  <div className="leading-tight">
+                    <div className={`font-display font-bold ${balanced ? "text-emerald-800" : "text-amber-800"}`}>{balanced ? "Groups are balanced" : "Groups are a little uneven"}</div>
+                    <div className={`text-xs font-body ${balanced ? "text-emerald-700" : "text-amber-700"}`}>Skill averages {groupAvgs.map((a) => a.toFixed(1)).join(" · ")} — spread {spread.toFixed(1)}</div>
+                  </div>
+                </div>
+                <motion.div
+                  layout
+                  className={`flex-1 min-w-[260px] flex items-center gap-3 rounded-2xl border px-4 py-3 ${selectedSlot ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-gray-200 text-gray-600"}`}
+                >
+                  <UserCheck size={18} className="flex-shrink-0" />
+                  <p className="text-sm font-body">
+                    {selectedSlot
+                      ? <>Now tap who <strong>{name(pairsByGroup[selectedSlot.groupIndex][selectedSlot.pairIndex][selectedSlot.slot])}</strong> should swap with — any group. Tap them again to cancel.</>
+                      : "Tap a player, then tap another — in this group or any other — to swap them. Everyone stays paired."}
+                  </p>
+                </motion.div>
+              </div>
+            );
+          })()}
+
+          {/* Equal rows across the full width: 6 groups → 3 + 3 on a wide screen, 1 per row on a phone. */}
           <div
             className="grid gap-4 items-start"
             style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 560px), 1fr))" }}
           >
             {pairsByGroup.map((pairs, g) => {
               const groupMemberIds = pairs.flat();
+              const accent = GROUP_ACCENTS[g % GROUP_ACCENTS.length];
+              const gAvg = avgLevel(groupMemberIds);
               return (
-                <section key={g} className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col gap-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <h2 className="font-display font-black text-gray-900 text-sm">Group {g + 1}</h2>
-                    <span className="text-[10px] font-display font-bold text-violet-500 bg-violet-50 rounded-full px-2 py-0.5">
-                      Avg {avgLevel(groupMemberIds).toFixed(1)}
-                    </span>
-                  </div>
-                  {pairs.map((pair, pairIndex) => (
-                    <div key={pairIndex} className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-xl px-2 py-1.5">
-                      <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                        {([0, 1] as const).map((slot) => {
-                          const isSelected =
-                            selectedSlot?.groupIndex === g && selectedSlot.pairIndex === pairIndex && selectedSlot.slot === slot;
-                          return (
-                            <button
-                              key={slot}
-                              onClick={() => {
-                                if (!selectedSlot) { setSelectedSlot({ groupIndex: g, pairIndex, slot }); return; }
-                                if (isSelected) { setSelectedSlot(null); return; }
-                                setPairsByGroup((prev) =>
-                                  swapInto(prev, selectedSlot.groupIndex, selectedSlot.pairIndex, selectedSlot.slot, pair[slot])
-                                );
-                                setSelectedSlot(null);
-                              }}
-                              className={`flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all active:scale-95
-                                ${isSelected
-                                  ? "bg-violet-600 border-violet-600 text-white shadow-md ring-2 ring-violet-300"
-                                  : selectedSlot
-                                    ? "bg-white border-dashed border-violet-300 text-gray-800 hover:bg-violet-50 hover:border-violet-500"
-                                    : "bg-white border-gray-200 text-gray-800 hover:border-violet-400 hover:bg-violet-50"}`}
-                            >
-                              <Avatar name={members[pair[slot]]?.name ?? "?"} size="xs" memberType={members[pair[slot]]?.member_type} />
-                              <span className="text-xs font-display font-bold truncate">
-                                {name(pair[slot]).split(" ")[0]}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <span className="text-[10px] font-display font-bold text-gray-400 flex-shrink-0 tabular-nums">
-                        {avgLevel(pair).toFixed(1)}
-                      </span>
+                <section key={g} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                  <div className={`flex items-center gap-3 px-4 py-2.5 border-b ${accent.header}`}>
+                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-sm text-white ${accent.badge}`}>G{g + 1}</span>
+                    <div className="leading-tight">
+                      <h2 className="font-display font-bold text-gray-900 text-base">Group {g + 1}</h2>
+                      <div className="text-[11px] font-body text-gray-500">{pairs.length} pairs · {pairs.length * 2} players</div>
                     </div>
-                  ))}
+                    <div className="ml-auto flex items-center gap-2">
+                      <div className="w-20 h-1.5 rounded-full bg-black/10 overflow-hidden">
+                        <div className={`h-full rounded-full ${accent.bar}`} style={{ width: `${(gAvg / 6) * 100}%` }} />
+                      </div>
+                      <span className={`text-xs font-display font-bold tabular-nums ${accent.text}`}>avg {gAvg.toFixed(1)}</span>
+                    </div>
+                  </div>
+                  <ol className="flex flex-col divide-y divide-gray-100">
+                    {pairs.map((pair, pairIndex) => (
+                      <li key={pairIndex} className="flex items-center gap-2 px-3 py-1.5">
+                        <span className="w-5 text-center text-[11px] font-display font-bold text-gray-300 tabular-nums">{pairIndex + 1}</span>
+                        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                          {([0, 1] as const).map((slot) => {
+                            const isSelected =
+                              selectedSlot?.groupIndex === g && selectedSlot.pairIndex === pairIndex && selectedSlot.slot === slot;
+                            const m = members[pair[slot]];
+                            return (
+                              <Fragment key={slot}>
+                                {slot === 1 && <span className="text-[10px] font-display font-bold text-gray-300 flex-shrink-0">+</span>}
+                                <button
+                                  onClick={() => {
+                                    if (!selectedSlot) { setSelectedSlot({ groupIndex: g, pairIndex, slot }); return; }
+                                    if (isSelected) { setSelectedSlot(null); return; }
+                                    setPairsByGroup((prev) =>
+                                      swapInto(prev, selectedSlot.groupIndex, selectedSlot.pairIndex, selectedSlot.slot, pair[slot])
+                                    );
+                                    setSelectedSlot(null);
+                                  }}
+                                  className={`flex-1 min-w-0 min-h-[44px] flex items-center gap-2 pl-1.5 pr-2 rounded-xl border-2 transition-all active:scale-[0.97]
+                                    ${isSelected
+                                      ? "bg-violet-600 border-violet-600 text-white shadow-md"
+                                      : selectedSlot
+                                        ? "bg-white border-dashed border-violet-300 text-gray-800"
+                                        : `bg-white ${GENDER_BORDER[m?.member_type ?? ""] ?? "border-gray-200"} text-gray-800`}`}
+                                >
+                                  <Avatar name={m?.name ?? "?"} url={m?.avatar_url} memberType={m?.member_type} size="sm" />
+                                  <span className="flex-1 min-w-0 text-left leading-tight">
+                                    <span className="block text-[13px] font-body font-medium truncate">{name(pair[slot]).split(" ")[0]}</span>
+                                    <span className={`block text-[10px] font-body ${isSelected ? "text-violet-100" : "text-gray-400"}`}>{LEVEL_LABELS[m?.level ?? 2]}</span>
+                                  </span>
+                                </button>
+                              </Fragment>
+                            );
+                          })}
+                        </div>
+                        <span className="w-9 text-right text-[11px] font-display font-bold text-gray-400 tabular-nums flex-shrink-0" title="Pair's average level">
+                          {avgLevel(pair).toFixed(1)}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
                 </section>
               );
             })}
           </div>
 
-          {reserves.length > 0 && (
-            <p className="text-xs font-display font-bold text-gray-500">
-              Sitting out this round (odd headcount): {reserves.map(name).join(", ")}
-            </p>
-          )}
-
           <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
-            {creating ? "Starting…" : "Confirm & Start Tournament →"}
+            <Trophy size={18} /> {creating ? "Starting…" : "Confirm & Start Tournament"}
           </Button>
         </main>
       )}
