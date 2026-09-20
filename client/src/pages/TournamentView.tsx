@@ -863,13 +863,9 @@ export default function TournamentView() {
                 <h2 className="text-[11px] font-display font-bold text-gray-500 uppercase tracking-widest">
                   Courts ({stageCourts.length} available) · {pool.length} match{pool.length === 1 ? "" : "es"} waiting
                 </h2>
-                <button
-                  onClick={handleRandomAssignAll}
-                  disabled={busy || idleCourts.length === 0 || pool.length === 0}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 text-amber-950 px-3 py-1.5 text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
-                >
+                <Button size="sm" variant="secondary" onClick={handleRandomAssignAll} disabled={busy || idleCourts.length === 0 || pool.length === 0}>
                   🎲 Randomly assign courts
-                </button>
+                </Button>
               </div>
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${stageCourts.length}, minmax(200px, 1fr))` }}>
                 {[...stageCourts].sort((a, b) => a.id - b.id).map((court) => {
@@ -888,7 +884,7 @@ export default function TournamentView() {
                             <select
                               value={choice}
                               onChange={(e) => setCourtChoice((c) => ({ ...c, [court.id]: e.target.value }))}
-                              className="w-full text-xs font-display font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2 py-2"
+                              className="w-full h-10 text-xs font-display font-semibold bg-white border-2 border-orange-200 focus:border-orange-400 focus:outline-none rounded-xl px-2"
                             >
                               <option value="">Choose a waiting match…</option>
                               {pool.map((f) => (
@@ -896,21 +892,17 @@ export default function TournamentView() {
                               ))}
                             </select>
                             <div className="flex gap-1.5">
-                              <button
+                              <Button
+                                size="sm"
+                                className="flex-1 px-2"
                                 onClick={() => { const f = pool.find((x) => x.id === choice); if (f) { setCourtChoice((c) => ({ ...c, [court.id]: "" })); sendToCourts([[f, court.id]]); } }}
                                 disabled={busy || !choice}
-                                className="flex-1 h-9 rounded-lg bg-violet-600 text-white text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
                               >
                                 Send to court
-                              </button>
-                              <button
-                                onClick={() => handleRandomAssignOne(court.id)}
-                                disabled={busy}
-                                title="Send a random waiting match to this court"
-                                className="w-10 h-9 rounded-lg bg-amber-100 border border-amber-300 text-base active:scale-95 transition-all disabled:opacity-40"
-                              >
+                              </Button>
+                              <Button size="sm" variant="secondary" className="px-3" onClick={() => handleRandomAssignOne(court.id)} disabled={busy} title="Send a random waiting match to this court">
                                 🎲
-                              </button>
+                              </Button>
                             </div>
                           </>
                         ) : (
@@ -921,28 +913,24 @@ export default function TournamentView() {
                   }
                   const target = targetPointsFor(live);
                   return (
-                    <div key={court.id} className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 flex flex-col gap-2">
+                    <div key={court.id} className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-3 flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <span className="font-display font-bold text-sm text-gray-900">{stageLabel} {court.id}</span>
-                        <span className="text-[10px] font-display font-bold uppercase tracking-wider rounded-full bg-amber-200 text-amber-900 px-2 py-0.5">
+                        <span className="text-[10px] font-display font-bold uppercase tracking-wider rounded-full bg-orange-200 text-orange-900 px-2 py-0.5">
                           {live.stage === "group" ? `Group ${(live.group_index ?? 0) + 1}` : knockoutRoundLabel(fixtures.filter((x) => x.stage === "knockout" && x.round === live.round).length)}
                         </span>
                       </div>
                       <div className="text-center">
                         <div className="font-body font-semibold text-[15px] text-gray-900 truncate">{pairName(live.team_a, members)}</div>
-                        <div className="text-[10px] font-display font-black text-amber-500 my-0.5">VS</div>
+                        <div className="text-[10px] font-display font-black text-orange-400 my-0.5">VS</div>
                         <div className="font-body font-semibold text-[15px] text-gray-900 truncate">{pairName(live.team_b, members)}</div>
                       </div>
-                      <button
-                        onClick={() => setScoringFixture(live)}
-                        disabled={busy}
-                        className="h-10 rounded-lg bg-emerald-600 text-white text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
-                      >
+                      <Button size="sm" fullWidth onClick={() => setScoringFixture(live)} disabled={busy}>
                         {liveMatch?.score_a != null ? `Edit result (${liveMatch.score_a}–${liveMatch.score_b})` : "Save result"}
-                      </button>
+                      </Button>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-body text-gray-500">First to {target}{live.stage === "group" ? " · sudden death" : ""}</span>
-                        <button onClick={() => handleFreeCourt(live)} disabled={busy} className="text-[10px] font-display font-bold text-gray-400 hover:text-red-500">Free court</button>
+                        <button onClick={() => handleFreeCourt(live)} disabled={busy} className="text-[10px] font-display font-bold text-orange-600 hover:text-red-500">Free court</button>
                       </div>
                     </div>
                   );
