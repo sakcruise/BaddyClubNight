@@ -11,6 +11,7 @@ import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import ScoreEntry from "../components/scoring/ScoreEntry";
 import TournamentTicker from "../components/tournament/TournamentTicker";
+import TournamentStats from "../components/tournament/TournamentStats";
 import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight, Maximize2, Minimize2, WifiOff } from "lucide-react";
 import { isOffline } from "../services/api";
 
@@ -664,6 +665,15 @@ export default function TournamentView() {
       <TournamentTicker
         tournament={tournament}
         fixtures={fixtures}
+        standingsByGroup={standingsByGroup}
+        matches={matches}
+        members={members}
+        courts={courts}
+      />
+      <TournamentStats
+        tournament={tournament}
+        fixtures={fixtures}
+        players={players}
         standingsByGroup={standingsByGroup}
         matches={matches}
         members={members}
