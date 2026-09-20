@@ -7,7 +7,8 @@ import { queueApi, membersApi, sessionsApi } from "../services/api";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
-import { Trophy, ChevronLeft, Search, UserPlus, Check, UserCheck, X, PartyPopper, RotateCcw } from "lucide-react";
+import { Trophy, ChevronLeft, Search, UserPlus, Check, UserCheck, X, PartyPopper, RotateCcw, Users } from "lucide-react";
+import MemberManagement from "../components/admin/MemberManagement";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
 // Same per-group accents as the tournament board, so a group looks the same here and there.
@@ -120,6 +121,7 @@ export default function TournamentSetupView() {
   // Backing out of the check-in page abandons the tournament night: "Start a Tournament"
   // opened a session, so we close it again and land on the home page, not club night.
   const [showCancel, setShowCancel] = useState(false);
+  const [showRoster, setShowRoster] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   async function cancelTournamentNight() {
     setCancelling(true);
@@ -244,7 +246,41 @@ export default function TournamentSetupView() {
             {step === "select" ? "Tap players as they arrive - once everyone's in, start the tournament" : "Swap anyone into a different pair before you start"}
           </p>
         </div>
+        <button
+          onClick={() => setShowRoster(true)}
+          title="Club roster - levels, ranks, archive"
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-semibold hover:bg-gray-100 transition-all"
+        >
+          <Users size={14} /> Roster
+        </button>
       </header>
+
+      <AnimatePresence>
+        {showRoster && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/40 z-40"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowRoster(false)}
+            />
+            <motion.div
+              className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl flex flex-col"
+              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <span className="font-display font-bold text-gray-900 text-lg">Club Roster</span>
+                <button onClick={() => setShowRoster(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500" aria-label="Close roster">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <MemberManagement />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {showCancel && (
         <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-6">

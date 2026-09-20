@@ -38,7 +38,11 @@ export default function MemberManagement() {
   const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
-    membersApi.list().then((res) => setMembers(res.members));
+    membersApi.list().then((res) => {
+      // list() excludes guests; keep any already in the store so tonight's checked-in guests still resolve.
+      const guests = Object.values(useMemberStore.getState().members).filter((m) => m.member_type === "guest");
+      setMembers([...res.members, ...guests]);
+    });
   }, [setMembers]);
 
   async function handleImport() {
