@@ -102,8 +102,11 @@ async function loadMatches(ids: string[]): Promise<Map<string, Match>> {
 
 /** Keep the session store's tournament link in step (both modes; it's what drives routing). */
 function linkSessionLocally(sessionId: string, tournamentId: string | undefined) {
-  const s = useSessionStore.getState().session;
-  if (s?.id === sessionId) useSessionStore.getState().setSession({ ...s, tournament_id: tournamentId });
+  const store = useSessionStore.getState();
+  const s = store.session;
+  if (s?.id === sessionId) store.setSession({ ...s, tournament_id: tournamentId });
+  // Once a tournament exists (or is dropped) the session is no longer "in setup".
+  if (tournamentId && store.tournamentSetupSessionId === sessionId) store.setTournamentSetupSession(null);
 }
 
 type KnockoutSlot = { seed: number; teamA: [string, string] | null; teamB: [string, string] | null };

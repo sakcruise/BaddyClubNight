@@ -28,7 +28,7 @@ export default function MainView() {
   const { adminName } = useAuthStore();
   const appMode = useGroupStore((s) => s.appMode);
   const logout = () => authApi.logout();
-  const { session, endSession, clubConfig: rawClubConfig, setCourts, setSession } = useSessionStore();
+  const { session, endSession, clubConfig: rawClubConfig, setCourts, setSession, tournamentSetupSessionId } = useSessionStore();
   const clubConfig = rawClubConfig ?? { name: "", venue: "", nightDay: "", nightStart: "", nightEnd: "", whatsapp: "" };
   const { setQueue, queue, activeMemberIds } = useQueueStore();
   const { setMatches, matches } = useMatchStore();
@@ -188,6 +188,8 @@ export default function MainView() {
 
   if (!session) return appMode === "friends" ? <Navigate to="/groups" replace /> : <HomeView />;
   if (session.tournament_id) return <Navigate to={`/tournament/${session.tournament_id}`} replace />;
+  // A night started as a tournament but not yet drafted lives on the check-in page, not club night.
+  if (tournamentSetupSessionId === session.id) return <Navigate to={`/tournament-setup/${session.id}`} replace />;
 
   const queuedIds = new Set(queue.map((q) => q.member_id));
   const allCheckedInIds = new Set([...queuedIds, ...activeMemberIds]);

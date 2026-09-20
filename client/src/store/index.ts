@@ -66,6 +66,9 @@ interface SessionStore {
   endSession: () => void;
   setClubName: (name: string) => void;
   setClubConfig: (cfg: Partial<ClubConfig>) => void;
+  // Session started via "Start a Tournament" but not yet drafted: "/" should show its check-in page.
+  tournamentSetupSessionId: string | null;
+  setTournamentSetupSession: (id: string | null) => void;
 }
 
 export const defaultClubConfig: ClubConfig = {
@@ -97,8 +100,10 @@ export const useSessionStore = create<SessionStore>()(
             c.id === courtId ? { ...c, status, current_match_id: matchId } : c
           ),
         })),
+      tournamentSetupSessionId: null,
+      setTournamentSetupSession: (id) => set({ tournamentSetupSessionId: id }),
       endSession: () => {
-        set({ session: null, courts: [] });
+        set({ session: null, courts: [], tournamentSetupSessionId: null });
         // Also wipe queue and matches so stale data never leaks into the next session
         useQueueStore.getState().setQueue([]);
         useQueueStore.getState().setActiveMemberIds(new Set());

@@ -63,6 +63,7 @@ export default function HomeView() {
       setMembers(membersRes.members);
       setSession(session);
       setCourts(Array.from({ length: numCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
+      useSessionStore.getState().setTournamentSetupSession(session.id);
       navigate(`/tournament-setup/${session.id}`);
     } finally {
       setStartingTournament(false);

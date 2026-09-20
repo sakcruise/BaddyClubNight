@@ -115,6 +115,7 @@ export default function TournamentSetupView() {
     try {
       const s = useSessionStore.getState().session;
       if (s) await sessionsApi.end(s.id).catch(() => {});
+      useSessionStore.getState().setTournamentSetupSession(null);
       useSessionStore.getState().endSession();
       useMatchStore.getState().setMatches([]);
       setQueue([]);
