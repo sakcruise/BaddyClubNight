@@ -185,7 +185,7 @@ export default function TournamentSetupView() {
   const [step, setStep] = useState<"select" | "review">("select");
   const [numGroups, setNumGroups] = useState(4);
   const [pairingMode, setPairingMode] = useState<PairingMode>("balanced");
-  const [advancePerGroup, setAdvancePerGroup] = useState(1);
+  const [advancePerGroup, setAdvancePerGroup] = useState(2);
   const [pairsByGroup, setPairsByGroup] = useState<Pairs>([]);
   const [reserves, setReserves] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
@@ -573,6 +573,7 @@ export default function TournamentSetupView() {
 
             <div>
               <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Pairs advancing to knockout, per group</label>
+              <p className="text-[11px] font-body text-gray-400 mb-1.5">The knockout is always 8 pairs — any places left over go to the best of the rest by average points across all groups.</p>
               <div className="flex items-center gap-2">
                 <button onClick={() => setAdvancePerGroup((n) => Math.max(1, n - 1))} className="w-11 h-11 rounded-xl bg-violet-100 border-2 border-violet-200 font-display font-black text-xl text-violet-600 hover:bg-violet-200 active:scale-95 transition-all">−</button>
                 <div className="flex-1 h-11 rounded-xl border-2 border-violet-300 text-center flex items-center justify-center font-display font-black text-2xl text-violet-600">{advancePerGroup}</div>

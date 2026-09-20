@@ -479,6 +479,9 @@ export const tournamentsApi = {
       if (picked.tiedForLast) throw new Error("Two pairs are tied for the last knockout place — pick one in the knockout dialog.");
       field = picked.qualifiers;
     }
+    if (field.length !== 8) {
+      throw new Error(`The knockout needs exactly 8 pairs (have ${field.length}) — there is no bye round.`);
+    }
     const bracket = buildKnockoutBracket(field);
     const fixtures = await insertKnockoutFixtures(tournamentId, 1, bracket);
     const updateData: any = { status: "knockout" };

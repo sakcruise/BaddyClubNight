@@ -51,12 +51,6 @@ function pairEq(a: [string, string], b: [string, string]) {
   return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
 }
 
-function nextPowerOfTwo(n: number): number {
-  let p = 1;
-  while (p < n) p *= 2;
-  return p;
-}
-
 function qualifierLabel(groupIndex: number, rank: number, advancePerGroup: number): string {
   if (advancePerGroup === 1) return `Group ${groupIndex + 1} Winner`;
   const place = rank === 1 ? "Winner" : rank === 2 ? "Runner-up" : `${rank}rd place`;
@@ -70,25 +64,29 @@ function knockoutRoundLabel(matchCount: number): string {
   return `Round of ${matchCount * 2}`;
 }
 
+// The knockout is always eight pairs: the top `advancePerGroup` from every
+// group, then the best of the rest across all groups by average points.
+const KNOCKOUT_PAIRS = 8;
+
 /** Preview of the knockout bracket shape before it's generated — same seeding
  * order buildKnockoutBracket uses (rank asc, then group asc; top seed vs
- * bottom seed), but with "Group N Winner"-style placeholders instead of real
- * pairs. Only round 1 names real groups; later rounds are TBD vs TBD. */
+ * bottom seed), with "Group N Winner" / "Best of the rest" placeholders. Only
+ * round 1 names real slots; later rounds are TBD vs TBD. Never a bye. */
 function knockoutPreviewRounds(
   numGroups: number,
   advancePerGroup: number,
   labelFor: (groupIndex: number, rank: number) => string = (g, r) => qualifierLabel(g, r, advancePerGroup)
 ): Array<{ label: string; matchups: [string, string][] }> {
   const labels: string[] = [];
-  for (let rank = 1; rank <= advancePerGroup; rank++) {
-    for (let g = 0; g < numGroups; g++) labels.push(labelFor(g, rank));
+  for (let rank = 1; rank <= advancePerGroup && labels.length < KNOCKOUT_PAIRS; rank++) {
+    for (let g = 0; g < numGroups && labels.length < KNOCKOUT_PAIRS; g++) labels.push(labelFor(g, rank));
   }
-  const bracketSize = nextPowerOfTwo(labels.length);
-  const slots: Array<string | null> = Array.from({ length: bracketSize }, (_, i) => labels[i] ?? null);
+  for (let k = 1; labels.length < KNOCKOUT_PAIRS; k++) labels.push(`Best of the rest #${k}`);
+  const bracketSize = KNOCKOUT_PAIRS;
 
   const round1: [string, string][] = [];
   for (let i = 0; i < bracketSize / 2; i++) {
-    round1.push([slots[i] ?? "Bye", slots[bracketSize - 1 - i] ?? "Bye"]);
+    round1.push([labels[i], labels[bracketSize - 1 - i]]);
   }
 
   const rounds = [{ label: knockoutRoundLabel(round1.length), matchups: round1 }];
@@ -1507,11 +1505,11 @@ export default function TournamentView() {
               const inField = (q: KnockoutQualifier) => koField.some((k) => pairEq(k.pair, q.pair));
               const label = (q: KnockoutQualifier) => `G${q.groupIndex + 1} #${q.rankInGroup} · ${pairName(q.pair, members)}`;
               const key = (q: KnockoutQualifier) => q.pair.join("-");
-              const slots = Math.max(koField.length, koTie ? koField.length + 1 : 0, 8);
+              const slots = KNOCKOUT_PAIRS;
               return (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs font-display font-bold uppercase tracking-widest text-gray-500">Going through ({koField.length} pairs)</span>
+                    <span className="text-xs font-display font-bold uppercase tracking-widest text-gray-500">Going through ({koField.length} of {KNOCKOUT_PAIRS} pairs)</span>
                     <span className="text-[11px] font-body text-gray-400">Top {tournament?.advance_per_group} per group, then best of the rest by avg points</span>
                   </div>
                   {koTie && (
@@ -1583,7 +1581,7 @@ export default function TournamentView() {
               <Button variant="ghost" fullWidth onClick={() => setShowKnockoutConfig(false)}>
                 Cancel
               </Button>
-              <Button fullWidth disabled={busy || koField.length < 2 || !!koTie} onClick={handleGenerateKnockout}>
+              <Button fullWidth disabled={busy || koField.length < KNOCKOUT_PAIRS || !!koTie} onClick={handleGenerateKnockout}>
                 Start Knockout →
               </Button>
             </div>
