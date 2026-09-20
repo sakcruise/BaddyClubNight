@@ -290,7 +290,7 @@ export default function MemberManagement() {
       </div>
 
       {/* Member list */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+      <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y space-y-2 pr-1 min-h-0">
         {visible.length === 0 && roster.length > 0 && (
           <p className="text-sm font-body text-gray-400 text-center py-6">No members match these filters.</p>
         )}
@@ -391,7 +391,7 @@ export default function MemberManagement() {
                       </span>
                       <span className={`text-[10px] font-display font-bold px-1.5 py-0.5 rounded-md border
                         ${LEVEL_COLORS[member.level ?? 2]}`}>
-                        L{member.level ?? 2} · {LEVEL_LABELS[member.level ?? 2]}
+                        L{member.level ?? 2}
                       </span>
                       <span className={`text-[10px] font-display font-bold px-1.5 py-0.5 rounded-md border tabular-nums
                         ${member.rank != null ? "bg-gray-100 text-gray-700 border-gray-200" : "bg-white text-gray-300 border-dashed border-gray-200"}`}>

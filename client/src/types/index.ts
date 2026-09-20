@@ -17,12 +17,12 @@ export interface Member {
 export type AutoPickMode = "balanced" | "competitive";
 
 export const LEVEL_LABELS: Record<number, string> = {
-  1: "Beginner",
-  2: "Improver",
-  3: "Intermediate",
-  4: "Upper Intermediate",
-  5: "Advanced",
-  6: "Elite",
+  1: "L1",
+  2: "L2",
+  3: "L3",
+  4: "L4",
+  5: "L5",
+  6: "L6",
 };
 export const MAX_LEVEL = 6;
 export const LEVELS = Array.from({ length: MAX_LEVEL }, (_, i) => i + 1);

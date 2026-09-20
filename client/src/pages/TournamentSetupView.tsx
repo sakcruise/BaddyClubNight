@@ -64,6 +64,7 @@ export default function TournamentSetupView() {
   const [search, setSearch] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
   const [guestName, setGuestName] = useState("");
+  const [guestLevel, setGuestLevel] = useState(2);
   const [showGuestForm, setShowGuestForm] = useState(false);
   const [addingGuest, setAddingGuest] = useState(false);
 
@@ -162,7 +163,7 @@ export default function TournamentSetupView() {
     if (!guestName.trim() || !sessionId) return;
     setAddingGuest(true);
     try {
-      const { member } = await membersApi.create(guestName.trim(), "guest");
+      const { member } = await membersApi.create(guestName.trim(), "guest", undefined, guestLevel);
       addMember(member);
       const res = await queueApi.checkIn(sessionId, member.id);
       setQueue(res.queue);
@@ -382,7 +383,7 @@ export default function TournamentSetupView() {
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="flex gap-2 p-3 rounded-2xl bg-violet-50 border border-violet-100">
+                  <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-violet-50 border border-violet-100">
                     <input
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
@@ -391,6 +392,19 @@ export default function TournamentSetupView() {
                       className="flex-1 h-11 px-3 rounded-xl border-2 border-violet-200 text-sm font-display font-bold focus:outline-none focus:border-violet-400 bg-white"
                       autoFocus
                     />
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5, 6].map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => setGuestLevel(lvl)}
+                          title={`Level ${lvl}`}
+                          className={`w-9 h-11 rounded-xl text-xs font-display font-bold border-2 transition-colors
+                            ${guestLevel === lvl ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-violet-200 text-violet-500"}`}
+                        >
+                          L{lvl}
+                        </button>
+                      ))}
+                    </div>
                     <Button size="md" disabled={!guestName.trim() || addingGuest} onClick={addGuest}>
                       {addingGuest ? "Adding…" : "Check in guest"}
                     </Button>

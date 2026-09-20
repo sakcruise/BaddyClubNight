@@ -328,3 +328,43 @@ export function clubRulesDraft(
   pairs.forEach((p, i) => pairsByGroup[i % numGroups].push(p));
   return { pairsByGroup, reserves };
 }
+
+/**
+ * Pick the knockout field: the top `advancePerGroup` pair(s) of every group,
+ * then — if that's short of `target` pairs — the best of the rest across all
+ * groups by average points per game, then games won. If the last slot is a
+ * dead heat, `tiedForLast` lists the pairs so the operator can pick one (or
+ * play it off); the qualifiers list is then one short.
+ */
+export function selectQualifiers(
+  standingsByGroup: Record<number, GroupStanding[]>,
+  advancePerGroup: number,
+  target = 8
+): { qualifiers: KnockoutQualifier[]; tiedForLast: KnockoutQualifier[] | null } {
+  const qualifiers: KnockoutQualifier[] = [];
+  const rest: Array<KnockoutQualifier & { avg: number; wins: number }> = [];
+  for (const [g, standings] of Object.entries(standingsByGroup)) {
+    const groupIndex = Number(g);
+    standings.forEach((s, i) => {
+      const q = { groupIndex, rankInGroup: i + 1, pair: s.pair };
+      if (i < advancePerGroup) qualifiers.push(q);
+      else {
+        const played = s.wins + s.losses;
+        rest.push({ ...q, avg: played > 0 ? s.pointsFor / played : 0, wins: s.wins });
+      }
+    });
+  }
+  rest.sort((a, b) => b.avg - a.avg || b.wins - a.wins || a.rankInGroup - b.rankInGroup);
+  let tiedForLast: KnockoutQualifier[] | null = null;
+  while (qualifiers.length < target && rest.length > 0) {
+    const next = rest[0];
+    const tied = rest.filter((r) => r.avg === next.avg && r.wins === next.wins);
+    if (qualifiers.length === target - 1 && tied.length > 1) {
+      tiedForLast = tied.map(({ groupIndex, rankInGroup, pair }) => ({ groupIndex, rankInGroup, pair }));
+      break;
+    }
+    rest.shift();
+    qualifiers.push({ groupIndex: next.groupIndex, rankInGroup: next.rankInGroup, pair: next.pair });
+  }
+  return { qualifiers, tiedForLast };
+}

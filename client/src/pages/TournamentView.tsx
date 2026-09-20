@@ -6,7 +6,8 @@ import { useSessionStore, useMemberStore, useMatchStore, useQueueStore, useSessi
 import { tournamentsApi } from "../services/tournaments";
 import type { TournamentChampion } from "../services/tournaments";
 import { matchesApi, sessionsApi } from "../services/api";
-import type { GroupStanding } from "../utils/tournament";
+import { selectQualifiers } from "../utils/tournament";
+import type { GroupStanding, KnockoutQualifier } from "../utils/tournament";
 import type { Tournament, TournamentFixture, TournamentPlayer } from "../types";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
@@ -121,6 +122,17 @@ export default function TournamentView() {
   const [showRoster, setShowRoster] = useState(false);
   const [showKnockoutConfig, setShowKnockoutConfig] = useState(false);
   const [knockoutConfig, setKnockoutConfig] = useState({ qf: 11, sf: 13, f: 15 });
+  // Operator-reviewed knockout field. Seeded from selectQualifiers when the dialog opens;
+  // any slot can be swapped for another group pair.
+  const [koField, setKoField] = useState<KnockoutQualifier[]>([]);
+  const [koTie, setKoTie] = useState<KnockoutQualifier[] | null>(null);
+  function openKnockoutConfig() {
+    if (!tournament) return;
+    const { qualifiers, tiedForLast } = selectQualifiers(standingsByGroup, tournament.advance_per_group);
+    setKoField(qualifiers);
+    setKoTie(tiedForLast);
+    setShowKnockoutConfig(true);
+  }
 
   // Browser full-screen for the wall/touch display.
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -337,6 +349,47 @@ export default function TournamentView() {
   // Which group-stage cell has its court chooser open.
   const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
 
+  // Send as many pending group matches to free courts as possible: one court at a
+  // time, cycling through the groups so no group hogs the hall, never putting a
+  // player on two courts at once. The operator can still move or reset any of them.
+  async function handleAutoFillCourts() {
+    if (!session || !tournament) return;
+    const busyPlayers = new Set(
+      fixtures.filter((f) => f.status === "active").flatMap((f) => [...(f.team_a ?? []), ...(f.team_b ?? [])])
+    );
+    const free = [...idleCourts].sort((a, b) => a.id - b.id);
+    const pending = fixtures.filter((f) => f.stage === "group" && f.status === "pending" && f.team_a && f.team_b);
+    const plan: Array<[TournamentFixture, number]> = [];
+    let g = 0;
+    let stall = 0;
+    while (free.length > 0 && stall < tournament.num_groups) {
+      const next = pending.find(
+        (f) => f.group_index === g && !plan.some(([p]) => p.id === f.id) && ![...f.team_a!, ...f.team_b!].some((id) => busyPlayers.has(id))
+      );
+      if (next) {
+        plan.push([next, free.shift()!.id]);
+        [...next.team_a!, ...next.team_b!].forEach((id) => busyPlayers.add(id));
+        stall = 0;
+      } else stall++;
+      g = (g + 1) % tournament.num_groups;
+    }
+    if (plan.length === 0) { setError(free.length === 0 ? "No free courts." : "Everyone still to play is already on a court."); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      for (const [f, courtId] of plan) {
+        const match = await tournamentsApi.launchFixture(f, session.id, courtId);
+        addMatch(match);
+        updateCourtStatus(courtId, "playing", match.id);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not fill the courts");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Live matches can be moved to another court (someone's already on the one we sent them to).
   async function handleMoveCourt(fixture: TournamentFixture, courtId: number) {
     const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
@@ -542,7 +595,7 @@ export default function TournamentView() {
     setError(null);
     setShowKnockoutConfig(false);
     try {
-      await tournamentsApi.generateKnockout(id, knockoutConfig);
+      await tournamentsApi.generateKnockout(id, knockoutConfig, koField);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not generate the bracket");
@@ -819,6 +872,15 @@ export default function TournamentView() {
 
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-semibold text-gray-400 px-1">
+            {tournament?.status === "groups" && (
+              <button
+                onClick={handleAutoFillCourts}
+                disabled={busy || idleCourts.length === 0}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-1.5 text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
+              >
+                <Play size={11} /> Auto-fill {idleCourts.length} free court{idleCourts.length === 1 ? "" : "s"}
+              </button>
+            )}
             <span className="flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 rounded-lg bg-violet-100 border border-violet-300 text-violet-800 px-1.5 py-0.5">
                 <Play size={9} /> Play
@@ -1263,7 +1325,7 @@ export default function TournamentView() {
                         Some group matches are still to play — generating now seeds the bracket from the current standings.
                       </p>
                     )}
-                    <Button size="lg" fullWidth disabled={busy} onClick={() => setShowKnockoutConfig(true)}>
+                    <Button size="lg" fullWidth disabled={busy} onClick={openKnockoutConfig}>
                       <Trophy size={18} /> Generate Knockout
                     </Button>
                   </section>
@@ -1331,7 +1393,7 @@ export default function TournamentView() {
                   <X size={18} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col">
                 <MemberManagement />
               </div>
             </motion.div>
@@ -1431,12 +1493,68 @@ export default function TournamentView() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 flex flex-col gap-6"
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto p-8 flex flex-col gap-6"
           >
             <div>
-              <h2 className="font-display font-black text-2xl text-gray-900">Knockout Rounds</h2>
-              <p className="text-sm text-gray-500 mt-1">How many points to play for each round?</p>
+              <h2 className="font-display font-black text-2xl text-gray-900">Knockout</h2>
+              <p className="text-sm text-gray-500 mt-1">Check who's through, then set the points for each round.</p>
             </div>
+
+            {(() => {
+              const allPairs: KnockoutQualifier[] = Object.entries(standingsByGroup).flatMap(([g, st]) =>
+                st.map((s, i) => ({ groupIndex: Number(g), rankInGroup: i + 1, pair: s.pair }))
+              );
+              const inField = (q: KnockoutQualifier) => koField.some((k) => pairEq(k.pair, q.pair));
+              const label = (q: KnockoutQualifier) => `G${q.groupIndex + 1} #${q.rankInGroup} · ${pairName(q.pair, members)}`;
+              const key = (q: KnockoutQualifier) => q.pair.join("-");
+              const slots = Math.max(koField.length, koTie ? koField.length + 1 : 0, 8);
+              return (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs font-display font-bold uppercase tracking-widest text-gray-500">Going through ({koField.length} pairs)</span>
+                    <span className="text-[11px] font-body text-gray-400">Top {tournament?.advance_per_group} per group, then best of the rest by avg points</span>
+                  </div>
+                  {koTie && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-display font-semibold text-amber-800">
+                      Tied for the last place on average points and games won: {koTie.map((q) => pairName(q.pair, members)).join(" and ")}.
+                      Pick one below, or play them off first to 7 and then pick the winner.
+                    </div>
+                  )}
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {Array.from({ length: slots }, (_, i) => {
+                      const q = koField[i];
+                      const isTieSlot = !q && koTie && i === koField.length;
+                      return (
+                        <div key={i} className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 ${isTieSlot ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-gray-50"}`}>
+                          <span className="w-5 text-[11px] font-display font-bold text-gray-400 tabular-nums">{i + 1}</span>
+                          <select
+                            value={q ? key(q) : ""}
+                            onChange={(e) => {
+                              const pick = allPairs.find((p) => key(p) === e.target.value);
+                              setKoField((prev) => {
+                                const next = [...prev];
+                                if (!pick) { next.splice(i, 1); return next; }
+                                next[i] = pick;
+                                return next;
+                              });
+                              if (isTieSlot) setKoTie(null);
+                            }}
+                            className="flex-1 min-w-0 text-xs font-display font-bold bg-white border border-gray-200 rounded-lg px-1.5 py-1.5"
+                          >
+                            <option value="">{isTieSlot ? "— pick the tie-breaker —" : "— empty —"}</option>
+                            {allPairs.map((p) => (
+                              <option key={key(p)} value={key(p)} disabled={inField(p) && !(q && pairEq(q.pair, p.pair))}>
+                                {label(p)}{koTie?.some((t) => pairEq(t.pair, p.pair)) ? " (tied)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="grid gap-4">
               {[
@@ -1465,7 +1583,7 @@ export default function TournamentView() {
               <Button variant="ghost" fullWidth onClick={() => setShowKnockoutConfig(false)}>
                 Cancel
               </Button>
-              <Button fullWidth disabled={busy} onClick={handleGenerateKnockout}>
+              <Button fullWidth disabled={busy || koField.length < 2 || !!koTie} onClick={handleGenerateKnockout}>
                 Start Knockout →
               </Button>
             </div>

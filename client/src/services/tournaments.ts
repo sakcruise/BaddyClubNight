@@ -22,7 +22,9 @@ import {
   computeGroupStandings,
   buildKnockoutBracket,
   advanceKnockoutRound,
+  selectQualifiers,
   rankParticipants,
+  type KnockoutQualifier,
   clubRulesDraft,
   type GroupStanding,
 } from "../utils/tournament";
@@ -459,16 +461,25 @@ export const tournamentsApi = {
 
   /** Once every group fixture is complete, build the round-1 knockout bracket
    * from the top `advance_per_group` pair(s) of each group. */
-  generateKnockout: async (tournamentId: string, knockoutConfig?: { qf: number; sf: number; f: number }): Promise<TournamentFixture[]> => {
+  /** Build round 1 from `qualifiers` if given (operator-reviewed list), else
+   * from the standings via selectQualifiers (top N per group, best-of-rest to 8). */
+  generateKnockout: async (
+    tournamentId: string,
+    knockoutConfig?: { qf: number; sf: number; f: number },
+    qualifiers?: KnockoutQualifier[]
+  ): Promise<TournamentFixture[]> => {
     const { tournament } = await tournamentsApi.get(tournamentId);
-    const qualifiers: Array<{ groupIndex: number; rankInGroup: number; pair: [string, string] }> = [];
-    for (let g = 0; g < tournament.num_groups; g++) {
-      const standings = await tournamentsApi.groupStandings(tournamentId, g);
-      standings.slice(0, tournament.advance_per_group).forEach((s, rank) => {
-        qualifiers.push({ groupIndex: g, rankInGroup: rank + 1, pair: s.pair });
-      });
+    let field = qualifiers;
+    if (!field) {
+      const standingsByGroup: Record<number, GroupStanding[]> = {};
+      for (let g = 0; g < tournament.num_groups; g++) {
+        standingsByGroup[g] = await tournamentsApi.groupStandings(tournamentId, g);
+      }
+      const picked = selectQualifiers(standingsByGroup, tournament.advance_per_group);
+      if (picked.tiedForLast) throw new Error("Two pairs are tied for the last knockout place — pick one in the knockout dialog.");
+      field = picked.qualifiers;
     }
-    const bracket = buildKnockoutBracket(qualifiers);
+    const bracket = buildKnockoutBracket(field);
     const fixtures = await insertKnockoutFixtures(tournamentId, 1, bracket);
     const updateData: any = { status: "knockout" };
     if (knockoutConfig) updateData.knockout_config = knockoutConfig;
