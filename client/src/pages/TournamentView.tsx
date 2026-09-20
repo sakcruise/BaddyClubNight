@@ -118,6 +118,8 @@ export default function TournamentView() {
   const [showWinners, setShowWinners] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
+  // Per-court dropdown choice, keyed by court id, before "Send to court" is tapped.
+  const [courtChoice, setCourtChoice] = useState<Record<number, string>>({});
   // Which group-stage cell has its court chooser open.
   const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
   const [showKnockoutConfig, setShowKnockoutConfig] = useState(false);
@@ -347,31 +349,21 @@ export default function TournamentView() {
   const stageCourts = tournament?.status === "groups" ? courts : courts.filter((c) => c.id <= KNOCKOUT_COURTS);
   const idleCourts = stageCourts.filter((c) => c.status === "idle");
 
-  // Send as many pending group matches to free courts as possible: one court at a
-  // time, cycling through the groups so no group hogs the hall, never putting a
-  // player on two courts at once. The operator can still move or reset any of them.
-  async function handleAutoFillCourts() {
-    if (!session || !tournament) return;
-    const busyPlayers = new Set(
+  // Matches waiting for a court in the current stage: not started, both pairs
+  // known, and nobody in them already on a court.
+  function eligiblePool(): TournamentFixture[] {
+    if (!tournament) return [];
+    const stage = tournament.status === "groups" ? "group" : "knockout";
+    const onCourt = new Set(
       fixtures.filter((f) => f.status === "active").flatMap((f) => [...(f.team_a ?? []), ...(f.team_b ?? [])])
     );
-    const free = [...idleCourts].sort((a, b) => a.id - b.id);
-    const pending = fixtures.filter((f) => f.stage === "group" && f.status === "pending" && f.team_a && f.team_b);
-    const plan: Array<[TournamentFixture, number]> = [];
-    let g = 0;
-    let stall = 0;
-    while (free.length > 0 && stall < tournament.num_groups) {
-      const next = pending.find(
-        (f) => f.group_index === g && !plan.some(([p]) => p.id === f.id) && ![...f.team_a!, ...f.team_b!].some((id) => busyPlayers.has(id))
-      );
-      if (next) {
-        plan.push([next, free.shift()!.id]);
-        [...next.team_a!, ...next.team_b!].forEach((id) => busyPlayers.add(id));
-        stall = 0;
-      } else stall++;
-      g = (g + 1) % tournament.num_groups;
-    }
-    if (plan.length === 0) { setError(free.length === 0 ? "No free courts." : "Everyone still to play is already on a court."); return; }
+    return fixtures.filter(
+      (f) => f.stage === stage && f.status === "pending" && f.team_a && f.team_b && ![...f.team_a, ...f.team_b].some((id) => onCourt.has(id))
+    );
+  }
+
+  async function sendToCourts(plan: Array<[TournamentFixture, number]>) {
+    if (!session || plan.length === 0) return;
     setBusy(true);
     setError(null);
     try {
@@ -382,10 +374,38 @@ export default function TournamentView() {
       }
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not fill the courts");
+      setError(e instanceof Error ? e.message : "Could not send to court");
     } finally {
       setBusy(false);
     }
+  }
+
+  // 🎲 Fill every free court with a random waiting match, re-checking the pool
+  // after each pick so a pair can't be sent to two courts in the same pass.
+  function handleRandomAssignAll() {
+    const free = [...idleCourts].sort((a, b) => a.id - b.id);
+    const taken = new Set<string>();
+    const plan: Array<[TournamentFixture, number]> = [];
+    for (const court of free) {
+      const pool = eligiblePool().filter((f) => ![...f.team_a!, ...f.team_b!].some((id) => taken.has(id)));
+      if (pool.length === 0) break;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      [...pick.team_a!, ...pick.team_b!].forEach((id) => taken.add(id));
+      plan.push([pick, court.id]);
+    }
+    if (plan.length === 0) { setError(free.length === 0 ? "No free courts." : "No matches ready — waiting on results elsewhere."); return; }
+    sendToCourts(plan);
+  }
+
+  function handleRandomAssignOne(courtId: number) {
+    const pool = eligiblePool();
+    if (pool.length === 0) { setError("No matches ready — waiting on results elsewhere."); return; }
+    sendToCourts([[pool[Math.floor(Math.random() * pool.length)], courtId]]);
+  }
+
+  // Free a court without recording a result — puts the match back in the pool.
+  async function handleFreeCourt(fixture: TournamentFixture) {
+    await handleResetFixture(fixture);
   }
 
   // Live matches can be moved to another court (someone's already on the one we sent them to).
@@ -828,39 +848,103 @@ export default function TournamentView() {
        >
         {error && <p className="text-sm font-display font-semibold text-red-600">{error}</p>}
 
-        {(() => {
-          const liveFixtures = fixtures.filter((f) => f.status === "active");
-          if (liveFixtures.length === 0) return null;
+        {tournament.status !== "complete" && (() => {
+          const stageLabel = tournament.status === "groups" ? "Court" : "KO Court";
+          const pool = eligiblePool();
+          const fixtureLabel = (f: TournamentFixture) => {
+            const prefix = f.stage === "group"
+              ? `Group ${(f.group_index ?? 0) + 1}`
+              : knockoutRoundLabel(fixtures.filter((x) => x.stage === "knockout" && x.round === f.round).length);
+            return `${prefix}: ${pairName(f.team_a, members)} vs ${pairName(f.team_b, members)}`;
+          };
           return (
-            <section className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-2.5">
-              <div className="flex items-center gap-2">
-                <motion.span
-                  animate={{ opacity: [1, 0.35, 1] }}
-                  transition={{ repeat: Infinity, duration: 1.4 }}
-                  className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"
-                />
-                <h2 className="text-xs font-display font-bold text-amber-700 uppercase tracking-widest">
-                  Now Playing ({liveFixtures.length})
+            <section className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap px-1">
+                <h2 className="text-[11px] font-display font-bold text-gray-500 uppercase tracking-widest">
+                  Courts ({stageCourts.length} available) · {pool.length} match{pool.length === 1 ? "" : "es"} waiting
                 </h2>
+                <button
+                  onClick={handleRandomAssignAll}
+                  disabled={busy || idleCourts.length === 0 || pool.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 text-amber-950 px-3 py-1.5 text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
+                >
+                  🎲 Randomly assign courts
+                </button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {liveFixtures.map((f) => {
-                  const match = f.match_id ? matches.find((m) => m.id === f.match_id) : undefined;
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${stageCourts.length}, minmax(200px, 1fr))` }}>
+                {[...stageCourts].sort((a, b) => a.id - b.id).map((court) => {
+                  const live = fixtures.find((f) => f.status === "active" && f.match_id && matches.find((m) => m.id === f.match_id)?.court_id === court.id);
+                  const liveMatch = live?.match_id ? matches.find((m) => m.id === live.match_id) : undefined;
+                  const choice = courtChoice[court.id] ?? "";
+                  if (!live) {
+                    return (
+                      <div key={court.id} className="rounded-2xl border border-gray-200 bg-white p-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-display font-bold text-sm text-gray-800">{stageLabel} {court.id}</span>
+                          <span className="text-[10px] font-display font-bold uppercase tracking-wider rounded-full bg-gray-100 text-gray-500 px-2 py-0.5">Free</span>
+                        </div>
+                        {pool.length > 0 ? (
+                          <>
+                            <select
+                              value={choice}
+                              onChange={(e) => setCourtChoice((c) => ({ ...c, [court.id]: e.target.value }))}
+                              className="w-full text-xs font-display font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2 py-2"
+                            >
+                              <option value="">Choose a waiting match…</option>
+                              {pool.map((f) => (
+                                <option key={f.id} value={f.id}>{fixtureLabel(f)}</option>
+                              ))}
+                            </select>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => { const f = pool.find((x) => x.id === choice); if (f) { setCourtChoice((c) => ({ ...c, [court.id]: "" })); sendToCourts([[f, court.id]]); } }}
+                                disabled={busy || !choice}
+                                className="flex-1 h-9 rounded-lg bg-violet-600 text-white text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
+                              >
+                                Send to court
+                              </button>
+                              <button
+                                onClick={() => handleRandomAssignOne(court.id)}
+                                disabled={busy}
+                                title="Send a random waiting match to this court"
+                                className="w-10 h-9 rounded-lg bg-amber-100 border border-amber-300 text-base active:scale-95 transition-all disabled:opacity-40"
+                              >
+                                🎲
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-[11px] font-body text-gray-400">No matches ready — waiting on results elsewhere.</p>
+                        )}
+                      </div>
+                    );
+                  }
+                  const target = targetPointsFor(live);
                   return (
-                    <button
-                      key={f.id}
-                      onClick={() => setScoringFixture(f)}
-                      className="flex items-center gap-2 bg-white border border-amber-300 rounded-xl pl-3 pr-2 py-1.5 hover:bg-amber-100 transition-colors"
-                    >
-                      {match && (
-                        <span className="text-[10px] font-display font-bold text-amber-600 bg-amber-100 rounded-md px-1.5 py-0.5">
-                          Court {match.court_id}
+                    <div key={court.id} className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-display font-bold text-sm text-gray-900">{stageLabel} {court.id}</span>
+                        <span className="text-[10px] font-display font-bold uppercase tracking-wider rounded-full bg-amber-200 text-amber-900 px-2 py-0.5">
+                          {live.stage === "group" ? `Group ${(live.group_index ?? 0) + 1}` : knockoutRoundLabel(fixtures.filter((x) => x.stage === "knockout" && x.round === live.round).length)}
                         </span>
-                      )}
-                      <span className="text-xs font-display font-semibold text-gray-800">
-                        {pairName(f.team_a, members)} <span className="text-gray-300">vs</span> {pairName(f.team_b, members)}
-                      </span>
-                    </button>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-body font-semibold text-[15px] text-gray-900 truncate">{pairName(live.team_a, members)}</div>
+                        <div className="text-[10px] font-display font-black text-amber-500 my-0.5">VS</div>
+                        <div className="font-body font-semibold text-[15px] text-gray-900 truncate">{pairName(live.team_b, members)}</div>
+                      </div>
+                      <button
+                        onClick={() => setScoringFixture(live)}
+                        disabled={busy}
+                        className="h-10 rounded-lg bg-emerald-600 text-white text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
+                      >
+                        {liveMatch?.score_a != null ? `Edit result (${liveMatch.score_a}–${liveMatch.score_b})` : "Save result"}
+                      </button>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-body text-gray-500">First to {target}{live.stage === "group" ? " · sudden death" : ""}</span>
+                        <button onClick={() => handleFreeCourt(live)} disabled={busy} className="text-[10px] font-display font-bold text-gray-400 hover:text-red-500">Free court</button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -870,15 +954,6 @@ export default function TournamentView() {
 
         {fixtures.some((f) => f.stage === "group") && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-semibold text-gray-400 px-1">
-            {tournament?.status === "groups" && (
-              <button
-                onClick={handleAutoFillCourts}
-                disabled={busy || idleCourts.length === 0}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-1.5 text-xs font-display font-bold active:scale-95 transition-all disabled:opacity-40"
-              >
-                <Play size={11} /> Auto-fill {idleCourts.length} free court{idleCourts.length === 1 ? "" : "s"}
-              </button>
-            )}
             <span className="flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 rounded-lg bg-violet-100 border border-violet-300 text-violet-800 px-1.5 py-0.5">
                 <Play size={9} /> Play
