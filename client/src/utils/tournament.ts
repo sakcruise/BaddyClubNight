@@ -253,3 +253,57 @@ export function advanceKnockoutRound(
   }
   return next;
 }
+
+/**
+ * "Club rules" draft: rank everyone, cut into six seed tiers, then pair each tier
+ * with its mirror tier (1×6, 2×5, 3×4) at RANDOM within the tier, so partners vary
+ * from year to year while every pair still sums to a similar strength. Pairs are
+ * then dealt round-robin into groups so each group gets a spread of pairs.
+ * Odd headcount: the weakest player sits out, same as the balanced draft.
+ */
+export function clubRulesDraft(
+  participantIds: string[],
+  members: Record<string, Member>,
+  numGroups: number
+): { pairsByGroup: Array<[string, string]>[]; reserves: string[] } {
+  const sorted = [...participantIds].sort(byStrength(members));
+  const reserves: string[] = [];
+  if (sorted.length % 2 === 1) reserves.push(sorted.pop()!);
+
+  const TIERS = 6;
+  const n = sorted.length;
+  const base = Math.floor(n / TIERS);
+  const rem = n % TIERS;
+  const tiers: string[][] = [];
+  let idx = 0;
+  for (let t = 0; t < TIERS; t++) {
+    const size = base + (t < rem ? 1 : 0);
+    tiers.push(sorted.slice(idx, idx + size));
+    idx += size;
+  }
+
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const pairs: Array<[string, string]> = [];
+  let leftover: string[] = [];
+  for (let t = 0; t < TIERS / 2; t++) {
+    const a = shuffle(tiers[t]);
+    const b = shuffle(tiers[TIERS - 1 - t]);
+    const k = Math.min(a.length, b.length);
+    for (let i = 0; i < k; i++) pairs.push([a[i], b[i]]);
+    leftover = leftover.concat(a.slice(k), b.slice(k));
+  }
+  leftover = shuffle(leftover);
+  for (let i = 0; i + 1 < leftover.length; i += 2) pairs.push([leftover[i], leftover[i + 1]]);
+
+  const pairsByGroup: Array<[string, string]>[] = Array.from({ length: numGroups }, () => []);
+  pairs.forEach((p, i) => pairsByGroup[i % numGroups].push(p));
+  return { pairsByGroup, reserves };
+}

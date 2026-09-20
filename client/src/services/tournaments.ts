@@ -23,8 +23,13 @@ import {
   buildKnockoutBracket,
   advanceKnockoutRound,
   rankParticipants,
+  clubRulesDraft,
   type GroupStanding,
 } from "../utils/tournament";
+
+/** balanced = strongest with weakest inside level-balanced groups (deterministic);
+ *  club = six seed tiers paired 1x6 / 2x5 / 3x4 at random, dealt into groups. */
+export type PairingMode = "balanced" | "club";
 
 async function getClubId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -233,8 +238,9 @@ export const tournamentsApi = {
   /** Draft the roster into level-balanced, pairable groups (snake draft +
    * strongest-with-weakest pairing) WITHOUT persisting anything — a preview
    * the admin can hand-tweak before `create` commits it. */
-  draft: (participantIds: string[], numGroups: number) => {
+  draft: (participantIds: string[], numGroups: number, mode: PairingMode = "balanced") => {
     const members = useMemberStore.getState().members;
+    if (mode === "club") return clubRulesDraft(participantIds, members, numGroups);
     const { groups, reserves } = snakeDraftGroups(participantIds, members, numGroups);
     const pairsByGroup = groups.map((groupMemberIds) => pairStrongestWithWeakest(groupMemberIds, members));
     return { pairsByGroup, reserves };

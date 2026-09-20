@@ -2,11 +2,12 @@ import { useState, useMemo, useEffect, Fragment } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
+import type { PairingMode } from "../services/tournaments";
 import { queueApi, membersApi, sessionsApi } from "../services/api";
 import Avatar from "../components/shared/Avatar";
 import Button from "../components/shared/Button";
 import { LEVEL_LABELS } from "../types";
-import { Trophy, ChevronLeft, Search, UserPlus, Check, UserCheck, X, PartyPopper } from "lucide-react";
+import { Trophy, ChevronLeft, Search, UserPlus, Check, UserCheck, X, PartyPopper, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
 // Same per-group accents as the tournament board, so a group looks the same here and there.
@@ -172,6 +173,7 @@ export default function TournamentSetupView() {
 
   const [step, setStep] = useState<"select" | "review">("select");
   const [numGroups, setNumGroups] = useState(4);
+  const [pairingMode, setPairingMode] = useState<PairingMode>("balanced");
   const [advancePerGroup, setAdvancePerGroup] = useState(1);
   const [pairsByGroup, setPairsByGroup] = useState<Pairs>([]);
   const [reserves, setReserves] = useState<string[]>([]);
@@ -188,12 +190,17 @@ export default function TournamentSetupView() {
   const playingCount = isOdd && sitOut ? count - 1 : count;
   const canDraft = numGroups >= 1 && (!isOdd || !!sitOut) && playingCount >= numGroups * 2;
 
-  function handleDraft() {
-    if (!canDraft) return;
+  function runDraft() {
     const participantIds = Array.from(selected).filter((id) => id !== sitOut);
-    const { pairsByGroup: drafted, reserves: draftedReserves } = tournamentsApi.draft(participantIds, numGroups);
+    const { pairsByGroup: drafted, reserves: draftedReserves } = tournamentsApi.draft(participantIds, numGroups, pairingMode);
     setPairsByGroup(drafted);
     setReserves(sitOut ? [...draftedReserves, sitOut] : draftedReserves);
+    setSelectedSlot(null);
+  }
+
+  function handleDraft() {
+    if (!canDraft) return;
+    runDraft();
     setStep("review");
   }
 
@@ -474,6 +481,26 @@ export default function TournamentSetupView() {
             </div>
 
             <div>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Pairing</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { key: "balanced", title: "Balanced", blurb: "Strongest with weakest in each group. Same pairs every time." },
+                  { key: "club", title: "Club rules", blurb: "Six seed tiers, random partner from the mirror tier. Reshuffle until happy." },
+                ] as const).map((o) => (
+                  <button
+                    key={o.key}
+                    onClick={() => setPairingMode(o.key)}
+                    className={`text-left rounded-xl border-2 px-3 py-2.5 transition-all active:scale-[0.98]
+                      ${pairingMode === o.key ? "border-violet-500 bg-violet-50" : "border-gray-200 bg-white"}`}
+                  >
+                    <div className={`font-display font-bold text-sm ${pairingMode === o.key ? "text-violet-800" : "text-gray-800"}`}>{o.title}</div>
+                    <div className="text-[11px] font-body text-gray-500 mt-0.5 leading-snug">{o.blurb}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Pairs advancing to knockout, per group</label>
               <div className="flex items-center gap-2">
                 <button onClick={() => setAdvancePerGroup((n) => Math.max(1, n - 1))} className="w-11 h-11 rounded-xl bg-violet-100 border-2 border-violet-200 font-display font-black text-xl text-violet-600 hover:bg-violet-200 active:scale-95 transition-all">−</button>
@@ -627,9 +654,16 @@ export default function TournamentSetupView() {
             })}
           </div>
 
-          <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
-            <Trophy size={18} /> {creating ? "Starting…" : "Confirm & Start Tournament"}
-          </Button>
+          <div className="flex gap-3">
+            {pairingMode === "club" && (
+              <Button size="lg" variant="secondary" disabled={creating} onClick={runDraft}>
+                <RotateCcw size={16} /> Reshuffle
+              </Button>
+            )}
+            <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
+              <Trophy size={18} /> {creating ? "Starting…" : "Confirm & Start Tournament"}
+            </Button>
+          </div>
         </main>
       )}
     </div>
