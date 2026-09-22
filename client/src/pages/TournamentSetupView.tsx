@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
+import { flushSync } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
@@ -74,6 +75,16 @@ export default function TournamentSetupView() {
   const [guestName, setGuestName] = useState("");
   const [guestLevel, setGuestLevel] = useState(2);
   const [showGuestForm, setShowGuestForm] = useState(false);
+  const guestInputRef = useRef<HTMLInputElement>(null);
+
+  // Touch keyboards only appear when focus happens inside the tap that opened the field,
+  // so render the form synchronously and focus it before the gesture ends (autoFocus is
+  // too late - it runs after React's async re-render).
+  function toggleGuestForm() {
+    const next = !showGuestForm;
+    flushSync(() => setShowGuestForm(next));
+    if (next) guestInputRef.current?.focus();
+  }
   const [addingGuest, setAddingGuest] = useState(false);
 
   useEffect(() => {
@@ -360,7 +371,7 @@ export default function TournamentSetupView() {
                   )}
                 </div>
                 <button
-                  onClick={() => setShowGuestForm((v) => !v)}
+                  onClick={toggleGuestForm}
                   className={`h-11 flex items-center gap-1.5 px-3 rounded-xl border-2 text-sm font-display font-bold transition-colors
                     ${showGuestForm ? "bg-violet-600 border-violet-600 text-white" : "border-violet-200 text-violet-600 active:bg-violet-50"}`}
                 >
@@ -393,12 +404,15 @@ export default function TournamentSetupView() {
                 >
                   <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-violet-50 border border-violet-100">
                     <input
+                      ref={guestInputRef}
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && addGuest()}
                       placeholder="Guest's name"
+                      autoCapitalize="words"
+                      autoComplete="off"
+                      enterKeyHint="done"
                       className="flex-1 h-11 px-3 rounded-xl border-2 border-violet-200 text-sm font-display font-bold focus:outline-none focus:border-violet-400 bg-white"
-                      autoFocus
                     />
                     <div className="flex gap-1">
                       {[1, 2, 3, 4, 5, 6].map((lvl) => (
