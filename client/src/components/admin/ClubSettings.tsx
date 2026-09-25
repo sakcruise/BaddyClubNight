@@ -261,22 +261,39 @@ export default function ClubSettings() {
             ))}
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
-            Guest Fee (£ / night)
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.50"
-            value={form.guestFee ?? 5}
-            onChange={(e) => handleChange("guestFee", e.target.value)}
-            className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
-                       focus:outline-none focus:border-emerald-400 w-full"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Guest Fee (£ / night)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.50"
+              value={form.guestFee ?? 5}
+              onChange={(e) => handleChange("guestFee", e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                         focus:outline-none focus:border-emerald-400 w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+              Ask to join after (visits)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.guestVisitsBeforeJoin ?? 3}
+              onChange={(e) => handleChange("guestVisitsBeforeJoin", e.target.value)}
+              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                         focus:outline-none focus:border-emerald-400 w-full"
+            />
+          </div>
         </div>
         <p className="text-xs text-gray-400 font-body">
-          Guests pay £{Number(form.guestFee ?? 5).toFixed(2)} each night they play. Member fees are set per plan below.
+          Guests pay £{Number(form.guestFee ?? 5).toFixed(2)} each night they play
+          {Number(form.guestVisitsBeforeJoin) > 0 ? ` and are flagged to join after ${form.guestVisitsBeforeJoin} visits` : ""}. Member fees are set per plan below.
         </p>
       </div>
 

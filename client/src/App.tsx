@@ -15,6 +15,7 @@ import MasterAdminView from "./pages/MasterAdminView";
 import PrivacyPolicyView from "./pages/PrivacyPolicyView";
 import MembersView from "./pages/MembersView";
 import MemberProfileView from "./pages/MemberProfileView";
+import GuestsView from "./pages/GuestsView";
 import FinanceView from "./pages/FinanceView";
 import SettingsView from "./pages/SettingsView";
 import { useSessionStore, useGroupStore } from "./store";
@@ -46,6 +47,7 @@ function AppRoutes() {
       <Route path="/analytics" element={<AnalyticsView />} />
       <Route path="/members" element={<MembersView />} />
       <Route path="/members/:id" element={<MemberProfileView />} />
+      <Route path="/guests" element={<GuestsView />} />
       <Route path="/finance" element={<FinanceView />} />
       <Route path="/settings" element={<SettingsView />} />
       <Route path="/groups" element={<GroupsHomeView />} />

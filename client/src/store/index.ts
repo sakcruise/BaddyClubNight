@@ -56,6 +56,7 @@ export interface ClubConfig {
   autoPickMode: "balanced" | "competitive"; // balanced = mix levels, competitive = group levels
   billingPeriod: BillingPeriod; // default cadence for new membership plans
   guestFee: number;             // £ per guest per night
+  guestVisitsBeforeJoin: number; // 0 = never nudge; else flag guests with this many visits
 }
 
 interface SessionStore {
@@ -85,6 +86,7 @@ const defaultClubConfig: ClubConfig = {
   autoPickMode: "balanced",
   billingPeriod: "quarterly",
   guestFee: 5,
+  guestVisitsBeforeJoin: 3,
 };
 
 export const useSessionStore = create<SessionStore>()(

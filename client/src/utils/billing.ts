@@ -33,6 +33,16 @@ function label(kind: BillingPeriod, y: number, m: number): string {
   }
 }
 
+/** Fee for the part of a window from `from` to its end, rounded to 50p. Whole fee if `from` is before the window starts. */
+export function proRata(fee: number, window: BillingWindow, from: string): number {
+  if (from <= window.start) return fee;
+  if (from > window.end) return 0;
+  const day = 864e5;
+  const total = Math.round((Date.parse(window.end) - Date.parse(window.start)) / day) + 1;
+  const left = Math.round((Date.parse(window.end) - Date.parse(from)) / day) + 1;
+  return Math.round((fee * left) / total * 2) / 2;
+}
+
 /** Billing windows around today: `before` past ones, the current one, and `after` upcoming ones. */
 export function billingWindows(kind: BillingPeriod, before = 2, after = 2, now = new Date()): BillingWindow[] {
   const n = MONTHS_PER[kind];

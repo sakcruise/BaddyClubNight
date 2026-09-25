@@ -3,8 +3,8 @@
  * no offline fallback, same stance as payments.ts).
  */
 import { supabase } from "../lib/supabase";
-import { getClubId, check } from "./api";
-import type { MembershipPlan, MemberNote, BillingPeriod } from "../types";
+import { getClubId, check, rowToMember } from "./api";
+import type { MembershipPlan, MemberNote, BillingPeriod, Member } from "../types";
 
 const rowToPlan = (r: any): MembershipPlan => ({ ...r, fee: Number(r.fee) });
 
@@ -61,6 +61,55 @@ export const plansApi = {
   delete: async (id: string): Promise<void> => {
     const { error } = await supabase.from("membership_plans").delete().eq("id", id);
     if (error) throw new Error(error.message);
+  },
+};
+
+export interface GuestSummary {
+  member: Member;
+  visits: number;
+  last_visit: string | null;   // ISO timestamp of the latest check-in
+}
+
+export const guestsApi = {
+  /** Every guest who has ever checked in, with visit counts. */
+  list: async (): Promise<GuestSummary[]> => {
+    const clubId = await getClubId();
+    const { data: guests, error } = await supabase
+      .from("members")
+      .select("*")
+      .eq("club_id", clubId)
+      .eq("member_type", "guest")
+      .order("name");
+    const rows = check(guests, error);
+    if (rows.length === 0) return [];
+    const ids = rows.map((g: any) => g.id);
+    const { data: visits, error: vErr } = await supabase
+      .from("queue_entries")
+      .select("member_id, checked_in_at")
+      .in("member_id", ids);
+    const agg = new Map<string, { n: number; last: string | null }>();
+    for (const v of check(visits, vErr) as any[]) {
+      const a = agg.get(v.member_id) ?? { n: 0, last: null };
+      a.n += 1;
+      if (!a.last || v.checked_in_at > a.last) a.last = v.checked_in_at;
+      agg.set(v.member_id, a);
+    }
+    return rows.map((g: any) => ({
+      member: rowToMember(g),
+      visits: agg.get(g.id)?.n ?? 0,
+      last_visit: agg.get(g.id)?.last ?? null,
+    }));
+  },
+
+  /** Turns a guest into a member. Their id — and so all match history — is unchanged. */
+  convert: async (id: string, p: { member_type: "male" | "female"; plan_id: string | null; status: "active" | "trial"; joined_at: string }): Promise<Member> => {
+    const { data, error } = await supabase
+      .from("members")
+      .update({ ...p, active: true, paused_from: null, paused_until: null, pause_reason: null })
+      .eq("id", id)
+      .select()
+      .single();
+    return rowToMember(check(data, error));
   },
 };
 

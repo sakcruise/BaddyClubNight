@@ -64,7 +64,7 @@ function rowToMatch(m: any): Match {
 }
 
 // ─── Helper: map member row → Member type ────────────────────────────────────
-function rowToMember(m: any): Member {
+export function rowToMember(m: any): Member {
   return {
     id: m.id,
     name: m.name,

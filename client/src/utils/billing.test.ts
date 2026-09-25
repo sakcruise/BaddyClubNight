@@ -1,5 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { billingWindows, billingPer } from "./billing";
+import { billingWindows, billingPer, proRata } from "./billing";
+
+describe("proRata", () => {
+  const q3 = { label: "2026 Q3", start: "2026-07-01", end: "2026-09-30", current: true };
+  it("charges the whole fee when joining at or before the start", () => {
+    expect(proRata(30, q3, "2026-07-01")).toBe(30);
+    expect(proRata(30, q3, "2026-05-01")).toBe(30);
+  });
+  it("charges the remaining share, rounded to 50p", () => {
+    // 1 Sep – 30 Sep = 30 of 92 days → £9.78 → £10.00
+    expect(proRata(30, q3, "2026-09-01")).toBe(10);
+    // 16 Aug – 30 Sep = 46 of 92 days → exactly half
+    expect(proRata(30, q3, "2026-08-16")).toBe(15);
+  });
+  it("charges nothing after the window has ended", () => {
+    expect(proRata(30, q3, "2026-10-01")).toBe(0);
+  });
+});
 
 const sep2026 = new Date(2026, 8, 25);
 

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSessionStore, useAuthStore, useMemberStore } from "../store";
 import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
-import { History, Users, Cog, LogOut, Play, BarChart2, Zap, Info, Trophy, Wallet } from "lucide-react";
+import { History, Users, UserPlus, Cog, LogOut, Play, BarChart2, Zap, Info, Trophy, Wallet } from "lucide-react";
 
 type Panel = "start" | null;
 
@@ -285,6 +285,7 @@ export default function HomeView() {
               { icon: History,   label: "History",   action: () => navigate("/history") },
               { icon: BarChart2, label: "Analytics", action: () => navigate("/analytics") },
               { icon: Users,     label: "Members",   action: () => navigate("/members") },
+              { icon: UserPlus,  label: "Guests",    action: () => navigate("/guests") },
               { icon: Wallet,    label: "Finance",   action: () => navigate("/finance") },
               { icon: Cog,       label: "Settings",  action: () => navigate("/settings") },
             ].map(({ icon: Icon, label, action }) => (
