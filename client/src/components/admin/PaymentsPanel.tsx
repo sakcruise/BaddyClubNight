@@ -4,7 +4,8 @@ import { useMemberStore, usePaymentStore, useSessionStore } from "../../store";
 import { membersApi } from "../../services/api";
 import { paymentsApi, type PaymentSessionSummary } from "../../services/payments";
 import Avatar from "../shared/Avatar";
-import type { Member, MembershipDue, SessionFee, PaymentStatus, PaidMethod } from "../../types";
+import type { Member, MembershipDue, SessionFee, PaymentStatus, PaidMethod, BillingPeriod } from "../../types";
+import { billingWindows, billingPer } from "../../utils/billing";
 
 type Tab = "dues" | "fees" | "ledger";
 
@@ -23,7 +24,6 @@ const STATUS_STYLE: Record<PaymentStatus, string> = {
 };
 
 const money = (n: number) => `£${n.toFixed(2)}`;
-const todayISO = () => new Date().toISOString().slice(0, 10);
 const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
@@ -94,8 +94,8 @@ export default function PaymentsPanel() {
 
       <div className="grid grid-cols-3 gap-1 bg-gray-100 rounded-2xl p-1">
         {([
-          ["dues", "Membership", CalendarDays],
-          ["fees", "Session Fees", Receipt],
+          ["dues", "Members", CalendarDays],
+          ["fees", "Guests", Receipt],
           ["ledger", "Ledger", Scale],
         ] as const).map(([key, label, Icon]) => (
           <button
@@ -124,7 +124,8 @@ export default function PaymentsPanel() {
             roster={roster}
             members={members}
             dues={dueList}
-            defaultAmount={Number(clubConfig.membershipFeeDefault) || 0}
+            billingPeriod={clubConfig.billingPeriod ?? "quarterly"}
+            defaultAmount={Number(clubConfig.membershipFee) || 0}
             onChanged={upsertDues}
             reload={async () => setDues(await paymentsApi.listDues())}
           />
@@ -133,7 +134,7 @@ export default function PaymentsPanel() {
             members={members}
             sessions={sessions}
             fees={feeList}
-            defaultAmount={Number(clubConfig.sessionFeeDefault) || 0}
+            defaultAmount={Number(clubConfig.guestFee) || 0}
             onChanged={upsertSessionFees}
             reload={async () => setSessionFees(await paymentsApi.listSessionFees())}
           />
@@ -147,10 +148,11 @@ export default function PaymentsPanel() {
 
 // ─── Membership dues ──────────────────────────────────────────────────────────
 
-function DuesTab({ roster, members, dues, defaultAmount, onChanged, reload }: {
+function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChanged, reload }: {
   roster: Member[];
   members: Record<string, Member>;
   dues: MembershipDue[];
+  billingPeriod: BillingPeriod;
   defaultAmount: number;
   onChanged: (rows: MembershipDue[]) => void;
   reload: () => Promise<void>;
@@ -161,12 +163,23 @@ function DuesTab({ roster, members, dues, defaultAmount, onChanged, reload }: {
     return [...seen.values()].sort((a, b) => b.period_start.localeCompare(a.period_start));
   }, [dues]);
 
+  // Windows from the club's billing cadence that haven't been billed yet
+  const windows = useMemo(
+    () => billingWindows(billingPeriod, 2, 2).filter((w) => !periods.some((p) => p.period_label === w.label)),
+    [billingPeriod, periods]
+  );
+
   const [selected, setSelected] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
-  const [label, setLabel] = useState("");
-  const [start, setStart] = useState(todayISO());
-  const [end, setEnd] = useState("");
+  const [windowLabel, setWindowLabel] = useState("");
   const [amount, setAmount] = useState(String(defaultAmount));
+
+  useEffect(() => {
+    if (!windows.some((w) => w.label === windowLabel)) {
+      setWindowLabel(windows.find((w) => w.current)?.label ?? windows[0]?.label ?? "");
+    }
+  }, [windows, windowLabel]);
+  const window_ = windows.find((w) => w.label === windowLabel) ?? null;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -198,21 +211,19 @@ function DuesTab({ roster, members, dues, defaultAmount, onChanged, reload }: {
 
   async function createPeriod() {
     const amt = parseFloat(amount);
-    if (!label.trim() || !start || !end || isNaN(amt)) return;
+    if (!window_ || isNaN(amt)) return;
     setCreating(true);
     try {
       await paymentsApi.createPeriod({
-        period_label: label,
-        period_start: start,
-        period_end: end,
+        period_label: window_.label,
+        period_start: window_.start,
+        period_end: window_.end,
         amount_due: amt,
         member_ids: roster.map((m) => m.id),
       });
       await reload();
-      setSelected(label.trim());
+      setSelected(window_.label);
       setShowNew(false);
-      setLabel("");
-      setEnd("");
     } finally {
       setCreating(false);
     }
@@ -274,28 +285,35 @@ function DuesTab({ roster, members, dues, defaultAmount, onChanged, reload }: {
 
       {showNew && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col gap-3">
-          <p className="text-xs font-display font-bold text-emerald-700 uppercase tracking-wider">New billing period</p>
-          <input
-            type="text"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g. 2026 Q4 or Sep 2026"
-            className="border-2 border-emerald-200 rounded-xl px-3 py-2.5 font-body text-sm bg-white focus:outline-none focus:border-emerald-400"
-          />
-          <div className="grid grid-cols-3 gap-2">
-            <Field label="From">
-              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inputCls} />
-            </Field>
-            <Field label="To">
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
-            </Field>
-            <Field label="Amount (£)">
-              <input type="number" min="0" step="0.50" value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} />
-            </Field>
-          </div>
+          <p className="text-xs font-display font-bold text-emerald-700 uppercase tracking-wider">
+            Bill members for a {billingPer(billingPeriod)}
+          </p>
+          {windows.length === 0 ? (
+            <p className="text-xs text-emerald-800 font-body">Every nearby {billingPer(billingPeriod)} is already billed.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Period">
+                <select value={windowLabel} onChange={(e) => setWindowLabel(e.target.value)} className={inputCls}>
+                  {windows.map((w) => (
+                    <option key={w.label} value={w.label}>
+                      {w.label}{w.current ? " (current)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={`Amount (£ / ${billingPer(billingPeriod)})`}>
+                <input type="number" min="0" step="0.50" value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} />
+              </Field>
+            </div>
+          )}
+          {window_ && (
+            <p className="text-[11px] text-emerald-700 font-display">
+              {shortDate(window_.start)} – {shortDate(window_.end)} · change the cadence in Club Settings
+            </p>
+          )}
           <button
             onClick={createPeriod}
-            disabled={creating || !label.trim() || !end || isNaN(parseFloat(amount))}
+            disabled={creating || !window_ || isNaN(parseFloat(amount))}
             className="bg-emerald-500 text-white py-2.5 rounded-xl font-display font-bold text-sm hover:bg-emerald-600
                        active:scale-95 transition-all disabled:opacity-50"
           >
@@ -349,7 +367,7 @@ function DuesTab({ roster, members, dues, defaultAmount, onChanged, reload }: {
         {!period && (
           <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
             <span className="text-4xl">💷</span>
-            <p className="text-gray-400 font-display font-bold text-sm">Create a billing period to start tracking dues</p>
+            <p className="text-gray-400 font-display font-bold text-sm">Bill members for a {billingPer(billingPeriod)} to start tracking dues</p>
           </div>
         )}
         {period && unbilled.length > 0 && periodDues.length > 0 && (
@@ -394,12 +412,12 @@ function FeesTab({ members, sessions, fees, defaultAmount, onChanged, reload }: 
     setGenerating(true);
     setMsg("");
     try {
-      const ids = await paymentsApi.listCheckedIn(sessionId);
+      const ids = (await paymentsApi.listCheckedIn(sessionId)).filter((id) => members[id]?.member_type === "guest");
       const before = sessionFees.length;
       await paymentsApi.generateSessionFees(sessionId, ids, amt);
       await reload();
       const added = Math.max(0, ids.length - before);
-      setMsg(ids.length === 0 ? "Nobody checked in to that night" : `Added ${added} fee${added === 1 ? "" : "s"} for ${ids.length} checked-in player${ids.length === 1 ? "" : "s"}`);
+      setMsg(ids.length === 0 ? "No guests played that night" : `Added ${added} fee${added === 1 ? "" : "s"} for ${ids.length} guest${ids.length === 1 ? "" : "s"}`);
     } catch (e: any) {
       setMsg(e?.message ?? "Could not generate fees");
     } finally {
@@ -446,7 +464,7 @@ function FeesTab({ members, sessions, fees, defaultAmount, onChanged, reload }: 
       {session && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex gap-2 items-end">
-            <Field label="Fee per player (£)">
+            <Field label="Guest fee (£ / night)">
               <input type="number" min="0" step="0.50" value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} />
             </Field>
             <button
@@ -455,7 +473,7 @@ function FeesTab({ members, sessions, fees, defaultAmount, onChanged, reload }: 
               className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl font-display font-bold text-sm hover:bg-emerald-600
                          active:scale-95 transition-all disabled:opacity-50"
             >
-              {generating ? "…" : sessionFees.length ? "Add newly checked-in" : "Charge checked-in players"}
+              {generating ? "…" : sessionFees.length ? "Add newly checked-in guests" : "Charge guests who played"}
             </button>
           </div>
           {msg && <p className="text-xs font-display font-bold text-emerald-700">{msg}</p>}
@@ -464,7 +482,7 @@ function FeesTab({ members, sessions, fees, defaultAmount, onChanged, reload }: 
 
       {sessionFees.length > 0 && (
         <div className="flex items-center justify-between text-xs font-display font-bold text-gray-500 px-1">
-          <span>{sessionFees.length} player{sessionFees.length === 1 ? "" : "s"}</span>
+          <span>{sessionFees.length} guest{sessionFees.length === 1 ? "" : "s"}</span>
           <span>{paid.length}/{sessionFees.length} paid · {money(paid.reduce((s, f) => s + f.amount_due, 0))} collected</span>
         </div>
       )}
@@ -488,7 +506,7 @@ function FeesTab({ members, sessions, fees, defaultAmount, onChanged, reload }: 
         })}
         {session && sessionFees.length === 0 && (
           <p className="text-center text-sm text-gray-400 font-display font-bold py-8">
-            No fees for this night yet — charge the checked-in players above
+            No guest fees for this night yet — charge the guests who played above
           </p>
         )}
       </div>

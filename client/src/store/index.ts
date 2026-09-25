@@ -4,7 +4,7 @@ import type {
   Session, Court, QueuePosition, Match, Member, PickerState, SyncState,
   Group, GroupMember, MemberType, PitstopState,
   Tournament, TournamentPlayer, TournamentFixture,
-  MembershipDue, SessionFee,
+  MembershipDue, SessionFee, BillingPeriod,
 } from "../types";
 import { normalisePositions } from "../utils/queueLogic";
 import { v4 as uuid } from "uuid";
@@ -54,8 +54,9 @@ export interface ClubConfig {
   shuttleBudgetTubes: number;  // tubes budgeted per night, e.g. 10
   autoPickEnabled: boolean;    // auto-pick players when court is free
   autoPickMode: "balanced" | "competitive"; // balanced = mix levels, competitive = group levels
-  membershipFeeDefault: number; // £ per billing period, prefilled when creating a period
-  sessionFeeDefault: number;    // £ per player per night, prefilled when generating session fees
+  billingPeriod: BillingPeriod; // how often members are billed
+  membershipFee: number;        // £ per billing period
+  guestFee: number;             // £ per guest per night
 }
 
 interface SessionStore {
@@ -83,8 +84,9 @@ const defaultClubConfig: ClubConfig = {
   shuttleBudgetTubes: 10,
   autoPickEnabled: false,
   autoPickMode: "balanced",
-  membershipFeeDefault: 30,
-  sessionFeeDefault: 5,
+  billingPeriod: "quarterly",
+  membershipFee: 30,
+  guestFee: 5,
 };
 
 export const useSessionStore = create<SessionStore>()(

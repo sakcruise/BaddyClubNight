@@ -193,6 +193,7 @@ export interface SyncState {
 
 // ─── Payments (manual tracking — money moves outside the app) ─────────────────
 
+export type BillingPeriod = "monthly" | "quarterly" | "half_yearly" | "yearly";
 export type PaymentStatus = "unpaid" | "paid" | "waived";
 export type PaidMethod = "cash" | "bank_transfer" | "upi" | "other";
 
