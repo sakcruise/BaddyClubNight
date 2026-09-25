@@ -2,6 +2,9 @@
 
 export type MemberType = "male" | "female" | "guest";
 
+// guest → trial → active → paused → lapsed → archived
+export type MemberStatus = "guest" | "trial" | "active" | "paused" | "lapsed" | "archived";
+
 export interface Member {
   id: string;
   name: string;
@@ -10,6 +13,34 @@ export interface Member {
   member_type: MemberType;
   level: number;          // 1..MAX_LEVEL, see LEVEL_LABELS
   active?: boolean;       // false = archived: hidden from rosters, kept for history
+  status?: MemberStatus;
+  phone?: string;
+  emergency_contact?: string;
+  joined_at?: string;     // ISO date
+  plan_id?: string | null;
+  paused_from?: string | null;
+  paused_until?: string | null;
+  pause_reason?: string | null;
+  created_at: string;
+}
+
+export interface MembershipPlan {
+  id: string;
+  club_id: string;
+  name: string;           // Full, Student, Social…
+  fee: number;
+  cadence: BillingPeriod;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface MemberNote {
+  id: string;
+  club_id: string;
+  member_id: string;
+  author: string | null;
+  body: string;
   created_at: string;
 }
 
@@ -205,6 +236,7 @@ export interface MembershipDue {
   period_start: string;   // ISO date
   period_end: string;     // ISO date
   amount_due: number;
+  plan_id?: string | null;
   status: PaymentStatus;
   paid_method: PaidMethod | null;
   paid_at: string | null;

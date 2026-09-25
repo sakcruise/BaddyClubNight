@@ -4,7 +4,9 @@ import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag, Z
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
 import OfflineMode from "../shared/OfflineMode";
-import { BILLING_PERIODS, billingPer } from "../../utils/billing";
+import { BILLING_PERIODS } from "../../utils/billing";
+import MembershipPlansCard from "./MembershipPlansCard";
+import type { BillingPeriod } from "../../types";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -237,11 +239,11 @@ export default function ClubSettings() {
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
         <div className="flex items-center gap-2 text-emerald-600">
           <Wallet size={16} />
-          <span className="font-display font-bold text-sm uppercase tracking-wider">Membership &amp; Fees</span>
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Billing &amp; Guest Fee</span>
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
-            Members are billed
+            Usual billing cadence (default for new plans)
           </label>
           <div className="grid grid-cols-4 gap-2">
             {BILLING_PERIODS.map((p) => (
@@ -259,41 +261,26 @@ export default function ClubSettings() {
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
-              Membership Fee (£ / {billingPer(form.billingPeriod ?? "quarterly")})
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.50"
-              value={form.membershipFee ?? 30}
-              onChange={(e) => handleChange("membershipFee", e.target.value)}
-              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
-                         focus:outline-none focus:border-emerald-400 w-full"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
-              Guest Fee (£ / night)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.50"
-              value={form.guestFee ?? 5}
-              onChange={(e) => handleChange("guestFee", e.target.value)}
-              className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
-                         focus:outline-none focus:border-emerald-400 w-full"
-            />
-          </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+            Guest Fee (£ / night)
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.50"
+            value={form.guestFee ?? 5}
+            onChange={(e) => handleChange("guestFee", e.target.value)}
+            className="border-2 border-gray-200 rounded-2xl px-4 py-3 font-display font-bold text-lg
+                       focus:outline-none focus:border-emerald-400 w-full"
+          />
         </div>
         <p className="text-xs text-gray-400 font-body">
-          Members pay £{Number(form.membershipFee ?? 30).toFixed(2)} per {billingPer(form.billingPeriod ?? "quarterly")};
-          guests pay £{Number(form.guestFee ?? 5).toFixed(2)} each night they play. Used to prefill Payments.
+          Guests pay £{Number(form.guestFee ?? 5).toFixed(2)} each night they play. Member fees are set per plan below.
         </p>
       </div>
+
+      <MembershipPlansCard defaultCadence={(form.billingPeriod ?? "quarterly") as BillingPeriod} />
 
       {/* Auto-Pick */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">

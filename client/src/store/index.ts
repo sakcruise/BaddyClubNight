@@ -54,8 +54,7 @@ export interface ClubConfig {
   shuttleBudgetTubes: number;  // tubes budgeted per night, e.g. 10
   autoPickEnabled: boolean;    // auto-pick players when court is free
   autoPickMode: "balanced" | "competitive"; // balanced = mix levels, competitive = group levels
-  billingPeriod: BillingPeriod; // how often members are billed
-  membershipFee: number;        // £ per billing period
+  billingPeriod: BillingPeriod; // default cadence for new membership plans
   guestFee: number;             // £ per guest per night
 }
 
@@ -85,7 +84,6 @@ const defaultClubConfig: ClubConfig = {
   autoPickEnabled: false,
   autoPickMode: "balanced",
   billingPeriod: "quarterly",
-  membershipFee: 30,
   guestFee: 5,
 };
 

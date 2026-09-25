@@ -73,6 +73,14 @@ function rowToMember(m: any): Member {
     member_type: m.member_type ?? "male",
     level: m.level ?? 2,
     active: m.active ?? true,
+    status: m.status ?? (m.member_type === "guest" ? "guest" : m.active === false ? "archived" : "active"),
+    phone: m.phone ?? undefined,
+    emergency_contact: m.emergency_contact ?? undefined,
+    joined_at: m.joined_at ?? undefined,
+    plan_id: m.plan_id ?? null,
+    paused_from: m.paused_from ?? null,
+    paused_until: m.paused_until ?? null,
+    pause_reason: m.pause_reason ?? null,
     created_at: m.created_at,
   };
 }
@@ -234,7 +242,7 @@ export const membersApi = {
     return { member: rowToMember(check(data, error)) };
   },
 
-  update: async (id: string, patch: { name?: string; member_type?: MemberType; level?: number; active?: boolean }) => {
+  update: async (id: string, patch: Partial<Omit<Member, "id" | "created_at">>) => {
     if (isOffline()) {
       useMemberStore.getState().updateMember(id, patch);
       const member = useMemberStore.getState().members[id];

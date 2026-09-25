@@ -3,8 +3,9 @@ import { Check, Ban, RotateCcw, X, Plus, WifiOff, Receipt, CalendarDays, Scale, 
 import { useMemberStore, usePaymentStore, useSessionStore } from "../../store";
 import { membersApi } from "../../services/api";
 import { paymentsApi, type PaymentSessionSummary } from "../../services/payments";
+import { plansApi } from "../../services/membership";
 import Avatar from "../shared/Avatar";
-import type { Member, MembershipDue, SessionFee, PaymentStatus, PaidMethod, BillingPeriod } from "../../types";
+import type { Member, MembershipDue, SessionFee, PaymentStatus, PaidMethod, MembershipPlan } from "../../types";
 import { billingWindows, billingPer } from "../../utils/billing";
 
 type Tab = "dues" | "fees" | "ledger";
@@ -34,6 +35,7 @@ export default function PaymentsPanel() {
 
   const [tab, setTab] = useState<Tab>("dues");
   const [sessions, setSessions] = useState<PaymentSessionSummary[]>([]);
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -49,16 +51,18 @@ export default function PaymentsPanel() {
     setLoading(true);
     setError("");
     try {
-      const [m, d, f, s] = await Promise.all([
+      const [m, d, f, s, p] = await Promise.all([
         membersApi.list(),
         paymentsApi.listDues(),
         paymentsApi.listSessionFees(),
         paymentsApi.listRecentSessions(),
+        plansApi.list(),
       ]);
       setMembers(m.members);
       setDues(d);
       setSessionFees(f);
       setSessions(s);
+      setPlans(p);
     } catch (e: any) {
       setError(e?.message ?? "Could not load payments");
     } finally {
@@ -124,8 +128,7 @@ export default function PaymentsPanel() {
             roster={roster}
             members={members}
             dues={dueList}
-            billingPeriod={clubConfig.billingPeriod ?? "quarterly"}
-            defaultAmount={Number(clubConfig.membershipFee) || 0}
+            plans={plans.filter((p) => p.active)}
             onChanged={upsertDues}
             reload={async () => setDues(await paymentsApi.listDues())}
           />
@@ -148,12 +151,11 @@ export default function PaymentsPanel() {
 
 // ─── Membership dues ──────────────────────────────────────────────────────────
 
-function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChanged, reload }: {
+function DuesTab({ roster, members, dues, plans, onChanged, reload }: {
   roster: Member[];
   members: Record<string, Member>;
   dues: MembershipDue[];
-  billingPeriod: BillingPeriod;
-  defaultAmount: number;
+  plans: MembershipPlan[];
   onChanged: (rows: MembershipDue[]) => void;
   reload: () => Promise<void>;
 }) {
@@ -163,22 +165,32 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
     return [...seen.values()].sort((a, b) => b.period_start.localeCompare(a.period_start));
   }, [dues]);
 
-  // Windows from the club's billing cadence that haven't been billed yet
-  const windows = useMemo(
-    () => billingWindows(billingPeriod, 2, 2).filter((w) => !periods.some((p) => p.period_label === w.label)),
-    [billingPeriod, periods]
-  );
-
   const [selected, setSelected] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [planId, setPlanId] = useState("");
   const [windowLabel, setWindowLabel] = useState("");
-  const [amount, setAmount] = useState(String(defaultAmount));
+  const [amount, setAmount] = useState("");
+
+  useEffect(() => {
+    if (!plans.some((p) => p.id === planId)) setPlanId(plans[0]?.id ?? "");
+  }, [plans, planId]);
+  const plan = plans.find((p) => p.id === planId) ?? null;
+  const billingPeriod = plan?.cadence ?? "quarterly";
+  const onPlan = useMemo(() => roster.filter((m) => m.plan_id === planId), [roster, planId]);
+  const unassigned = useMemo(() => roster.filter((m) => !m.plan_id), [roster]);
+
+  // Windows from this plan's cadence that none of its members have been billed for yet
+  const windows = useMemo(() => {
+    const billed = new Set(dues.filter((d) => d.plan_id === planId).map((d) => d.period_label));
+    return billingWindows(billingPeriod, 2, 2).filter((w) => !billed.has(w.label));
+  }, [billingPeriod, dues, planId]);
 
   useEffect(() => {
     if (!windows.some((w) => w.label === windowLabel)) {
       setWindowLabel(windows.find((w) => w.current)?.label ?? windows[0]?.label ?? "");
     }
   }, [windows, windowLabel]);
+  useEffect(() => { if (plan) setAmount(String(plan.fee)); }, [plan]);
   const window_ = windows.find((w) => w.label === windowLabel) ?? null;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -211,7 +223,7 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
 
   async function createPeriod() {
     const amt = parseFloat(amount);
-    if (!window_ || isNaN(amt)) return;
+    if (!window_ || !plan || isNaN(amt)) return;
     setCreating(true);
     try {
       await paymentsApi.createPeriod({
@@ -219,7 +231,8 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
         period_start: window_.start,
         period_end: window_.end,
         amount_due: amt,
-        member_ids: roster.map((m) => m.id),
+        member_ids: onPlan.map((m) => m.id),
+        plan_id: plan.id,
       });
       await reload();
       setSelected(window_.label);
@@ -233,12 +246,14 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
     if (!period) return;
     setBusyId(m.id);
     try {
+      const mp = plans.find((p) => p.id === m.plan_id);
       await paymentsApi.createPeriod({
         period_label: period.period_label,
         period_start: period.period_start,
         period_end: period.period_end,
-        amount_due: period.amount_due,
+        amount_due: mp?.fee ?? period.amount_due,
         member_ids: [m.id],
+        plan_id: mp?.id ?? null,
       });
       await reload();
     } finally {
@@ -270,7 +285,7 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
           {periods.length === 0 && <option value="">No billing periods yet</option>}
           {periods.map((p) => (
             <option key={p.period_label} value={p.period_label}>
-              {p.period_label} · {money(p.amount_due)}
+              {p.period_label}
             </option>
           ))}
         </select>
@@ -286,12 +301,21 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
       {showNew && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col gap-3">
           <p className="text-xs font-display font-bold text-emerald-700 uppercase tracking-wider">
-            Bill members for a {billingPer(billingPeriod)}
+            Bill a plan for a {billingPer(billingPeriod)}
           </p>
-          {windows.length === 0 ? (
-            <p className="text-xs text-emerald-800 font-body">Every nearby {billingPer(billingPeriod)} is already billed.</p>
+          {plans.length === 0 ? (
+            <p className="text-xs text-emerald-800 font-body">No membership plans yet — add them in Settings.</p>
+          ) : windows.length === 0 ? (
+            <p className="text-xs text-emerald-800 font-body">Every nearby {billingPer(billingPeriod)} is already billed for this plan.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Plan">
+                <select value={planId} onChange={(e) => setPlanId(e.target.value)} className={inputCls}>
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Period">
                 <select value={windowLabel} onChange={(e) => setWindowLabel(e.target.value)} className={inputCls}>
                   {windows.map((w) => (
@@ -313,12 +337,17 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
           )}
           <button
             onClick={createPeriod}
-            disabled={creating || !window_ || isNaN(parseFloat(amount))}
+            disabled={creating || !window_ || !plan || onPlan.length === 0 || isNaN(parseFloat(amount))}
             className="bg-emerald-500 text-white py-2.5 rounded-xl font-display font-bold text-sm hover:bg-emerald-600
                        active:scale-95 transition-all disabled:opacity-50"
           >
-            {creating ? "Creating…" : `Bill ${roster.length} active member${roster.length === 1 ? "" : "s"}`}
+            {creating ? "Creating…" : `Bill ${onPlan.length} member${onPlan.length === 1 ? "" : "s"} on ${plan?.name ?? "plan"}`}
           </button>
+          {unassigned.length > 0 && (
+            <p className="text-[11px] text-amber-700 font-display">
+              {unassigned.length} active member{unassigned.length === 1 ? " has" : "s have"} no plan yet — set one on their profile in Members.
+            </p>
+          )}
         </div>
       )}
 
@@ -367,7 +396,7 @@ function DuesTab({ roster, members, dues, billingPeriod, defaultAmount, onChange
         {!period && (
           <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
             <span className="text-4xl">💷</span>
-            <p className="text-gray-400 font-display font-bold text-sm">Bill members for a {billingPer(billingPeriod)} to start tracking dues</p>
+            <p className="text-gray-400 font-display font-bold text-sm">Bill a plan for a {billingPer(billingPeriod)} to start tracking dues</p>
           </div>
         )}
         {period && unbilled.length > 0 && periodDues.length > 0 && (

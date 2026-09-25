@@ -47,6 +47,7 @@ export const paymentsApi = {
     period_end: string;
     amount_due: number;
     member_ids: string[];
+    plan_id?: string | null;
   }): Promise<void> => {
     if (p.member_ids.length === 0) return;
     const clubId = await getClubId();
@@ -57,6 +58,7 @@ export const paymentsApi = {
       period_start: p.period_start,
       period_end: p.period_end,
       amount_due: p.amount_due,
+      plan_id: p.plan_id ?? null,
     }));
     const { error } = await supabase
       .from("membership_dues")
