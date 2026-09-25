@@ -13,6 +13,9 @@ import JoinView from "./pages/JoinView";
 import SessionRsvpView from "./pages/SessionRsvpView";
 import MasterAdminView from "./pages/MasterAdminView";
 import PrivacyPolicyView from "./pages/PrivacyPolicyView";
+import MembersView from "./pages/MembersView";
+import FinanceView from "./pages/FinanceView";
+import SettingsView from "./pages/SettingsView";
 import { useSessionStore, useGroupStore } from "./store";
 import { applyTheme } from "./styles/themes";
 import type { ThemeKey } from "./styles/themes";
@@ -40,6 +43,9 @@ function AppRoutes() {
       <Route path="/" element={<MainView />} />
       <Route path="/history" element={<SessionHistoryView />} />
       <Route path="/analytics" element={<AnalyticsView />} />
+      <Route path="/members" element={<MembersView />} />
+      <Route path="/finance" element={<FinanceView />} />
+      <Route path="/settings" element={<SettingsView />} />
       <Route path="/groups" element={<GroupsHomeView />} />
       <Route path="/groups/:id" element={<GroupDetailView />} />
       <Route path="/tournament-setup/:sessionId" element={<TournamentSetupView />} />
