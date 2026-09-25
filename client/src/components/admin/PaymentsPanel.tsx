@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Plus, WifiOff, Receipt, CalendarDays, Scale } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { X, Plus, WifiOff, Receipt, CalendarDays, Scale, AlertTriangle, Download } from "lucide-react";
 import PayRow, { money, shortDate } from "./PayRow";
-import { BILLABLE, effectiveStatus } from "../../utils/memberStatus";
+import { BILLABLE, effectiveStatus, statusPatch } from "../../utils/memberStatus";
+import { toCsv, downloadCsv } from "../../utils/csv";
 import { useMemberStore, usePaymentStore, useSessionStore } from "../../store";
 import { membersApi } from "../../services/api";
 import { paymentsApi, type PaymentSessionSummary } from "../../services/payments";
@@ -127,7 +129,7 @@ export default function PaymentsPanel() {
             reload={async () => setSessionFees(await paymentsApi.listSessionFees())}
           />
         ) : (
-          <LedgerTab members={members} dues={dueList} fees={feeList} />
+          <LedgerTab members={members} dues={dueList} fees={feeList} plans={plans} />
         )}
       </div>
     </div>
@@ -530,39 +532,126 @@ function FeesTab({ members, sessions, fees, defaultAmount, onChanged, reload }: 
 
 // ─── Ledger ───────────────────────────────────────────────────────────────────
 
-function LedgerTab({ members, dues, fees }: { members: Record<string, Member>; dues: MembershipDue[]; fees: SessionFee[] }) {
+function LedgerTab({ members, dues, fees, plans }: { members: Record<string, Member>; dues: MembershipDue[]; fees: SessionFee[]; plans: MembershipPlan[] }) {
+  const navigate = useNavigate();
+  const updateMember = useMemberStore((s) => s.updateMember);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+
   const rows = useMemo(() => {
-    const acc = new Map<string, { owed: number; paid: number; unpaidItems: number }>();
-    const add = (memberId: string, amount: number, status: PaymentStatus) => {
-      const r = acc.get(memberId) ?? { owed: 0, paid: 0, unpaidItems: 0 };
+    const acc = new Map<string, { owed: number; paid: number; unpaidItems: number; overdue: number }>();
+    const add = (memberId: string, amount: number, status: PaymentStatus, overdue: boolean) => {
+      const r = acc.get(memberId) ?? { owed: 0, paid: 0, unpaidItems: 0, overdue: 0 };
       if (status === "paid") r.paid += amount;
-      if (status === "unpaid") { r.owed += amount; r.unpaidItems += 1; }
+      if (status === "unpaid") { r.owed += amount; r.unpaidItems += 1; if (overdue) r.overdue += 1; }
       acc.set(memberId, r);
     };
-    dues.forEach((d) => add(d.member_id, d.amount_due, d.status));
-    fees.forEach((f) => add(f.member_id, f.amount_due, f.status));
+    dues.forEach((d) => add(d.member_id, d.amount_due, d.status, d.period_end < today));
+    fees.forEach((f) => add(f.member_id, f.amount_due, f.status, false));
     return [...acc.entries()]
       .map(([id, r]) => ({ member: members[id], ...r }))
       .filter((r) => r.member)
-      .sort((a, b) => b.owed - a.owed || a.member.name.localeCompare(b.member.name));
-  }, [members, dues, fees]);
+      .sort((a, b) => b.overdue - a.overdue || b.owed - a.owed || a.member.name.localeCompare(b.member.name));
+  }, [members, dues, fees, today]);
+
+  // Income by month, from paid_at
+  const byMonth = useMemo(() => {
+    const m = new Map<string, { dues: number; fees: number }>();
+    const add = (paidAt: string | null, amt: number, kind: "dues" | "fees") => {
+      if (!paidAt) return;
+      const k = paidAt.slice(0, 7);
+      const r = m.get(k) ?? { dues: 0, fees: 0 };
+      r[kind] += amt;
+      m.set(k, r);
+    };
+    dues.filter((d) => d.status === "paid").forEach((d) => add(d.paid_at, d.amount_due, "dues"));
+    fees.filter((f) => f.status === "paid").forEach((f) => add(f.paid_at, f.amount_due, "fees"));
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12);
+  }, [dues, fees]);
 
   const totalOwed = rows.reduce((s, r) => s + r.owed, 0);
   const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
+  const overdueRows = rows.filter((r) => r.overdue > 0 && effectiveStatus(r.member) !== "lapsed");
+
+  async function markLapsed(m: Member) {
+    if (!confirm(`Mark ${m.name} as lapsed? They stay on the roster but won't be billed until reinstated.`)) return;
+    setBusyId(m.id);
+    try {
+      const { member } = await membersApi.update(m.id, statusPatch("lapsed"));
+      updateMember(m.id, member);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function exportCsv() {
+    const planName = (id?: string | null) => plans.find((p) => p.id === id)?.name ?? "";
+    const csv = toCsv(
+      ["Member", "Type", "Item", "Plan", "Amount", "Status", "Paid on", "Method", "Notes"],
+      [
+        ...dues.map((d) => [members[d.member_id]?.name ?? d.member_id, "Membership", d.period_label, planName(d.plan_id), d.amount_due.toFixed(2), d.status, d.paid_at?.slice(0, 10), d.paid_method, d.notes]),
+        ...fees.map((f) => [members[f.member_id]?.name ?? f.member_id, "Night fee", f.created_at.slice(0, 10), "", f.amount_due.toFixed(2), f.status, f.paid_at?.slice(0, 10), f.paid_method, f.notes]),
+      ]
+    );
+    downloadCsv(`payments-${today}.csv`, csv);
+  }
 
   if (rows.length === 0) {
     return <p className="text-center text-sm text-gray-400 font-display font-bold py-10">Nothing recorded yet</p>;
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2">
         <Stat label="Outstanding" value={money(totalOwed)} tone="amber" />
         <Stat label="Collected" value={money(totalPaid)} tone="green" />
       </div>
+
+      {overdueRows.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-3 flex flex-col gap-2">
+          <p className="text-xs font-display font-bold text-red-700 uppercase tracking-wider flex items-center gap-1.5">
+            <AlertTriangle size={13} /> Overdue — {overdueRows.length} member{overdueRows.length === 1 ? "" : "s"} past a period end
+          </p>
+          {overdueRows.map(({ member, owed, overdue }) => (
+            <div key={member.id} className="flex items-center gap-2 text-sm">
+              <button onClick={() => navigate(`/members/${member.id}`)} className="flex-1 text-left font-display font-bold text-gray-900 truncate hover:underline">
+                {member.name}
+              </button>
+              <span className="text-xs text-red-700 font-display">{overdue} overdue · {money(owed)}</span>
+              <button onClick={() => markLapsed(member)} disabled={busyId === member.id}
+                className="text-[11px] font-display font-bold text-red-700 bg-white border border-red-200 px-2 py-1 rounded-lg hover:bg-red-100 disabled:opacity-40">
+                Mark lapsed
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {byMonth.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-3">
+          <p className="text-[10px] font-display font-bold text-gray-500 uppercase tracking-wider mb-2">Income by month</p>
+          <div className="divide-y divide-gray-100">
+            {byMonth.map(([month, r]) => (
+              <div key={month} className="flex items-center justify-between py-1.5 text-xs font-display">
+                <span className="font-bold text-gray-700">{new Date(month + "-15").toLocaleDateString("en-GB", { month: "short", year: "numeric" })}</span>
+                <span className="text-gray-400">{money(r.dues)} dues · {money(r.fees)} guests</span>
+                <span className="font-black text-green-700">{money(r.dues + r.fees)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-display font-bold text-gray-500 uppercase tracking-wider">By member</p>
+        <button onClick={exportCsv} className="flex items-center gap-1 text-xs font-display font-bold text-gray-600 hover:text-gray-900">
+          <Download size={13} /> Export CSV
+        </button>
+      </div>
       <div className="space-y-2">
         {rows.map(({ member, owed, paid, unpaidItems }) => (
-          <div key={member.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3 p-3">
+          <button key={member.id} onClick={() => navigate(`/members/${member.id}`)}
+            className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3 p-3 text-left hover:border-gray-300">
             <Avatar name={member.name} memberType={member.member_type} size="sm" />
             <div className="flex-1 min-w-0">
               <div className="font-display font-bold text-sm text-gray-900 truncate">{member.name}</div>
@@ -573,7 +662,7 @@ function LedgerTab({ members, dues, fees }: { members: Record<string, Member>; d
             <span className={`text-sm font-display font-black ${owed > 0 ? "text-amber-600" : "text-green-600"}`}>
               {owed > 0 ? money(owed) : "✓"}
             </span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

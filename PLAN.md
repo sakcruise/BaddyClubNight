@@ -36,19 +36,19 @@ with the night tool as one part. Built for the committee first; a members' side 
 | Settings | `/settings` | Club profile, nights, membership plans & fees, theme |
 | Club Night / Tournaments / History / Analytics | existing | unchanged |
 
-## Phase 1 — Members, guests & money  ← current
+## Phase 1 — Members, guests & money  ✅ built (2026-09-25)
 
-1. **Full pages** for Members, Finance, Settings replacing the home-screen drawers. ✅ pages + routes written; Home buttons pending
-2. **Membership plans** in Settings: Full / Student / Social — name, fee, cadence, active. Each member is on a plan.
-3. **Member lifecycle**: `guest → trial → active → paused → lapsed → archived`. Status badge on roster; check-in warns if paused/lapsed.
-4. **Richer profile**: phone, emergency contact, joined date, plan, level, gender.
-5. **Notes** timeline on the profile (author + date, e.g. "knee injury, paused till Nov").
-6. **Pause**: from / until / reason. No dues generated while paused; auto-resume on end date; badge on roster.
-7. **Guests page**: visit counts from check-ins, per-night fee, optional "after N visits ask them to join", **Convert to member** (keeps history, sets join date, prompts first period's dues — pro-rata or full, default full).
-8. **Billing**: bill a period → one due per active member at their plan's fee (skips paused); mark paid / waived / unpaid with method + note; per-member ledger; outstanding list; income by month; CSV export.
-9. **Lapse detection**: unpaid a whole period or not seen for X weeks → flagged; one click to chase or archive.
+1. ✅ **Full pages** for Members, Guests, Finance, Settings replacing the home-screen drawers.
+2. ✅ **Membership plans** in Settings: Full / Student / Social — name, fee, cadence, active. Each member is on a plan.
+3. ✅ **Member lifecycle**: `guest → trial → active → paused → lapsed → archived`. Status badge on roster; check-in warns if paused/lapsed.
+4. ✅ **Richer profile**: phone, emergency contact, joined date, plan, level, gender.
+5. ✅ **Notes** timeline on the profile (author + date).
+6. ✅ **Pause**: from / until / reason. No dues while paused; auto-resume on end date.
+7. ✅ **Guests page**: visit counts, "ask to join after N visits", **Convert to member** (keeps history; first period full / pro-rata / none).
+8. ✅ **Billing**: bill a plan for a period (skips paused); mark paid / waived / unpaid; per-member ledger; income by month; CSV export.
+9. ✅ **Overdue flag**: unpaid dues past the period end are listed in the Ledger with one-click "Mark lapsed". (Not-seen-for-X-weeks shows on the profile's Attendance tab; no automatic flag yet.)
 
-Done already: dues + guest fee tables (`018_payments.sql`), Payments panel (Members / Guests / Ledger tabs), billing cadence + fee settings.
+Migrations applied to Supabase: `018_payments.sql`, `019_membership.sql`. Tests: `cd client && npm test`.
 
 ## Phase 2 — Committee
 

@@ -21,7 +21,10 @@ const todayISO = () => {
  * The status a member should have today. A pause whose end date has passed
  * resumes as active; the caller persists the change if it differs.
  */
-export function effectiveStatus(m: Member, today = todayISO()): MemberStatus {
+export function effectiveStatus(
+  m: Pick<Member, "status" | "active" | "paused_until"> & { member_type: string },
+  today = todayISO()
+): MemberStatus {
   const s = m.status ?? (m.member_type === "guest" ? "guest" : m.active === false ? "archived" : "active");
   if (s === "paused" && m.paused_until && m.paused_until < today) return "active";
   return s;

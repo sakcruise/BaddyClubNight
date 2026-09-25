@@ -8,6 +8,7 @@ import ConfirmDialog from "../shared/ConfirmDialog";
 import { UserPlus, UserMinus, Search, UserCheck, X, Play, GripVertical } from "lucide-react";
 import type { QueuePosition } from "../../types";
 import PitstopCard from "./PitstopCard";
+import { effectiveStatus } from "../../utils/memberStatus";
 
 function ReorderQueueItem({
   q, idx, member, loadingId, onRequestRemove, formatTime,
@@ -20,6 +21,7 @@ function ReorderQueueItem({
   formatTime: (iso: string) => string;
 }) {
   const controls = useDragControls();
+  const members = useMemberStore((s) => s.members);
   const isFirst = idx === 0;
   const rowBg = isFirst
     ? "bg-orange-50 border-orange-200"
@@ -55,6 +57,8 @@ function ReorderQueueItem({
         <div className="text-[10px] text-gray-400 font-display">
           {formatTime(q.checked_in_at)}
           {member.member_type === "guest" && <span className="ml-1 text-purple-400 font-black">GUEST</span>}
+          {effectiveStatus(members[member.id] ?? member) === "paused" && <span className="ml-1 text-amber-500 font-black">PAUSED</span>}
+          {effectiveStatus(members[member.id] ?? member) === "lapsed" && <span className="ml-1 text-red-500 font-black">LAPSED</span>}
         </div>
       </div>
       <button
@@ -151,6 +155,12 @@ export default function CheckInPanel() {
         const res = await queueApi.remove(session.id, memberId);
         setQueue(res.queue);
       } else {
+        const m = members[memberId];
+        const s = m ? effectiveStatus(m) : "active";
+        if ((s === "paused" || s === "lapsed") &&
+            !confirm(`${m.name}'s membership is ${s}${s === "paused" && m.pause_reason ? ` (${m.pause_reason})` : ""}. Check them in anyway?`)) {
+          return;
+        }
         const res = await queueApi.checkIn(session.id, memberId);
         setQueue(res.queue);
       }
