@@ -64,6 +64,30 @@ export const plansApi = {
   },
 };
 
+export interface AttendanceRow {
+  session_id: string;
+  checked_in_at: string;
+  date: string;
+  club_name: string;
+}
+
+export const attendanceApi = {
+  /** Nights a member checked in to, newest first (queue_entries is the check-in record). */
+  forMember: async (member_id: string): Promise<AttendanceRow[]> => {
+    const { data, error } = await supabase
+      .from("queue_entries")
+      .select("session_id, checked_in_at, sessions(date, club_name)")
+      .eq("member_id", member_id)
+      .order("checked_in_at", { ascending: false });
+    return check(data, error).map((r: any) => ({
+      session_id: r.session_id,
+      checked_in_at: r.checked_in_at,
+      date: r.sessions?.date ?? r.checked_in_at.slice(0, 10),
+      club_name: r.sessions?.club_name ?? "",
+    }));
+  },
+};
+
 export const notesApi = {
   list: async (member_id: string): Promise<MemberNote[]> => {
     const { data, error } = await supabase
