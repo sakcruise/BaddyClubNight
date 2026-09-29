@@ -154,9 +154,10 @@ export const groupsApi = {
   listSessions: async (groupId: string): Promise<GroupSession[]> => {
     const { data, error } = await supabase.rpc("list_group_sessions", { p_group_id: groupId });
     if (error) throw new Error(error.message);
-    if (!data) return [];
-    const rows = Array.isArray(data) ? data : [data];
-    return rows.filter(Boolean).map(rowToGroupSession);
+    const parsed = parseJson(data);
+    if (!parsed) return [];
+    const rows = Array.isArray(parsed) ? parsed : [parsed];
+    return rows.filter((row) => row && typeof row === "object").map(rowToGroupSession);
   },
 
   /** Create a scheduled or immediate session for a group. */
@@ -218,9 +219,11 @@ export const groupsApi = {
 
   /** Set RSVP for the current user's group member record. */
   rsvp: async (sessionId: string, memberId: string, status: "yes" | "no" | "maybe"): Promise<void> => {
-    const { error } = await supabase
-      .from("session_rsvps")
-      .upsert({ session_id: sessionId, member_id: memberId, status }, { onConflict: "session_id,member_id" });
+    const { error } = await supabase.rpc("rsvp_session", {
+      p_session_id: sessionId,
+      p_member_id: memberId,
+      p_status: status,
+    });
     if (error) throw new Error(error.message);
   },
 
@@ -238,11 +241,21 @@ export const groupsApi = {
   },
 };
 
+function parseJson(value: unknown): any {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+function asRsvpRows(value: unknown): any[] {
+  const parsed = parseJson(value);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 function rowToGroupSession(s: any): GroupSession {
-  const rsvps: GroupRsvp[] = (s.session_rsvps ?? []).map((r: any) => ({
+  const rsvps: GroupRsvp[] = asRsvpRows(s.session_rsvps ?? s.rsvps).map((r: any) => ({
     id: r.id,
     member_id: r.member_id,
-    member_name: r.group_members?.display_name ?? "",
+    member_name: r.member_name ?? r.group_members?.display_name ?? "",
     status: r.status,
   }));
   return {

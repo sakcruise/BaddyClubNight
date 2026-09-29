@@ -62,7 +62,9 @@ export default function SessionRsvpView() {
       const { data: result, error: err } = await supabase.rpc("get_session_rsvp_page", { p_session_id: id });
       if (err) throw err;
       if (!result) { setError("Session not found"); return; }
-      setData(result as SessionPage);
+      const page = (typeof result === "string" ? JSON.parse(result) : result) as SessionPage;
+      if (!page?.id) { setError("Session not found"); return; }
+      setData({ ...page, members: page.members ?? [] });
     } catch (e: any) {
       setError(e.message ?? "Failed to load session");
     } finally {
