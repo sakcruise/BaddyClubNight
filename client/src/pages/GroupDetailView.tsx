@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X } from "lucide-react";
-import { useGroupStore, useSessionStore, useMemberStore, useAuthStore } from "../store";
+import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X, Lock, Unlock } from "lucide-react";
+import { useGroupStore, useSessionStore, useMemberStore, useAuthStore, useQueueStore } from "../store";
 import { groupsApi } from "../services/groups";
+import { queueApi } from "../services/api";
 import { supabase } from "../lib/supabase";
 import type { MemberType, Member, Session, GroupSession, Match } from "../types";
 import { v4 as uuid } from "uuid";
@@ -27,6 +28,61 @@ function rowToMatch(m: any): Match {
     started_at: m.started_at,
     ended_at: m.ended_at ?? undefined,
   };
+}
+
+type RsvpPerson = { member_id: string; name: string; member_type: MemberType };
+type RsvpGroups = { yes: RsvpPerson[]; maybe: RsvpPerson[]; no: RsvpPerson[]; none: RsvpPerson[] };
+
+function RsvpListSheet({ groups, onClose }: { groups: RsvpGroups; onClose: () => void }) {
+  const sections: { key: keyof RsvpGroups; label: string; cls: string; icon: JSX.Element }[] = [
+    { key: "yes",   label: "Going",    cls: "text-green-700 bg-green-50",   icon: <CheckCircle2 size={13} /> },
+    { key: "maybe", label: "Maybe",    cls: "text-yellow-700 bg-yellow-50", icon: <HelpCircle size={13} /> },
+    { key: "no",    label: "Can't",    cls: "text-red-600 bg-red-50",       icon: <XCircle size={13} /> },
+    { key: "none",  label: "No reply", cls: "text-gray-500 bg-gray-100",    icon: <Clock size={13} /> },
+  ];
+  const total = sections.reduce((n, s) => n + groups[s.key].length, 0);
+  return (
+    <>
+      <motion.div className="fixed inset-0 bg-black/40 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
+      <motion.div
+        className="fixed left-0 right-0 bottom-0 sm:left-1/2 sm:-translate-x-1/2 sm:bottom-auto sm:top-16 sm:w-[28rem] bg-white z-50 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh]"
+        initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <p className="font-display font-black text-gray-900 text-base">Who's coming</p>
+            <p className="text-xs text-gray-400 font-display">{groups.yes.length} going · {groups.maybe.length} maybe · of {total}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500"><X size={18} /></button>
+        </div>
+        <div className="overflow-y-auto p-4 flex flex-col gap-4">
+          {sections.map((s) => {
+            const people = groups[s.key];
+            if (people.length === 0) return null;
+            return (
+              <div key={s.key} className="flex flex-col gap-1.5">
+                <span className={`self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-display font-black uppercase tracking-wider ${s.cls}`}>
+                  {s.icon} {s.label} · {people.length}
+                </span>
+                <div className="flex flex-col">
+                  {people.map((p) => (
+                    <div key={p.member_id} className="flex items-center gap-3 py-1.5">
+                      <span className={`w-7 h-7 rounded-full ${TYPE_DOT[p.member_type]} flex items-center justify-center text-white font-display font-black text-[11px] flex-shrink-0`}>
+                        {p.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="font-display font-bold text-gray-800 text-sm truncate">{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {total === 0 && <p className="text-center text-sm text-gray-400 font-display font-bold py-6">No members in this group yet</p>}
+        </div>
+      </motion.div>
+    </>
+  );
 }
 
 const TYPE_DOT: Record<MemberType, string> = {
@@ -85,6 +141,8 @@ export default function GroupDetailView() {
   const [myMemberId, setMyMemberId]     = useState<string | null>(null);
   const [copiedSession, setCopiedSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<GroupSession | null>(null);
+  const [rsvpList, setRsvpList] = useState<RsvpGroups | null>(null);
+  const [pollBusy, setPollBusy] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [groupMatches, setGroupMatches] = useState<Match[]>([]);
   const [sessionsPlayed, setSessionsPlayed] = useState(0);
@@ -201,6 +259,8 @@ export default function GroupDetailView() {
     // re-adds the owner automatically on next load if their row ever ends up
     // missing, so deleting a bad/duplicate own-row entry (e.g. a wrong auto
     // -generated name) is always safe to allow here.
+    const name = group?.members.find((m) => m.id === memberId)?.name ?? "this member";
+    if (!confirm(`Remove ${name} from the group? Their RSVPs and match history for this group will go too.`)) return;
     try {
       await groupsApi.removeMember(memberId);
       await refresh();
@@ -210,7 +270,13 @@ export default function GroupDetailView() {
     }
   }
 
-  function launchSession(sessionId: string | undefined, numCourts: number, venue?: string, scheduledAt?: string) {
+  async function launchSession(
+    sessionId: string | undefined,
+    numCourts: number,
+    venue?: string,
+    scheduledAt?: string,
+    goingMemberIds: string[] = [],
+  ) {
     const g = group!;
     const members: Member[] = g.members.map((m) => ({
       id: m.id,
@@ -234,6 +300,16 @@ export default function GroupDetailView() {
     };
     setSession(session);
     setCourts(Array.from({ length: numCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
+    useQueueStore.getState().setQueue([]);
+    if (sessionId && goingMemberIds.length > 0) {
+      for (const memberId of goingMemberIds) {
+        try { await queueApi.checkIn(sessionId, memberId); } catch { /* already queued */ }
+      }
+      try {
+        const { queue } = await queueApi.get(sessionId);
+        useQueueStore.getState().setQueue(queue);
+      } catch { /* MainView will reload the queue */ }
+    }
     navigate("/");
   }
 
@@ -248,7 +324,7 @@ export default function GroupDetailView() {
           scheduled_at, venue, num_courts, status: "active",
         });
         setShowModal(false);
-        launchSession(s.id, num_courts, venue, scheduled_at);
+        await launchSession(s.id, num_courts, venue, scheduled_at);
       } else {
         // Save as upcoming — don't launch yet
         const s = await groupsApi.createSession(group!.id, group!.name, {
@@ -289,19 +365,42 @@ export default function GroupDetailView() {
   async function handleActivateSession(s: GroupSession) {
     try {
       await groupsApi.activateSession(s.id);
-      launchSession(s.id, s.num_courts, s.venue, s.scheduled_at);
+      const goingIds = s.rsvps.filter((r) => r.status === "yes").map((r) => r.member_id);
+      await launchSession(s.id, s.num_courts, s.venue, s.scheduled_at, goingIds);
     } catch (e: any) {
       alert(`Couldn't activate session: ${e?.message ?? "unknown error"}`);
     }
   }
 
+  async function handleTogglePoll(s: GroupSession) {
+    setPollBusy(s.id);
+    try {
+      await groupsApi.setRsvpOpen(s.id, !s.rsvp_open);
+      setUpcomingSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, rsvp_open: !s.rsvp_open } : x)));
+    } catch (e: any) {
+      alert(`Couldn't update the poll: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setPollBusy(null);
+    }
+  }
+
   async function handleRsvp(sessionId: string, status: "yes" | "no" | "maybe") {
     if (!myMemberId) return;
+    const myName = group?.members.find((m) => m.id === myMemberId)?.name ?? "";
+    setUpcomingSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== sessionId) return s;
+        const rest = s.rsvps.filter((r) => r.member_id !== myMemberId);
+        const rsvps = [...rest, { id: myMemberId, member_id: myMemberId, member_name: myName, status }];
+        return { ...s, rsvps, going_count: rsvps.filter((r) => r.status === "yes").length };
+      })
+    );
     try {
       await groupsApi.rsvp(sessionId, myMemberId, status);
       await refreshSessions();
     } catch (e: any) {
       alert(`RSVP failed: ${e?.message ?? "unknown error"}`);
+      await refreshSessions();
     }
   }
 
@@ -368,7 +467,23 @@ export default function GroupDetailView() {
         {nextSession ? (() => {
           const { dayLabel, time } = formatScheduled(nextSession.scheduled_at);
           const myRsvp = nextSession.rsvps.find((r) => r.member_id === myMemberId);
-          const goingCount = nextSession.going_count;
+          const byStatus = (st: "yes" | "maybe" | "no") =>
+            nextSession.rsvps
+              .filter((r) => r.status === st)
+              .map((r) => {
+                const member = group.members.find((m) => m.id === r.member_id);
+                return { member_id: r.member_id, name: r.member_name || member?.name || "Player", member_type: member?.member_type ?? ("male" as MemberType) };
+              })
+              .sort((a, b) => a.name.localeCompare(b.name));
+          const replied = new Set(nextSession.rsvps.map((r) => r.member_id));
+          const rsvpGroups = {
+            yes: byStatus("yes"),
+            maybe: byStatus("maybe"),
+            no: byStatus("no"),
+            none: group.members.filter((m) => !replied.has(m.id)).map((m) => ({ member_id: m.id, name: m.name, member_type: m.member_type })),
+          };
+          const goingPlayers = rsvpGroups.yes;
+          const goingCount = goingPlayers.length || nextSession.going_count;
           return (
             <div className="bg-white border border-orange-200 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
               {/* Coloured top bar */}
@@ -380,11 +495,15 @@ export default function GroupDetailView() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {goingCount > 0 && (
-                    <span className="flex items-center gap-1 bg-white/20 rounded-full px-2 py-0.5 text-white font-display font-bold text-xs">
-                      <CheckCircle2 size={11} /> {goingCount} going
-                    </span>
-                  )}
+                  <button
+                    onClick={() => setRsvpList(rsvpGroups)}
+                    className="flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-full px-2 py-0.5 text-white font-display font-bold text-xs transition-all active:scale-95"
+                    title="See who's coming"
+                  >
+                    <CheckCircle2 size={11} /> {goingCount} going
+                    {rsvpGroups.maybe.length > 0 && <span className="text-white/70">· {rsvpGroups.maybe.length} maybe</span>}
+                    <ChevronRight size={11} className="text-white/70" />
+                  </button>
                   {isOwner && (
                     <button onClick={() => setEditingSession(nextSession)} className="p-1 rounded-lg bg-white/15 text-white/80 hover:bg-white/25 transition-all">
                       <Pencil size={13} />
@@ -429,13 +548,32 @@ export default function GroupDetailView() {
                         no:    { icon: <XCircle      size={15} />, label: "Can't",  active: "bg-red-500 text-white border-red-500"       },
                       }[st];
                       return (
-                        <button key={st} onClick={() => handleRsvp(nextSession.id, st)}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 font-display font-black text-sm transition-all active:scale-95
+                        <button key={st} onClick={() => handleRsvp(nextSession.id, st)} disabled={!nextSession.rsvp_open}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 font-display font-black text-sm transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100
                             ${myRsvp?.status === st ? cfg.active : "border-gray-200 text-gray-500 bg-white"}`}>
                           {cfg.icon} {cfg.label}
                         </button>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Poll state */}
+                {nextSession.status === "upcoming" && (
+                  <div className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-display font-bold
+                    ${nextSession.rsvp_open ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    {nextSession.rsvp_open ? <Unlock size={13} /> : <Lock size={13} />}
+                    <span className="flex-1">{nextSession.rsvp_open ? "Poll open — members can reply" : "Poll closed — replies are locked"}</span>
+                    {isOwner && (
+                      <button
+                        onClick={() => handleTogglePoll(nextSession)}
+                        disabled={pollBusy === nextSession.id}
+                        className={`px-2.5 py-1 rounded-lg font-black transition-all active:scale-95 disabled:opacity-50
+                          ${nextSession.rsvp_open ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50" : "bg-green-500 text-white hover:bg-green-600"}`}
+                      >
+                        {pollBusy === nextSession.id ? "…" : nextSession.rsvp_open ? "Close poll" : "Open poll"}
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -453,7 +591,7 @@ export default function GroupDetailView() {
                     {copiedSession === nextSession.id ? <><Check size={12} />Copied!</> : <><Share2 size={12} />Share RSVP link</>}
                   </button>
                   {nextSession.status === "active" && (
-                    <button onClick={() => launchSession(nextSession.id, nextSession.num_courts, nextSession.venue, nextSession.scheduled_at)}
+                    <button onClick={() => launchSession(nextSession.id, nextSession.num_courts, nextSession.venue, nextSession.scheduled_at, goingPlayers.map((p) => p.member_id))}
                       className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-500 text-white font-display font-black text-sm active:scale-95 transition-all shadow-md shadow-green-500/30">
                       <Play size={14} /> Enter session
                     </button>
@@ -598,13 +736,25 @@ export default function GroupDetailView() {
           <div className="border-t border-gray-100">
             {group.members.map((m) => {
               const isSelf = isOwner && m.id === myMemberId;
+              const memberRsvp = nextSession?.rsvps.find((r) => r.member_id === m.id)?.status;
               return (
               <div key={m.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 last:border-0">
                 <span className={`w-8 h-8 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-xs flex-shrink-0`}>
                   {m.name.charAt(0).toUpperCase()}
                 </span>
                 <span className="flex-1 font-display font-bold text-gray-800 text-sm truncate">{m.name}</span>
-                <span className="text-gray-300 text-xs font-display capitalize">{m.member_type}</span>
+                {memberRsvp === "yes" && (
+                  <span className="text-[10px] font-display font-black text-green-600 bg-green-50 rounded-full px-2 py-0.5">Going</span>
+                )}
+                {memberRsvp === "maybe" && (
+                  <span className="text-[10px] font-display font-black text-yellow-600 bg-yellow-50 rounded-full px-2 py-0.5">Maybe</span>
+                )}
+                {memberRsvp === "no" && (
+                  <span className="text-[10px] font-display font-black text-red-500 bg-red-50 rounded-full px-2 py-0.5">Can't</span>
+                )}
+                {!memberRsvp && (
+                  <span className="text-gray-300 text-xs font-display capitalize">{m.member_type}</span>
+                )}
                 {isSelf && (
                   <span className="text-[10px] font-display font-black text-purple-500 bg-purple-50 rounded-full px-2 py-0.5 ml-1">
                     You · Owner
@@ -652,6 +802,8 @@ export default function GroupDetailView() {
           busy={modalBusy}
         />
       )}
+
+      {rsvpList && <RsvpListSheet groups={rsvpList} onClose={() => setRsvpList(null)} />}
 
       {editingSession && (
         <SessionScheduleModal

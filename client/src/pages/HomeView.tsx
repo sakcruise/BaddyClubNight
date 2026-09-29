@@ -4,11 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSessionStore, useAuthStore, useMemberStore } from "../store";
 import { sessionsApi, membersApi, authApi } from "../services/api";
 import ShuttlecockIcon from "../components/shared/ShuttlecockIcon";
-import MemberManagement from "../components/admin/MemberManagement";
-import ClubSettings from "../components/admin/ClubSettings";
-import { History, Users, Cog, LogOut, Play, X, BarChart2, Zap, Info, Trophy } from "lucide-react";
+import { History, Users, UserPlus, Cog, LogOut, Play, BarChart2, Zap, Info, Trophy, Wallet } from "lucide-react";
 
-type Panel = "start" | "members" | "settings" | null;
+type Panel = "start" | null;
 
 export default function HomeView() {
   const navigate = useNavigate();
@@ -286,12 +284,14 @@ export default function HomeView() {
           </motion.button>
 
           {/* Secondary options */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {[
               { icon: History,   label: "History",   action: () => navigate("/history") },
               { icon: BarChart2, label: "Analytics", action: () => navigate("/analytics") },
-              { icon: Users,     label: "Members",   action: () => setPanel(panel === "members" ? null : "members") },
-              { icon: Cog,       label: "Settings",  action: () => setPanel(panel === "settings" ? null : "settings") },
+              { icon: Users,     label: "Members",   action: () => navigate("/members") },
+              { icon: UserPlus,  label: "Guests",    action: () => navigate("/guests") },
+              { icon: Wallet,    label: "Finance",   action: () => navigate("/finance") },
+              { icon: Cog,       label: "Settings",  action: () => navigate("/settings") },
             ].map(({ icon: Icon, label, action }) => (
               <motion.button
                 key={label}
@@ -307,36 +307,6 @@ export default function HomeView() {
           </div>
         </div>
       </main>
-
-      {/* Slide-over for Members / Settings */}
-      <AnimatePresence>
-        {(panel === "members" || panel === "settings") && (
-          <>
-            <motion.div className="fixed inset-0 bg-black/40 z-40"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setPanel(null)} />
-            <motion.div
-              className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl flex flex-col"
-              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <span className="font-display font-black text-gray-900 text-lg">
-                  {panel === "members" ? "Club Roster" : "Club Settings"}
-                </span>
-                <button onClick={() => setPanel(null)}
-                  className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                {panel === "members" && <MemberManagement />}
-                {panel === "settings" && <ClubSettings />}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

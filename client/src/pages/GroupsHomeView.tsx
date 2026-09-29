@@ -141,7 +141,7 @@ export default function GroupsHomeView() {
                 id: data.id, group_id: data.group_id, club_name: data.club_name,
                 scheduled_at: data.scheduled_at ?? data.created_at, venue: data.venue,
                 num_courts: data.num_courts, status: data.status, created_at: data.created_at,
-                rsvps: [], going_count: 0,
+                rsvp_open: false, rsvps: [], going_count: 0,
               };
               setFeaturedSessions((prev) => ({ ...prev, [g.id]: { session: past, isPast: true } }));
             } else {

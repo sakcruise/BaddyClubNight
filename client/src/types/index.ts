@@ -2,6 +2,9 @@
 
 export type MemberType = "male" | "female" | "guest";
 
+// guest → trial → active → paused → lapsed → archived
+export type MemberStatus = "guest" | "trial" | "active" | "paused" | "lapsed" | "archived";
+
 export interface Member {
   id: string;
   name: string;
@@ -11,6 +14,34 @@ export interface Member {
   level: number;          // 1..MAX_LEVEL, see LEVEL_LABELS
   active?: boolean;       // false = archived: hidden from rosters, kept for history
   rank?: number | null;   // club strength order, 1 = strongest; breaks ties within a level
+  status?: MemberStatus;
+  phone?: string;
+  emergency_contact?: string;
+  joined_at?: string;     // ISO date
+  plan_id?: string | null;
+  paused_from?: string | null;
+  paused_until?: string | null;
+  pause_reason?: string | null;
+  created_at: string;
+}
+
+export interface MembershipPlan {
+  id: string;
+  club_id: string;
+  name: string;           // Full, Student, Social…
+  fee: number;
+  cadence: BillingPeriod;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface MemberNote {
+  id: string;
+  club_id: string;
+  member_id: string;
+  author: string | null;
+  body: string;
   created_at: string;
 }
 
@@ -133,6 +164,7 @@ export interface GroupSession {
   num_courts: number;
   status: "upcoming" | "active" | "ended";
   created_at: string;
+  rsvp_open: boolean;
   rsvps: GroupRsvp[];
   going_count: number;
 }
@@ -197,4 +229,39 @@ export interface SyncState {
   pending_changes: number;
   status: "idle" | "syncing" | "error";
   error?: string;
+}
+
+// ─── Payments (manual tracking — money moves outside the app) ─────────────────
+
+export type BillingPeriod = "monthly" | "quarterly" | "half_yearly" | "yearly";
+export type PaymentStatus = "unpaid" | "paid" | "waived";
+export type PaidMethod = "cash" | "bank_transfer" | "upi" | "other";
+
+export interface MembershipDue {
+  id: string;
+  club_id: string;
+  member_id: string;
+  period_label: string;   // admin-defined, e.g. "2026 Q1" or "Sep 2026"
+  period_start: string;   // ISO date
+  period_end: string;     // ISO date
+  amount_due: number;
+  plan_id?: string | null;
+  status: PaymentStatus;
+  paid_method: PaidMethod | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface SessionFee {
+  id: string;
+  club_id: string;
+  session_id: string;
+  member_id: string;
+  amount_due: number;
+  status: PaymentStatus;
+  paid_method: PaidMethod | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
 }

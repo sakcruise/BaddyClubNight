@@ -21,7 +21,7 @@ export function isOffline(): boolean {
 }
 
 // ─── Helper: get current club's user id ───────────────────────────────────────
-async function getClubId(): Promise<string> {
+export async function getClubId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   return user.id;
@@ -40,7 +40,7 @@ async function ownerScope(): Promise<{ group_id: string } | { club_id: string }>
 }
 
 // ─── Helper: throw on Supabase error ─────────────────────────────────────────
-function check<T>(data: T | null, error: any): T {
+export function check<T>(data: T | null, error: any): T {
   if (error) throw new Error(error.message ?? "Supabase error");
   if (data === null) throw new Error("No data returned");
   return data;
@@ -64,7 +64,7 @@ function rowToMatch(m: any): Match {
 }
 
 // ─── Helper: map member row → Member type ────────────────────────────────────
-function rowToMember(m: any): Member {
+export function rowToMember(m: any): Member {
   return {
     id: m.id,
     name: m.name,
@@ -74,6 +74,14 @@ function rowToMember(m: any): Member {
     level: m.level ?? 2,
     active: m.active ?? true,
     rank: m.rank ?? null,
+    status: m.status ?? (m.member_type === "guest" ? "guest" : m.active === false ? "archived" : "active"),
+    phone: m.phone ?? undefined,
+    emergency_contact: m.emergency_contact ?? undefined,
+    joined_at: m.joined_at ?? undefined,
+    plan_id: m.plan_id ?? null,
+    paused_from: m.paused_from ?? null,
+    paused_until: m.paused_until ?? null,
+    pause_reason: m.pause_reason ?? null,
     created_at: m.created_at,
   };
 }
@@ -192,15 +200,21 @@ export const authApi = {
    * auth email). Verifies username + recovery email match, then returns a
    * single-use reset link generated server-side via the Supabase admin API.
    */
+  // Runs as a Supabase Edge Function — the Express server isn't reachable from
+  // the deployed web app, and Safari surfaced that as "string did not match the
+  // expected pattern" when it tried to parse the SPA's HTML as JSON.
   forgotPersonal: async (username: string, email: string): Promise<string> => {
-    const res = await fetch("/api/auth/forgot-personal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: username.trim(), email: email.trim() }),
+    const { data, error } = await supabase.functions.invoke("forgot-personal", {
+      body: { username: username.trim(), email: email.trim() },
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message ?? "Could not generate reset link");
-    return json.reset_link as string;
+    if (error) {
+      // FunctionsHttpError carries the function's JSON body; surface its message
+      const ctx = (error as any).context;
+      let message = "Could not generate reset link";
+      try { message = (await ctx?.json())?.message ?? message; } catch { /* keep default */ }
+      throw new Error(message);
+    }
+    return data.reset_link as string;
   },
 };
 
@@ -246,7 +260,7 @@ export const membersApi = {
     return { member: rowToMember(check(data, error)) };
   },
 
-  update: async (id: string, patch: { name?: string; member_type?: MemberType; level?: number; active?: boolean; rank?: number | null }) => {
+  update: async (id: string, patch: Partial<Omit<Member, "id" | "created_at">>) => {
     if (isOffline()) {
       useMemberStore.getState().updateMember(id, patch);
       const member = useMemberStore.getState().members[id];

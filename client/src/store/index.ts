@@ -4,6 +4,7 @@ import type {
   Session, Court, QueuePosition, Match, Member, PickerState, SyncState,
   Group, GroupMember, MemberType, PitstopState,
   Tournament, TournamentPlayer, TournamentFixture,
+  MembershipDue, SessionFee, BillingPeriod,
 } from "../types";
 import { normalisePositions } from "../utils/queueLogic";
 import { v4 as uuid } from "uuid";
@@ -53,6 +54,9 @@ export interface ClubConfig {
   shuttleBudgetTubes: number;  // tubes budgeted per night, e.g. 10
   autoPickEnabled: boolean;    // auto-pick players when court is free
   autoPickMode: "balanced" | "competitive"; // balanced = mix levels, competitive = group levels
+  billingPeriod: BillingPeriod; // default cadence for new membership plans
+  guestFee: number;             // £ per guest per night
+  guestVisitsBeforeJoin: number; // 0 = never nudge; else flag guests with this many visits
 }
 
 interface SessionStore {
@@ -83,6 +87,9 @@ export const defaultClubConfig: ClubConfig = {
   shuttleBudgetTubes: 10,
   autoPickEnabled: false,
   autoPickMode: "balanced",
+  billingPeriod: "quarterly",
+  guestFee: 5,
+  guestVisitsBeforeJoin: 3,
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -502,5 +509,34 @@ export const useTournamentStore = create<TournamentStore>()(
       removeFixtures: (ids) => set((s) => ({ fixtures: s.fixtures.filter((f) => !ids.includes(f.id)) })),
     }),
     { name: "tournament-store" }
+  )
+);
+
+// ─── Payment Store ────────────────────────────────────────────────────────────
+// Cache of Supabase rows only — payments has no offline mode, Supabase is the
+// source of truth and PaymentsPanel reloads on open.
+
+interface PaymentStore {
+  dues: Record<string, MembershipDue>;
+  sessionFees: Record<string, SessionFee>;
+  setDues: (rows: MembershipDue[]) => void;
+  upsertDues: (rows: MembershipDue[]) => void;
+  setSessionFees: (rows: SessionFee[]) => void;
+  upsertSessionFees: (rows: SessionFee[]) => void;
+}
+
+const byId = <T extends { id: string }>(rows: T[]) => Object.fromEntries(rows.map((r) => [r.id, r]));
+
+export const usePaymentStore = create<PaymentStore>()(
+  persist(
+    (set) => ({
+      dues: {},
+      sessionFees: {},
+      setDues: (rows) => set({ dues: byId(rows) }),
+      upsertDues: (rows) => set((s) => ({ dues: { ...s.dues, ...byId(rows) } })),
+      setSessionFees: (rows) => set({ sessionFees: byId(rows) }),
+      upsertSessionFees: (rows) => set((s) => ({ sessionFees: { ...s.sessionFees, ...byId(rows) } })),
+    }),
+    { name: "payment-store" }
   )
 );
