@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X, Lock, Unlock, Wallet } from "lucide-react";
 import { useGroupStore, useSessionStore, useMemberStore, useAuthStore, useQueueStore } from "../store";
-import { groupsApi } from "../services/groups";
+import { groupsApi, expensesApi } from "../services/groups";
+import { computeBalances } from "../utils/splits";
 import { queueApi } from "../services/api";
 import { supabase } from "../lib/supabase";
 import type { MemberType, Member, Session, GroupSession, Match } from "../types";
@@ -149,6 +150,8 @@ export default function GroupDetailView() {
   const [pastSessions, setPastSessions] = useState<Session[]>([]);
   const [expandedPastId, setExpandedPastId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [balances, setBalances] = useState<Record<string, number> | null>(null);
+  const [costBySession, setCostBySession] = useState<Record<string, number>>({});
 
   useCountdownTick(); // re-renders every second to keep countdowns live
 
@@ -168,6 +171,15 @@ export default function GroupDetailView() {
     // Load upcoming sessions and my member id
     groupsApi.listSessions(id).then(setUpcomingSessions).catch((e) => console.error("listSessions failed:", e));
     groupsApi.myMemberId(id).then(setMyMemberId).catch((e) => console.error("myMemberId failed:", e));
+    // Costs: my balance for the card, and what each past session cost
+    expensesApi.ledger(id)
+      .then(({ expenses, settlements }) => {
+        setBalances(computeBalances(expenses, settlements));
+        const c: Record<string, number> = {};
+        expenses.forEach((e) => { if (e.session_id) c[e.session_id] = (c[e.session_id] ?? 0) + e.amount; });
+        setCostBySession(c);
+      })
+      .catch((e) => console.error("ledger failed:", e));
     // Lifetime stats: all matches + how many sessions have been played
     supabase.from("matches").select("*").eq("group_id", id)
       .then(({ data }) => setGroupMatches((data ?? []).map(rowToMatch)))
@@ -463,8 +475,9 @@ export default function GroupDetailView() {
           ))}
         </div>
 
-        {/* ── SESSION HERO ── */}
-        {nextSession ? (() => {
+        {/* ── SESSION CARDS ── every upcoming session gets its own full card, so a
+             second (or third) scheduled session has its own poll, not just a summary row */}
+        {upcomingSessions.length > 0 ? upcomingSessions.map((nextSession, idx) => {
           const { dayLabel, time } = formatScheduled(nextSession.scheduled_at);
           const myRsvp = nextSession.rsvps.find((r) => r.member_id === myMemberId);
           const byStatus = (st: "yes" | "maybe" | "no") =>
@@ -485,13 +498,13 @@ export default function GroupDetailView() {
           const goingPlayers = rsvpGroups.yes;
           const goingCount = goingPlayers.length || nextSession.going_count;
           return (
-            <div className="bg-white border border-orange-200 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
+            <div key={nextSession.id} className="bg-white border border-orange-200 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
               {/* Coloured top bar */}
               <div className="bg-gradient-to-r from-purple-600 to-purple-400 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CalendarPlus size={15} className="text-white/80" />
                   <span className="font-display font-black text-white text-xs uppercase tracking-wider">
-                    {nextSession.status === "active" ? "Session in progress" : "Next session"}
+                    {nextSession.status === "active" ? "Session in progress" : idx === 0 ? "Next session" : "Also scheduled"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -606,7 +619,7 @@ export default function GroupDetailView() {
               </div>
             </div>
           );
-        })() : (
+        }) : (
           /* No session yet */
           <div className="bg-orange-50 border border-orange-100 rounded-3xl p-5 flex items-center gap-3">
             <CalendarPlus size={20} className="text-orange-400 flex-shrink-0" />
@@ -617,29 +630,29 @@ export default function GroupDetailView() {
           </div>
         )}
 
-        {/* Additional future sessions (if more than one) */}
-        {upcomingSessions.length > 1 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-gray-400 text-xs font-display font-bold uppercase tracking-wider px-1">Also scheduled</p>
-            {upcomingSessions.slice(1).map((s) => {
-              const { dayLabel, time } = formatScheduled(s.scheduled_at);
-              return (
-                <div key={s.id} className="bg-orange-50 border border-orange-100 rounded-2xl px-4 py-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-black text-gray-900 text-sm">{dayLabel} <span className="font-normal text-gray-400">{time}</span></p>
-                    {s.venue && <p className="text-gray-400 text-xs font-display truncate">{s.venue}</p>}
-                  </div>
-                  <span className="text-gray-400 text-xs font-display tabular-nums">{getCountdown(s.scheduled_at)}</span>
-                  {isOwner && (
-                    <button onClick={() => setEditingSession(s)} className="p-1.5 rounded-lg bg-gray-100 text-gray-400">
-                      <Pencil size={13} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* ── COSTS (Splitwise-style) ── */}
+        {(() => {
+          const mine = myMemberId && balances ? (balances[myMemberId] ?? 0) / 100 : 0;
+          const owed = mine > 0.004, owes = mine < -0.004;
+          return (
+            <button onClick={() => navigate(`/groups/${id}/money`)}
+              className="w-full bg-white border border-orange-200 rounded-3xl shadow-md shadow-black/5 px-4 py-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all">
+              <span className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${owed ? "bg-green-50 text-green-600" : owes ? "bg-orange-50 text-orange-600" : "bg-gray-100 text-gray-500"}`}>
+                <Wallet size={18} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-black text-gray-900 text-sm">Costs &amp; balances</p>
+                <p className={`text-xs font-display font-bold ${owed ? "text-green-600" : owes ? "text-orange-600" : "text-gray-400"}`}>
+                  {balances === null ? "Court & shuttle costs, split between players"
+                    : owed ? `You are owed £${mine.toFixed(2)}`
+                    : owes ? `You owe £${Math.abs(mine).toFixed(2)}`
+                    : "All settled up"}
+                </p>
+              </div>
+              <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+            </button>
+          );
+        })()}
 
         {/* ── TOP PLAYERS ── */}
         {topPlayers.length > 0 && (
@@ -693,6 +706,9 @@ export default function GroupDetailView() {
                         <p className="font-display font-bold text-gray-800 text-sm">{dayLabel}</p>
                         {s.venue && <p className="text-gray-400 text-xs font-display truncate">{s.venue}</p>}
                       </div>
+                      {costBySession[s.id] !== undefined && (
+                        <span className="text-purple-500 text-xs font-display font-bold flex-shrink-0">£{costBySession[s.id].toFixed(2)}</span>
+                      )}
                       <span className="text-gray-400 text-xs font-display flex-shrink-0">
                         {matchCount} game{matchCount !== 1 ? "s" : ""}
                       </span>
@@ -700,6 +716,10 @@ export default function GroupDetailView() {
                     </button>
                     {isExpanded && (
                       <div className="px-4 pb-3 flex flex-col gap-1.5">
+                        <button onClick={() => navigate(`/groups/${id}/money?session=${s.id}`)}
+                          className="self-start flex items-center gap-1.5 text-xs font-display font-bold text-purple-600 bg-purple-50 rounded-lg px-2.5 py-1 mb-1">
+                          <Wallet size={12} /> {costBySession[s.id] !== undefined ? "Add more costs" : "Add court & shuttle costs"}
+                        </button>
                         {board.length === 0 ? (
                           <p className="text-gray-400 text-xs font-display text-center py-2">No scored matches</p>
                         ) : (

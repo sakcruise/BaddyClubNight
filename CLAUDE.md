@@ -119,7 +119,8 @@ A second mode alongside clubs, for friends who organise ad-hoc games.
 - **Session re-scoping**: a group session is a normal `Session` carrying `group_id`. `api.ts isOffline()` returns true whenever the active session has a `group_id`, so the *entire* queue/court/match engine runs on local Zustand for groups. Start Session hydrates `useMemberStore` from the group's members, then opens the session.
 - **Invite / join**: `GroupDetailView` shows an invite link → `/groups/join/:token` (`JoinView`, a **public** route mounted outside `AuthGuard` in `App.tsx`). Join uses the `get_group_by_invite` / `join_group` SECURITY DEFINER RPCs; anon name-only joins are allowed.
 - **Backend**: migrations **003_groups.sql** (tables + RLS + RPCs) and **004_fix_group_rls.sql** (fixes 42P17 recursion via `is_group_owner`/`is_group_member` SECURITY DEFINER helpers) are **APPLIED**. Group RLS is owner-scoped + member-read.
-- **v1 roadmap** (agreed): Core loop ✅ → Supabase + invite/join ✅ → Splitwise expenses (next) → RSVP + reminders.
+- **Costs (Splitwise-style)**: `pages/GroupMoneyView.tsx` (`/groups/:id/money`) + `components/groups/AddCostsModal.tsx`. Court + shuttle (+ other) costs per session, each with its own payer, split equally between attendees (queue_entries ∪ match players, via `group_session_attendees`). Balances / fewest-payments settle-up in `utils/splits.ts` (pence maths, tested). Backend: migration **022_group_expenses.sql** — all access via SECURITY DEFINER RPCs (`list_group_ledger`, `add_group_expense`, `add_group_settlement`, deletes). Guest (local) groups not supported.
+- **v1 roadmap** (agreed): Core loop ✅ → Supabase + invite/join ✅ → RSVP polls ✅ → Splitwise costs ✅ (migration 022 must be applied) → reminders.
 
 ## Preview Server
 - Preview server ID: `bd895075-0b59-409b-b439-2a42c3139835` (port 5173)
