@@ -200,6 +200,15 @@ export const groupsApi = {
   },
 
   /** Activate an upcoming session (owner only). */
+  /** Open or close the RSVP poll (owner only, via the sessions RLS policy). */
+  setRsvpOpen: async (sessionId: string, open: boolean): Promise<void> => {
+    const { error } = await supabase
+      .from("sessions")
+      .update({ rsvp_open: open })
+      .eq("id", sessionId);
+    if (error) throw new Error(error.message);
+  },
+
   activateSession: async (sessionId: string): Promise<void> => {
     const { error } = await supabase
       .from("sessions")
@@ -267,6 +276,7 @@ function rowToGroupSession(s: any): GroupSession {
     num_courts: s.num_courts,
     status: s.status,
     created_at: s.created_at,
+    rsvp_open: s.rsvp_open ?? true,
     rsvps,
     going_count: rsvps.filter((r) => r.status === "yes").length,
   };

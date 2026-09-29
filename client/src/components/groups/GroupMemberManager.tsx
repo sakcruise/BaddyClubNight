@@ -44,6 +44,8 @@ export default function GroupMemberManager({ groupId }: { groupId: string }) {
   }
 
   async function handleRemove(memberId: string) {
+    const name = members.find((m) => m.id === memberId)?.name ?? "this member";
+    if (!confirm(`Remove ${name} from the group? Their RSVPs and match history for this group will go too.`)) return;
     try {
       await groupsApi.removeMember(memberId);
       await refresh();

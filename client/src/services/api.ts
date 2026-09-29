@@ -188,15 +188,21 @@ export const authApi = {
    * auth email). Verifies username + recovery email match, then returns a
    * single-use reset link generated server-side via the Supabase admin API.
    */
+  // Runs as a Supabase Edge Function — the Express server isn't reachable from
+  // the deployed web app, and Safari surfaced that as "string did not match the
+  // expected pattern" when it tried to parse the SPA's HTML as JSON.
   forgotPersonal: async (username: string, email: string): Promise<string> => {
-    const res = await fetch("/api/auth/forgot-personal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: username.trim(), email: email.trim() }),
+    const { data, error } = await supabase.functions.invoke("forgot-personal", {
+      body: { username: username.trim(), email: email.trim() },
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message ?? "Could not generate reset link");
-    return json.reset_link as string;
+    if (error) {
+      // FunctionsHttpError carries the function's JSON body; surface its message
+      const ctx = (error as any).context;
+      let message = "Could not generate reset link";
+      try { message = (await ctx?.json())?.message ?? message; } catch { /* keep default */ }
+      throw new Error(message);
+    }
+    return data.reset_link as string;
   },
 };
 

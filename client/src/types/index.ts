@@ -156,6 +156,7 @@ export interface GroupSession {
   num_courts: number;
   status: "upcoming" | "active" | "ended";
   created_at: string;
+  rsvp_open: boolean;
   rsvps: GroupRsvp[];
   going_count: number;
 }

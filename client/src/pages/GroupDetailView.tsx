@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X } from "lucide-react";
+import { ArrowLeft, Trash2, Check, CalendarPlus, Users, MapPin, Clock, CheckCircle2, XCircle, HelpCircle, Play, Share2, Pencil, Trophy, Swords, CalendarCheck, History, ChevronRight, Cog, X, Lock, Unlock } from "lucide-react";
 import { useGroupStore, useSessionStore, useMemberStore, useAuthStore, useQueueStore } from "../store";
 import { groupsApi } from "../services/groups";
 import { queueApi } from "../services/api";
@@ -142,6 +142,7 @@ export default function GroupDetailView() {
   const [copiedSession, setCopiedSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<GroupSession | null>(null);
   const [rsvpList, setRsvpList] = useState<RsvpGroups | null>(null);
+  const [pollBusy, setPollBusy] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [groupMatches, setGroupMatches] = useState<Match[]>([]);
   const [sessionsPlayed, setSessionsPlayed] = useState(0);
@@ -258,6 +259,8 @@ export default function GroupDetailView() {
     // re-adds the owner automatically on next load if their row ever ends up
     // missing, so deleting a bad/duplicate own-row entry (e.g. a wrong auto
     // -generated name) is always safe to allow here.
+    const name = group?.members.find((m) => m.id === memberId)?.name ?? "this member";
+    if (!confirm(`Remove ${name} from the group? Their RSVPs and match history for this group will go too.`)) return;
     try {
       await groupsApi.removeMember(memberId);
       await refresh();
@@ -366,6 +369,18 @@ export default function GroupDetailView() {
       await launchSession(s.id, s.num_courts, s.venue, s.scheduled_at, goingIds);
     } catch (e: any) {
       alert(`Couldn't activate session: ${e?.message ?? "unknown error"}`);
+    }
+  }
+
+  async function handleTogglePoll(s: GroupSession) {
+    setPollBusy(s.id);
+    try {
+      await groupsApi.setRsvpOpen(s.id, !s.rsvp_open);
+      setUpcomingSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, rsvp_open: !s.rsvp_open } : x)));
+    } catch (e: any) {
+      alert(`Couldn't update the poll: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setPollBusy(null);
     }
   }
 
@@ -533,13 +548,32 @@ export default function GroupDetailView() {
                         no:    { icon: <XCircle      size={15} />, label: "Can't",  active: "bg-red-500 text-white border-red-500"       },
                       }[st];
                       return (
-                        <button key={st} onClick={() => handleRsvp(nextSession.id, st)}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 font-display font-black text-sm transition-all active:scale-95
+                        <button key={st} onClick={() => handleRsvp(nextSession.id, st)} disabled={!nextSession.rsvp_open}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 font-display font-black text-sm transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100
                             ${myRsvp?.status === st ? cfg.active : "border-gray-200 text-gray-500 bg-white"}`}>
                           {cfg.icon} {cfg.label}
                         </button>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Poll state */}
+                {nextSession.status === "upcoming" && (
+                  <div className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-display font-bold
+                    ${nextSession.rsvp_open ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    {nextSession.rsvp_open ? <Unlock size={13} /> : <Lock size={13} />}
+                    <span className="flex-1">{nextSession.rsvp_open ? "Poll open — members can reply" : "Poll closed — replies are locked"}</span>
+                    {isOwner && (
+                      <button
+                        onClick={() => handleTogglePoll(nextSession)}
+                        disabled={pollBusy === nextSession.id}
+                        className={`px-2.5 py-1 rounded-lg font-black transition-all active:scale-95 disabled:opacity-50
+                          ${nextSession.rsvp_open ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50" : "bg-green-500 text-white hover:bg-green-600"}`}
+                      >
+                        {pollBusy === nextSession.id ? "…" : nextSession.rsvp_open ? "Close poll" : "Open poll"}
+                      </button>
+                    )}
                   </div>
                 )}
 

@@ -20,6 +20,7 @@ interface SessionPage {
   venue?: string;
   num_courts: number;
   status: string;
+  rsvp_open?: boolean;
   members: SessionMember[];
 }
 
@@ -119,6 +120,7 @@ export default function SessionRsvpView() {
   }
 
   const { date, time } = formatDate(data.scheduled_at);
+  const pollOpen = data.rsvp_open !== false;
 
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col"
@@ -186,14 +188,22 @@ export default function SessionRsvpView() {
         <div className="bg-white rounded-2xl shadow-xl shadow-black/20 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
             <p className="font-display font-black text-gray-900 text-sm">
-              Who's coming? <span className="text-gray-400 font-normal">— tap your name to update</span>
+              Who's coming?{" "}
+              <span className="text-gray-400 font-normal">{pollOpen ? "— tap your name to update" : "— poll closed"}</span>
             </p>
           </div>
+
+          {!pollOpen && (
+            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-display font-bold text-gray-500">
+              The organiser has closed replies for this session.
+            </div>
+          )}
 
           {(data.members ?? []).map((m) => (
             <div key={m.id}>
               <button
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 disabled:cursor-default"
+                disabled={!pollOpen}
                 onClick={() => setPicking(picking === m.id ? null : m.id)}
               >
                 <span className={`w-8 h-8 rounded-full ${TYPE_DOT[m.member_type]} flex items-center justify-center text-white font-display font-black text-sm flex-shrink-0`}>
@@ -235,7 +245,7 @@ export default function SessionRsvpView() {
         </div>
 
         <p className="text-center text-white/40 text-xs font-display pb-2">
-          Tap your name to mark your attendance · No account needed
+          {pollOpen ? "Tap your name to mark your attendance · No account needed" : "Replies are closed for this session"}
         </p>
       </div>
     </div>
