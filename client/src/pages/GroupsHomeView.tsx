@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Users, ChevronRight, X, LogOut, Calendar, Clock, Zap,
-  Play, MapPin, Activity, Swords, CalendarCheck, Trash2, Pencil,
+  Play, MapPin, Activity, Swords, CalendarCheck, Trash2, Pencil, Check,
 } from "lucide-react";
 import { useGroupStore, useAuthStore, useSessionStore } from "../store";
 import { authApi } from "../services/api";
@@ -79,6 +79,10 @@ export default function GroupsHomeView() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [editName, setEditName] = useState("");
   const [renaming, setRenaming] = useState(false);
+  const [editingMe, setEditingMe] = useState(false);
+  const [myName, setMyName] = useState("");
+  const [savingMe, setSavingMe] = useState(false);
+  const [meError, setMeError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
@@ -228,6 +232,24 @@ export default function GroupsHomeView() {
       alert(`Couldn't create group: ${e?.message ?? "unknown error"}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveMyName() {
+    const clean = myName.trim();
+    if (!clean || savingMe) return;
+    setSavingMe(true);
+    setMeError(null);
+    try {
+      await groupsApi.updateMyName(clean);
+      const auth = useAuthStore.getState();
+      auth.setProfile(auth.username ?? "", clean, clean, auth.email ?? "");
+      setGroups(await groupsApi.list()); // member lists now show the new name
+      setEditingMe(false);
+    } catch (e: any) {
+      setMeError(e?.message ?? "Couldn't save your name");
+    } finally {
+      setSavingMe(false);
     }
   }
 
@@ -615,7 +637,7 @@ export default function GroupsHomeView() {
             <motion.div
               className="fixed inset-0 bg-black/50 z-40"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowSettings(false)}
+              onClick={() => { setShowSettings(false); setEditingMe(false); }}
             />
             <motion.div
               className="fixed left-0 right-0 bottom-0 z-50 bg-white rounded-t-3xl p-5 pb-10 max-w-xl mx-auto"
@@ -634,12 +656,44 @@ export default function GroupsHomeView() {
                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center text-white font-display font-black text-2xl flex-shrink-0 shadow-lg shadow-purple-200">
                   {firstName.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-black text-gray-900 text-base truncate">
-                    {adminName?.trim() || displayName?.trim() || "Anonymous"}
-                  </p>
-                  <p className="text-gray-400 text-xs font-display mt-0.5">Group account</p>
-                </div>
+                {editingMe ? (
+                  <form className="flex-1 min-w-0 flex flex-col gap-2"
+                    onSubmit={(e) => { e.preventDefault(); handleSaveMyName(); }}>
+                    <label htmlFor="my-name" className="text-gray-400 text-xs font-display">Your name</label>
+                    <input
+                      id="my-name" autoFocus maxLength={40} value={myName}
+                      onChange={(e) => setMyName(e.target.value)}
+                      className="w-full border-2 border-purple-300 rounded-xl px-3 py-2 text-base focus:outline-none focus:border-purple-500"
+                    />
+                    {meError && <p className="text-red-600 text-xs font-display font-bold">{meError}</p>}
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={!myName.trim() || savingMe}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-purple-600 text-white font-display font-black text-sm disabled:opacity-50 active:scale-95 transition-all">
+                        <Check size={14} /> {savingMe ? "Saving…" : "Save"}
+                      </button>
+                      <button type="button" onClick={() => { setEditingMe(false); setMeError(null); }}
+                        className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 font-display font-bold text-sm">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-display font-black text-gray-900 text-base truncate">
+                        {adminName?.trim() || displayName?.trim() || "Anonymous"}
+                      </p>
+                      <p className="text-gray-400 text-xs font-display mt-0.5">Group account</p>
+                    </div>
+                    <button
+                      onClick={() => { setMyName(adminName?.trim() || displayName?.trim() || ""); setMeError(null); setEditingMe(true); }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-gray-200 text-purple-600 font-display font-bold text-sm active:scale-95 transition-all"
+                      aria-label="Edit your name"
+                    >
+                      <Pencil size={14} /> Edit
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Stats summary */}

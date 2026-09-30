@@ -236,6 +236,16 @@ export const groupsApi = {
     if (error) throw new Error(error.message);
   },
 
+  /** Change the signed-in person's name: their login profile, their account,
+   *  and every group they're in (migration 023's update_my_name). */
+  updateMyName: async (name: string): Promise<void> => {
+    const clean = name.trim();
+    const { error } = await supabase.rpc("update_my_name", { p_name: clean });
+    if (error) throw new Error(error.message);
+    const { error: authError } = await supabase.auth.updateUser({ data: { display_name: clean, admin_name: clean } });
+    if (authError) throw new Error(authError.message);
+  },
+
   /** Find the group_member row for the current user in a group. */
   myMemberId: async (groupId: string): Promise<string | null> => {
     const { data: { user } } = await supabase.auth.getUser();
