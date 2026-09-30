@@ -223,7 +223,7 @@ export default function GroupMoneyView() {
                   <span className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">{CAT_ICON[a.e.category]}</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-gray-800 text-sm truncate">{a.e.description}</p>
-                    <p className="text-gray-400 text-xs font-display truncate">
+                    <p className="text-gray-400 text-xs font-display">
                       {nameOf(a.e.paid_by)} paid · split {a.e.shares.length} way{a.e.shares.length !== 1 ? "s" : ""}
                       {sessionName(a.e.session_id) && ` · ${sessionName(a.e.session_id)}`}
                     </p>

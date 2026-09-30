@@ -500,17 +500,17 @@ export default function GroupDetailView() {
           return (
             <div key={nextSession.id} className="bg-white border border-orange-200 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
               {/* Coloured top bar */}
-              <div className="bg-gradient-to-r from-purple-600 to-purple-400 px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CalendarPlus size={15} className="text-white/80" />
+              <div className="bg-gradient-to-r from-purple-600 to-purple-400 px-4 py-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarPlus size={15} className="text-white/80 flex-shrink-0" />
                   <span className="font-display font-black text-white text-xs uppercase tracking-wider">
                     {nextSession.status === "active" ? "Session in progress" : idx === 0 ? "Next session" : "Also scheduled"}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => setRsvpList(rsvpGroups)}
-                    className="flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-full px-2 py-0.5 text-white font-display font-bold text-xs transition-all active:scale-95"
+                    className="flex items-center gap-1 whitespace-nowrap bg-white/20 hover:bg-white/30 rounded-full px-2 py-0.5 text-white font-display font-bold text-xs transition-all active:scale-95"
                     title="See who's coming"
                   >
                     <CheckCircle2 size={11} /> {goingCount} going
