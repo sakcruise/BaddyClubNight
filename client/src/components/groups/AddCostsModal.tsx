@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, LayoutGrid, Feather, Receipt, Check } from "lucide-react";
+import { X, LayoutGrid, Feather, Receipt, Check, Plus, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { expensesApi } from "../../services/groups";
 import { useSessionStore } from "../../store";
@@ -20,6 +20,7 @@ interface Props {
 
 const money = (n: number) => `£${n.toFixed(2)}`;
 type SplitMode = "equal" | "percent" | "exact";
+interface CourtLine { key: number; label: string; amount: string; payer: string }
 const MODES: { key: SplitMode; label: string }[] = [
   { key: "equal", label: "Equally" },
   { key: "percent", label: "By %" },
@@ -38,8 +39,14 @@ export default function AddCostsModal({ groupId, members, sessions, defaultSessi
   const firstPayer = defaultPayerId ?? members[0]?.id ?? "";
 
   const [sessionId, setSessionId] = useState<string>(defaultSessionId ?? sessions[0]?.id ?? "");
-  const [court, setCourt] = useState("");
-  const [courtPayer, setCourtPayer] = useState(firstPayer);
+  // Several court bookings can go on one session (two courts, a booking fee…),
+  // each with its own amount and payer. Each becomes its own court expense.
+  const [courts, setCourts] = useState<CourtLine[]>([{ key: 1, label: "", amount: "", payer: firstPayer }]);
+  const updateCourt = (key: number, patch: Partial<CourtLine>) =>
+    setCourts((cs) => cs.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+  const addCourt = () =>
+    setCourts((cs) => [...cs, { key: Math.max(...cs.map((c) => c.key)) + 1, label: "", amount: "", payer: cs[cs.length - 1]?.payer ?? firstPayer }]);
+  const removeCourt = (key: number) => setCourts((cs) => cs.filter((c) => c.key !== key));
   const [shuttles, setShuttles] = useState("");
   const [shuttlePayer, setShuttlePayer] = useState(firstPayer);
   const [other, setOther] = useState("");
@@ -73,12 +80,16 @@ export default function AddCostsModal({ groupId, members, sessions, defaultSessi
   const lines = useMemo(() => {
     const l: { category: ExpenseCategory; description: string; amount: number; paid_by: string }[] = [];
     const pence = (v: string) => Math.round((parseFloat(v) || 0) * 100) / 100;
-    const c = pence(court), s = pence(shuttles), o = pence(other);
-    if (c > 0) l.push({ category: "court", description: "Court hire", amount: c, paid_by: courtPayer });
+    const s = pence(shuttles), o = pence(other);
+    courts.forEach((c, i) => {
+      const amount = pence(c.amount);
+      const description = c.label.trim() || (courts.length > 1 ? `Court ${i + 1}` : "Court hire");
+      if (amount > 0) l.push({ category: "court", description, amount, paid_by: c.payer });
+    });
     if (s > 0) l.push({ category: "shuttles", description: "Shuttles", amount: s, paid_by: shuttlePayer });
     if (o > 0) l.push({ category: "other", description: otherLabel.trim() || "Other", amount: o, paid_by: otherPayer });
     return l;
-  }, [court, shuttles, other, otherLabel, courtPayer, shuttlePayer, otherPayer]);
+  }, [courts, shuttles, other, otherLabel, shuttlePayer, otherPayer]);
 
   const total = lines.reduce((t, l) => t + l.amount, 0);
   const people = members.filter((m) => splitIds.has(m.id));
@@ -201,13 +212,45 @@ export default function AddCostsModal({ groupId, members, sessions, defaultSessi
 
           {/* Court */}
           <div className="flex flex-col gap-1.5">
-            <span className="flex items-center gap-1.5 text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
-              <LayoutGrid size={13} /> Court cost
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" inputMode="decimal" min="0" step="0.01" placeholder="£0.00" value={court} onChange={(e) => setCourt(e.target.value)} className={inputCls} />
-              {payerSelect(courtPayer, setCourtPayer)}
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-display font-bold text-gray-500 uppercase tracking-wider">
+                <LayoutGrid size={13} /> Court cost
+              </span>
+              {courts.length > 1 && (
+                <span className="text-xs font-display font-bold text-gray-500 tabular-nums">
+                  Total {money(courts.reduce((t, c) => t + (Math.round((parseFloat(c.amount) || 0) * 100) / 100), 0))}
+                </span>
+              )}
             </div>
+            {courts.length === 1 ? (
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" inputMode="decimal" min="0" step="0.01" placeholder="£0.00" aria-label="Court cost"
+                  value={courts[0].amount} onChange={(e) => updateCourt(courts[0].key, { amount: e.target.value })} className={inputCls} />
+                {payerSelect(courts[0].payer, (v) => updateCourt(courts[0].key, { payer: v }))}
+              </div>
+            ) : (
+              courts.map((c, i) => (
+                <div key={c.key} className="flex flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50/60 p-2">
+                  <div className="flex items-center gap-2">
+                    <input placeholder={`Court ${i + 1}`} aria-label={`Court line ${i + 1} name`} value={c.label}
+                      onChange={(e) => updateCourt(c.key, { label: e.target.value })} className={`${inputCls} py-2`} />
+                    <button type="button" onClick={() => removeCourt(c.key)} aria-label={`Remove court line ${i + 1}`}
+                      className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" inputMode="decimal" min="0" step="0.01" placeholder="£0.00" aria-label={`Court line ${i + 1} amount`}
+                      value={c.amount} onChange={(e) => updateCourt(c.key, { amount: e.target.value })} className={inputCls} />
+                    {payerSelect(c.payer, (v) => updateCourt(c.key, { payer: v }))}
+                  </div>
+                </div>
+              ))
+            )}
+            <button type="button" onClick={addCourt}
+              className="self-start flex items-center gap-1 text-xs font-display font-bold text-purple-600 bg-purple-50 rounded-lg px-2.5 py-1.5">
+              <Plus size={13} /> Add another court cost
+            </button>
           </div>
 
           {/* Shuttles */}
