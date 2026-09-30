@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { equalSplit, computeBalances, simplifyDebts } from "./splits";
+import { equalSplit, computeBalances, simplifyDebts, splitPenceByWeights, allocateLines } from "./splits";
 import type { GroupExpense, GroupSettlement } from "../types";
 
 const expense = (paid_by: string, amount: number, shares: [string, number][]): GroupExpense => ({
@@ -45,5 +45,34 @@ describe("simplifyDebts", () => {
     const after = { ...b };
     t.forEach((x) => { after[x.from] += x.amount * 100; after[x.to] -= x.amount * 100; });
     Object.values(after).forEach((p) => expect(Math.round(p)).toBe(0));
+  });
+});
+
+describe("splitPenceByWeights", () => {
+  it("splits £42 as 50/30/20 exactly", () => {
+    expect(splitPenceByWeights(4200, [{ id: "a", weight: 50 }, { id: "b", weight: 30 }, { id: "c", weight: 20 }]))
+      .toEqual({ a: 2100, b: 1260, c: 840 });
+  });
+
+  it("thirds of £10 still add up to 1000p", () => {
+    const s = splitPenceByWeights(1000, [{ id: "a", weight: 1 }, { id: "b", weight: 1 }, { id: "c", weight: 1 }]);
+    expect(Object.values(s).reduce((t, p) => t + p, 0)).toBe(1000);
+    expect(Object.values(s).sort()).toEqual([333, 333, 334]);
+  });
+});
+
+describe("allocateLines", () => {
+  it("court + shuttles, custom totals: every line and every person adds up", () => {
+    // £24 court + £18 shuttles = £42. Custom totals: a £20, b £12.50, c £9.50
+    const targets = { a: 2000, b: 1250, c: 950 };
+    const lines = allocateLines([2400, 1800], targets);
+    lines.forEach((l, i) => expect(Object.values(l).reduce((t, p) => t + p, 0)).toBe([2400, 1800][i]));
+    Object.entries(targets).forEach(([id, p]) => expect(lines[0][id] + lines[1][id]).toBe(p));
+    lines.forEach((l) => Object.values(l).forEach((p) => expect(p).toBeGreaterThanOrEqual(0)));
+  });
+
+  it("someone paying 0 gets 0 on every line", () => {
+    const lines = allocateLines([1000, 333, 7], { a: 1340, b: 0 });
+    expect(lines.map((l) => l.b)).toEqual([0, 0, 0]);
   });
 });

@@ -16,6 +16,12 @@ const CAT_ICON: Record<ExpenseCategory, JSX.Element> = {
   other: <Receipt size={14} />,
 };
 
+/** More than a penny between the smallest and largest share = not an equal split. */
+function isUneven(e: GroupExpense): boolean {
+  const p = e.shares.map((s) => Math.round(s.amount * 100));
+  return p.length > 1 && Math.max(...p) - Math.min(...p) > 1;
+}
+
 function sessionLabel(s: any): string {
   const d = new Date(s.scheduled_at ?? `${s.date}T12:00:00`);
   const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
@@ -225,6 +231,7 @@ export default function GroupMoneyView() {
                     <p className="font-display font-bold text-gray-800 text-sm truncate">{a.e.description}</p>
                     <p className="text-gray-400 text-xs font-display">
                       {nameOf(a.e.paid_by)} paid · split {a.e.shares.length} way{a.e.shares.length !== 1 ? "s" : ""}
+                      {isUneven(a.e) && " (custom)"}
                       {sessionName(a.e.session_id) && ` · ${sessionName(a.e.session_id)}`}
                     </p>
                     {myMemberId && (() => {
