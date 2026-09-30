@@ -26,8 +26,17 @@ export default {
         },
       },
       fontFamily: {
-        display: ["Nunito", "system-ui", "sans-serif"],
-        body: ["Inter", "system-ui", "sans-serif"],
+        display: ["Inter Variable", "Inter", "system-ui", "sans-serif"],
+        body: ["Inter Variable", "Inter", "system-ui", "sans-serif"],
+      },
+      // One step lighter than Tailwind's defaults, app-wide: the UI leans on
+      // font-black / font-bold everywhere, which reads heavy. Inter is a
+      // variable font, so the in-between weights render exactly.
+      fontWeight: {
+        semibold: "500",
+        bold: "600",
+        extrabold: "650",
+        black: "700",
       },
       borderRadius: {
         "4xl": "2rem",
