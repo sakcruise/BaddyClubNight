@@ -192,6 +192,31 @@ export interface Group {
   created_at: string;
 }
 
+// ─── Group costs (Splitwise-style) ──────────────────────────────────────────────
+
+export type ExpenseCategory = "court" | "shuttles" | "other";
+
+export interface GroupExpense {
+  id: string;
+  session_id?: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;              // £
+  paid_by: string;             // group_members.id
+  created_by?: string;         // auth user id
+  created_at: string;
+  shares: { member_id: string; amount: number }[];
+}
+
+export interface GroupSettlement {
+  id: string;
+  from_member: string;         // paid …
+  to_member: string;           // … to
+  amount: number;
+  created_by?: string;
+  created_at: string;
+}
+
 export interface PlayerStats {
   member_id: string;
   member: Member;

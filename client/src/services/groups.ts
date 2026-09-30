@@ -10,7 +10,7 @@
  *   group_members → GroupMember (display_name→name, joined_at→created_at)
  */
 import { supabase } from "../lib/supabase";
-import type { Group, GroupMember, GroupSession, GroupRsvp, MemberType } from "../types";
+import type { Group, GroupMember, GroupSession, GroupRsvp, MemberType, GroupExpense, GroupSettlement, ExpenseCategory } from "../types";
 
 async function getUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -247,6 +247,78 @@ export const groupsApi = {
       .eq("member_user_id", user.id)
       .maybeSingle();
     return data?.id ?? null;
+  },
+};
+
+// ─── Costs (Splitwise-style) — migration 022 ─────────────────────────────────
+
+export const expensesApi = {
+  /** Every expense (with shares) and settle-up in a group. */
+  ledger: async (groupId: string): Promise<{ expenses: GroupExpense[]; settlements: GroupSettlement[] }> => {
+    const { data, error } = await supabase.rpc("list_group_ledger", { p_group_id: groupId });
+    if (error) throw new Error(error.message);
+    const d = parseJson(data) ?? {};
+    const expenses: GroupExpense[] = (d.expenses ?? []).map((e: any) => ({
+      id: e.id,
+      session_id: e.session_id ?? undefined,
+      category: e.category,
+      description: e.description ?? "",
+      amount: Number(e.amount),
+      paid_by: e.paid_by,
+      created_by: e.created_by ?? undefined,
+      created_at: e.created_at,
+      shares: (e.shares ?? []).map((s: any) => ({ member_id: s.member_id, amount: Number(s.amount) })),
+    }));
+    const settlements: GroupSettlement[] = (d.settlements ?? []).map((s: any) => ({
+      id: s.id,
+      from_member: s.from_member,
+      to_member: s.to_member,
+      amount: Number(s.amount),
+      created_by: s.created_by ?? undefined,
+      created_at: s.created_at,
+    }));
+    return { expenses, settlements };
+  },
+
+  add: async (groupId: string, e: {
+    session_id?: string; category: ExpenseCategory; description: string;
+    amount: number; paid_by: string; shares: { member_id: string; amount: number }[];
+  }): Promise<string> => {
+    const { data, error } = await supabase.rpc("add_group_expense", {
+      p_group_id: groupId,
+      p_session_id: e.session_id ?? null,
+      p_category: e.category,
+      p_description: e.description,
+      p_amount: e.amount,
+      p_paid_by: e.paid_by,
+      p_shares: e.shares,
+    });
+    if (error) throw new Error(error.message);
+    return data as string;
+  },
+
+  remove: async (expenseId: string): Promise<void> => {
+    const { error } = await supabase.rpc("delete_group_expense", { p_expense_id: expenseId });
+    if (error) throw new Error(error.message);
+  },
+
+  settle: async (groupId: string, from: string, to: string, amount: number): Promise<void> => {
+    const { error } = await supabase.rpc("add_group_settlement", {
+      p_group_id: groupId, p_from: from, p_to: to, p_amount: amount,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  removeSettlement: async (settlementId: string): Promise<void> => {
+    const { error } = await supabase.rpc("delete_group_settlement", { p_settlement_id: settlementId });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Group member ids who checked in or played at a session. */
+  attendees: async (sessionId: string): Promise<string[]> => {
+    const { data, error } = await supabase.rpc("group_session_attendees", { p_session_id: sessionId });
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as any[]).map((r) => (typeof r === "string" ? r : r.group_session_attendees ?? Object.values(r)[0]));
   },
 };
 
