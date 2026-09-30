@@ -248,3 +248,13 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.group_session_attendees(UUID) TO authenticated;
+
+-- ── Signed-in callers only (Postgres grants EXECUTE to PUBLIC by default) ─────
+-- assert_group_access is an internal helper, called only from the RPCs above.
+REVOKE EXECUTE ON FUNCTION public.assert_group_access(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.list_group_ledger(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.add_group_expense(UUID, UUID, TEXT, TEXT, NUMERIC, UUID, JSONB) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.delete_group_expense(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.add_group_settlement(UUID, UUID, UUID, NUMERIC) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.delete_group_settlement(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.group_session_attendees(UUID) FROM PUBLIC, anon;
