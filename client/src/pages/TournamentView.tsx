@@ -847,8 +847,8 @@ export default function TournamentView() {
   }
 
   return (
-    <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col overflow-hidden antialiased">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0">
+    <div className={`${isMobile ? "min-h-screen min-h-[100dvh]" : "h-screen h-[100dvh] overflow-hidden"} bg-gray-50 flex flex-col antialiased`}>
+      <header className={`flex flex-wrap items-center gap-x-3 gap-y-2 bg-white border-b border-gray-100 flex-shrink-0 ${isMobile ? "px-3 py-3" : "px-5 py-4"}`}>
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0">
           <Trophy size={18} className="text-white" />
         </div>
@@ -856,20 +856,21 @@ export default function TournamentView() {
           <h1 className="font-display font-bold text-gray-900 text-lg leading-tight">{tournament.name}</h1>
           <p className="text-gray-500 text-xs font-display capitalize">{tournament.status} stage</p>
         </div>
-        <div className="flex-1 flex flex-wrap items-center gap-2 px-2">
+        <div className={`flex items-center gap-2 ${isMobile ? "order-last w-full flex-nowrap overflow-x-auto" : "flex-1 flex-wrap px-2"}`}>
           {championsByYear.map((c) => (
             <span
               key={c.year}
-              className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-display font-semibold text-amber-800"
+              className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-display font-semibold text-amber-800 whitespace-nowrap flex-shrink-0"
             >
               <Trophy size={12} className="text-amber-500" />
               <span className="text-amber-500">{c.year}</span> {c.winners}
             </span>
           ))}
         </div>
+        <div className={isMobile ? "w-full flex items-center gap-2 overflow-x-auto [&>*]:flex-shrink-0 [&>*]:whitespace-nowrap" : "contents"}>
         {offline && (
           <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-display font-semibold">
-            <WifiOff size={14} /> Offline — saved on this device
+            <WifiOff size={14} /> {isMobile ? "Offline" : "Offline — saved on this device"}
           </span>
         )}
         <button
@@ -903,6 +904,7 @@ export default function TournamentView() {
         >
           <Flag size={14} /> End Tournament
         </button>
+        </div>
       </header>
 
       <TournamentTicker
@@ -925,7 +927,7 @@ export default function TournamentView() {
 
       <main
         ref={fitOuterRef}
-        className={`flex-1 min-h-0 w-full flex ${isMobile ? "overflow-y-auto overflow-x-hidden" : fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}
+        className={`w-full flex ${isMobile ? "" : `flex-1 min-h-0 ${fitZoom <= MIN_FIT_ZOOM ? "overflow-auto" : "overflow-hidden"}`}`}
       >
        <div
          ref={fitInnerRef}
@@ -1052,11 +1054,11 @@ export default function TournamentView() {
           <div className={`flex gap-6 flex-1 min-h-0 ${isMobile ? "flex-col gap-4" : "items-stretch"}`}>
             {/* Knockout / complete: groups collapse to a compact scoreboard so the bracket gets the screen */}
             {tournament.status !== "groups" && !showFullGroups && (
-              <div className={`grid grid-cols-2 gap-2 flex-shrink-0 ${isMobile ? "w-full" : "w-max self-center"}`} style={{ zoom: isMobile ? 1 : groupsScale }}>
+              <div className={`grid grid-cols-2 gap-2 flex-shrink-0 ${isMobile ? "w-full [grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]" : "w-max self-center"}`} style={{ zoom: isMobile ? 1 : groupsScale }}>
                 {Array.from({ length: tournament.num_groups }, (_, g) => {
                   const rows = standingsByGroup[g] ?? [];
                   return (
-                    <section key={g} className="bg-white rounded-xl border border-gray-200 p-2 w-[200px]">
+                    <section key={g} className={`bg-white rounded-xl border border-gray-200 p-2 ${isMobile ? "min-w-0" : "w-[200px]"}`}>
                       <h2 className="font-display font-semibold text-gray-700 text-[11px] uppercase tracking-wider mb-1">Group {g + 1}</h2>
                       <ol className="flex flex-col">
                         {rows.map((s, i) => (
@@ -1340,7 +1342,7 @@ export default function TournamentView() {
                   onClick={() => nudgeGroupsScale(0.1)}
                   disabled={groupsScale >= 2}
                   aria-label="Make the groups panel bigger"
-                  className="h-12 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-500 text-xl font-display font-bold active:bg-violet-50 disabled:opacity-30"
+                  className="max-[900px]:hidden h-12 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-500 text-xl font-display font-bold active:bg-violet-50 disabled:opacity-30"
                 >
                   +
                 </button>
@@ -1365,7 +1367,7 @@ export default function TournamentView() {
                   onClick={() => nudgeGroupsScale(-0.1)}
                   disabled={groupsScale <= 0.5}
                   aria-label="Make the groups panel smaller"
-                  className="h-12 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-500 text-xl font-display font-bold active:bg-violet-50 disabled:opacity-30"
+                  className="max-[900px]:hidden h-12 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-500 text-xl font-display font-bold active:bg-violet-50 disabled:opacity-30"
                 >
                   −
                 </button>
@@ -1442,7 +1444,7 @@ export default function TournamentView() {
                         Names fill in as each group's leader changes — this is who'd go through if the groups ended now.
                       </p>
                     </div>
-                    <div>
+                    <div className="overflow-x-auto pb-2 -mx-1 px-1">
                       <div className="grid gap-x-8 mb-3" style={{ gridTemplateColumns: `repeat(${previewRounds.length}, 220px)` }}>
                         {previewRounds.map((r) => (
                           <h3 key={r.label} className="text-[10px] font-display font-semibold text-gray-400 uppercase tracking-widest text-center">

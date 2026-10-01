@@ -360,9 +360,9 @@ export default function TournamentTicker(props: Props) {
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
-    <div className="flex items-stretch bg-violet-50 border-b border-violet-100 text-violet-900 overflow-hidden flex-shrink-0">
+    <div className="flex items-stretch max-md:flex-wrap bg-violet-50 border-b border-violet-100 text-violet-900 overflow-hidden flex-shrink-0">
       {/* LIVE badge */}
-      <div className="flex items-center px-4 flex-shrink-0">
+      <div className="flex items-center px-4 max-md:px-2 flex-shrink-0">
         <span className="flex items-center gap-1.5 rounded-full bg-white border border-violet-200 pl-2 pr-2.5 py-1">
           <motion.span
             animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
@@ -374,7 +374,7 @@ export default function TournamentTicker(props: Props) {
       </div>
 
       {/* Rotating commentary */}
-      <div className="relative flex-1 min-w-0 h-16 flex items-center justify-center px-4 overflow-hidden">
+      <div className="relative flex-1 min-w-0 h-16 max-md:order-last max-md:basis-full max-md:h-auto max-md:min-h-[56px] max-md:py-2 max-md:border-t max-md:border-violet-100 flex items-center justify-center px-4 overflow-hidden">
         {/* Highlight sweep on every new line */}
         {!reduceMotion && (
           <motion.div
@@ -407,18 +407,18 @@ export default function TournamentTicker(props: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, y: reduceMotion ? 0 : -18 }}
             transition={{ duration: 0.25 }}
-            className={`flex items-center justify-center gap-3 max-w-full min-w-0 font-display font-semibold text-xl text-center ${style.text}`}
+            className={`flex items-center justify-center gap-3 max-w-full min-w-0 font-display font-semibold text-xl max-md:text-base text-center ${style.text}`}
           >
             <motion.span
               initial={reduceMotion ? {} : { scale: 0, rotate: -30 }}
               animate={reduceMotion ? {} : { scale: [0, 1.4, 1], rotate: [-30, 12, -8, 0] }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-3xl leading-none flex-shrink-0"
+              className="text-3xl max-md:text-2xl leading-none flex-shrink-0"
               aria-hidden
             >
               {style.emoji}
             </motion.span>
-            <span className="truncate">
+            <span className="truncate max-md:whitespace-normal">
               {line.split(" ").map((word, i) => (
                 <motion.span
                   key={i}
@@ -443,12 +443,12 @@ export default function TournamentTicker(props: Props) {
       </div>
 
       {/* Clock */}
-      <div className="flex items-center gap-4 px-4 border-l border-violet-100 bg-white flex-shrink-0 tabular-nums">
-        <div className="text-right leading-tight">
+      <div className="flex items-center gap-4 px-4 max-md:gap-2 max-md:px-3 max-md:ml-auto max-md:py-2 border-l border-violet-100 bg-white flex-shrink-0 tabular-nums">
+        <div className="text-right leading-tight max-md:hidden">
           <div className="text-[9px] font-display font-semibold uppercase tracking-widest text-gray-400">Running</div>
           <div className="font-display font-bold text-sm text-violet-600">{elapsedLabel(props.tournament.created_at, now)}</div>
         </div>
-        <div className="font-display font-bold text-3xl tracking-wide text-gray-900">{time}</div>
+        <div className="font-display font-bold text-3xl max-md:text-base tracking-wide text-gray-900">{time}</div>
       </div>
     </div>
   );
