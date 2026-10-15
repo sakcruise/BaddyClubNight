@@ -307,6 +307,23 @@ export const expensesApi = {
     return data as string;
   },
 
+  /** Replace a saved cost's details and shares (organiser or whoever added it). */
+  update: async (expenseId: string, e: {
+    session_id?: string; category: ExpenseCategory; description: string;
+    amount: number; paid_by: string; shares: { member_id: string; amount: number }[];
+  }): Promise<void> => {
+    const { error } = await supabase.rpc("update_group_expense", {
+      p_expense_id: expenseId,
+      p_session_id: e.session_id ?? null,
+      p_category: e.category,
+      p_description: e.description,
+      p_amount: e.amount,
+      p_paid_by: e.paid_by,
+      p_shares: e.shares,
+    });
+    if (error) throw new Error(error.message);
+  },
+
   remove: async (expenseId: string): Promise<void> => {
     const { error } = await supabase.rpc("delete_group_expense", { p_expense_id: expenseId });
     if (error) throw new Error(error.message);

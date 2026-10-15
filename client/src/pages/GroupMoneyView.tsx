@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Plus, ArrowRight, Trash2, LayoutGrid, Feather, Receipt, HandCoins, Wallet } from "lucide-react";
+import { ArrowLeft, Plus, ArrowRight, Trash2, Pencil, LayoutGrid, Feather, Receipt, HandCoins, Wallet } from "lucide-react";
 import { useGroupStore } from "../store";
 import { groupsApi, expensesApi } from "../services/groups";
 import { supabase } from "../lib/supabase";
 import { computeBalances, simplifyDebts } from "../utils/splits";
 import AddCostsModal, { type CostSession } from "../components/groups/AddCostsModal";
+import EditCostModal from "../components/groups/EditCostModal";
 import type { GroupExpense, GroupSettlement, ExpenseCategory } from "../types";
 
 const money = (n: number) => `£${Math.abs(n).toFixed(2)}`;
@@ -44,6 +45,10 @@ export default function GroupMoneyView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(!!params.get("session"));
+  const [editing, setEditing] = useState<GroupExpense | null>(null);
+  // Payments under £1 aren't worth chasing — hidden from Settle up unless asked for.
+  // Balances above still include them, so nothing is lost.
+  const [showSmall, setShowSmall] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const isOwner = !!userId && group?.owner_id === userId;
@@ -78,7 +83,10 @@ export default function GroupMoneyView() {
   const sessionName = (sid?: string) => sessions.find((s) => s.id === sid)?.label;
 
   const balances = useMemo(() => computeBalances(expenses, settlements), [expenses, settlements]);
-  const transfers = useMemo(() => simplifyDebts(balances), [balances]);
+  const allTransfers = useMemo(() => simplifyDebts(balances), [balances]);
+  const SMALL = 1;
+  const smallCount = allTransfers.filter((t) => t.amount < SMALL).length;
+  const transfers = showSmall ? allTransfers : allTransfers.filter((t) => t.amount >= SMALL);
   const myBalance = myMemberId ? (balances[myMemberId] ?? 0) / 100 : 0;
   const totalSpent = expenses.reduce((t, e) => t + e.amount, 0);
 
@@ -176,7 +184,9 @@ export default function GroupMoneyView() {
             <span className="font-display font-black text-gray-900 text-sm">Settle up</span>
           </div>
           {transfers.length === 0 ? (
-            <p className="text-gray-400 text-sm font-display text-center pb-5 pt-2">{loading ? "Loading…" : "Nobody owes anything 🎉"}</p>
+            <p className="text-gray-400 text-sm font-display text-center pb-5 pt-2">
+              {loading ? "Loading…" : smallCount > 0 ? "Only small amounts left, under £1" : "Nobody owes anything 🎉"}
+            </p>
           ) : (
             <div className="border-t border-gray-100">
               {transfers.map((t) => (
@@ -194,6 +204,14 @@ export default function GroupMoneyView() {
                 </div>
               ))}
             </div>
+          )}
+          {smallCount > 0 && (
+            <button onClick={() => setShowSmall((v) => !v)}
+              className="w-full border-t border-gray-100 px-4 py-2.5 text-xs font-display font-bold text-purple-600 text-left">
+              {showSmall
+                ? "Hide amounts under £1"
+                : `${smallCount} small amount${smallCount !== 1 ? "s" : ""} under £1 hidden · Show`}
+            </button>
           )}
         </div>
 
@@ -247,7 +265,10 @@ export default function GroupMoneyView() {
                   </div>
                   <span className="font-display font-black text-gray-900 text-sm tabular-nums">{money(a.e.amount)}</span>
                   {(isOwner || a.e.created_by === userId) && (
-                    <button onClick={() => removeExpense(a.e)} className="p-1 text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+                    <>
+                      <button onClick={() => setEditing(a.e)} aria-label={`Edit ${a.e.description}`} className="p-1 text-gray-300 hover:text-purple-600"><Pencil size={14} /></button>
+                      <button onClick={() => removeExpense(a.e)} aria-label={`Delete ${a.e.description}`} className="p-1 text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+                    </>
                   )}
                 </div>
               ) : (
@@ -273,6 +294,16 @@ export default function GroupMoneyView() {
           <Plus size={20} /> Add court &amp; shuttle costs
         </button>
       </div>
+
+      {editing && (
+        <EditCostModal
+          expense={editing}
+          members={members}
+          sessions={sessions}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); loadLedger(); }}
+        />
+      )}
 
       {showAdd && (
         <AddCostsModal
