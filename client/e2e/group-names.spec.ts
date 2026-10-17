@@ -8,7 +8,7 @@ const MEMBER_ROW = "e2e00000-0000-4000-8000-0000000000b3";
 test.describe("friends group: who can change a name", () => {
   test.afterAll(async () => {
     const owner = await apiAs("e2e_owner");
-    await owner.from("group_members").update({ display_name: "E2E Placeholder" }).eq("id", PLACEHOLDER);
+    await owner.from("group_members").update({ display_name: "E2E Placeholder", member_user_id: null }).eq("id", PLACEHOLDER);
     await owner.from("group_members").update({ display_name: "E2E Member" }).eq("id", MEMBER_ROW);
   });
 
@@ -32,6 +32,9 @@ test.describe("friends group: who can change a name", () => {
     const owner = await apiAs("e2e_owner");
     const { data } = await owner.from("group_members").update({ member_user_id: MEMBER_ID }).eq("id", PLACEHOLDER).select("id");
     expect(data ?? []).toHaveLength(0);
+    // the placeholder must still exist and still be unlinked, or this test proves nothing
+    const { data: row } = await owner.from("group_members").select("member_user_id").eq("id", PLACEHOLDER).single();
+    expect(row!.member_user_id).toBeNull();
   });
 
   test("the person renames themself through update_my_name", async () => {
