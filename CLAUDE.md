@@ -133,3 +133,9 @@ A second mode alongside clubs, for friends who organise ad-hoc games.
 - Old localStorage can be missing `clubConfig` — the persist merge strategy handles this
 - Guests should never appear in `MemberManagement` (filter `member_type !== 'guest'`)
 - After `matchesApi.start()`, always update Zustand state (match, court, queue, activeIds)
+
+## Regression tests (Playwright, `client/e2e/`)
+- Run: `cd client && npm run e2e` (starts Vite itself, phone-sized Chromium; in the cloud sandbox add `PW_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`). Reports in `client/e2e-report/`, screenshots in `client/e2e-shots/`.
+- Uses real fixture logins on the live Supabase project: `e2e_owner`, `e2e_admin` (Treasurer), `e2e_member`, password in `e2e/helpers.ts`, group "E2E Test Group". Created by `supabase/tests/seed_e2e_users.sql` (re-runnable), removed by `teardown_e2e_users.sql`. All ids start `e2e00000-`.
+- `roles-rules.spec.ts` = database rules (no browser); `roles-ui.spec.ts` = screens. **Add a spec for each new feature as it is built.**
+- The cloud sandbox network blocks `*.supabase.co` unless the environment's allowed domains include it, so these tests run on a normal machine/CI; in the sandbox the DB rules can be checked by SQL impersonation (`set_config('request.jwt.claims', …)`).

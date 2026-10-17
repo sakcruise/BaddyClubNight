@@ -4,3 +4,6 @@ dist/
 server/data/
 *.db
 server/public
+e2e-report/
+e2e-shots/
+test-results/
