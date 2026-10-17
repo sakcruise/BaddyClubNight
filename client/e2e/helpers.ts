@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,13 +10,22 @@ export const PASSWORD = "E2e-Test-Pass-1!";
 const URL = "https://minhnhrdvgvlqajjcbph.supabase.co";
 const KEY = "sb_publishable_H8XJmKqpfPoFtoNFxnl7kA_oHOklkrW";
 
-/** Sign in through the real login screen. */
+/** Sign in through the real login screen. Retries when the network drops ("Failed to fetch"). */
 export async function login(page: Page, username: string) {
   await page.goto("/");
-  await page.getByPlaceholder("User ID").fill(username);
-  await page.getByPlaceholder("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: /Sign In/ }).click();
-  await expect(page.getByPlaceholder("User ID")).toBeHidden({ timeout: 20_000 });
+  for (let attempt = 1; ; attempt++) {
+    await page.getByPlaceholder("User ID").fill(username);
+    await page.getByPlaceholder("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: /Sign In/ }).click();
+    const error = page.locator("text=/Failed to fetch|Invalid|incorrect|failed/i").first();
+    const outcome = await Promise.race([
+      page.getByPlaceholder("User ID").waitFor({ state: "hidden", timeout: 60_000 }).then(() => "in"),
+      error.waitFor({ timeout: 60_000 }).then(() => "error"),
+    ]);
+    if (outcome === "in") return;
+    const text = await error.innerText();
+    if (!/Failed to fetch/i.test(text) || attempt >= 4) throw new Error(`login failed: ${text}`);
+  }
 }
 
 /** A Supabase client signed in as a fixture user, for testing the database rules directly. */

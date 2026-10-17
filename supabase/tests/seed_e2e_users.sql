@@ -31,6 +31,8 @@ BEGIN
     INSERT INTO public.accounts (id, user_id, username, display_name, admin_name, email, account_type)
     VALUES (u.id, u.id, u.uname, u.dname, u.dname, u.uname || '@baddyapp.internal', 'group')
     ON CONFLICT (id) DO NOTHING;
+    -- the insert leaves username empty here, and the login screen finds people by username
+    UPDATE public.accounts SET username = u.uname WHERE id = u.id AND username IS DISTINCT FROM u.uname;
 
     INSERT INTO public.profiles (user_id, display_name, email)
     VALUES (u.id, u.dname, u.uname || '@baddyapp.internal')

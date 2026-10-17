@@ -7,6 +7,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
+  timeout: 120_000,
+  expect: { timeout: 30_000 },
   reporter: [["list"], ["html", { open: "never", outputFolder: "e2e-report" }]],
   use: {
     baseURL: "http://localhost:5173",
@@ -14,6 +16,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
+    // Cloud sandbox only: send browser traffic through the egress proxy (set PW_PROXY=$HTTPS_PROXY).
+    ...(process.env.PW_PROXY ? { proxy: { server: process.env.PW_PROXY, bypass: "localhost,127.0.0.1" }, ignoreHTTPSErrors: true } : {}),
   },
   projects: [{ name: "phone", use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 } } }],
   webServer: {
