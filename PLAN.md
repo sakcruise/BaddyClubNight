@@ -97,3 +97,37 @@ One commit per step. Migrations numbered from `019_…`.
 
 - Resend account + verified sending domain (before phase 3)
 - Stripe account (before phase 4)
+
+
+## Roles, one login, unified groups (started 2026-10-17)
+
+Decisions (agreed with the owner):
+- One login per person; duplicate logins are merged only after an admin AND the person confirm.
+- One group type: a club is a group with `kind = 'club'` (club features on). Small groups stay simple.
+- Access: **admin** or **member**. Admins get per-person feature ticks (`permissions`): manage_members,
+  manage_dues, manage_sessions, send_messages, manage_costs, manage_access. Owner always has everything.
+- Title is free text and changes nothing by itself (picking one pre-ticks usual features).
+- Admins can't change their own access; only the owner changes another admin's access.
+- Invites: one club link (expires 7 days, revocable, joins as Member, optional admin approval) plus
+  per-person links that claim an existing roster spot (match by phone/email, then name; confirm "Is this you?").
+- Ownership transfer: owner asks → new owner accepts → another admin confirms (only if the club has >1 admin);
+  expires in 7 days, cancellable; old owner becomes admin; every step logged.
+- Splitwise belongs to each group (members = that group's roster; default split = who attended) plus an
+  "All balances" view across groups. Club dues stay separate from Splitwise.
+- Designs: https://claude.ai/artifact/BK4KhMcTLYXmsVjNZJcbfz
+
+Build order:
+1. ✅ 025 restore finance policies (dues/session_fees had RLS on but no policies — Finance was blocked)
+2. ✅ 026 foundation: profiles, groups.kind, group_memberships, group_activity, has_group_permission / is_group_admin,
+   backfill (each club gets a groups row with id = its old club_id). Backup in schema backup_20261017.
+3. Switch finance/members policies from club_id = auth.uid() to has_group_permission(...)
+4. Role + permission RPCs (set access/title/permissions, with the rules above) + activity log
+5. App: home list of all groups + switcher, group settings (features, people & roles, permissions sheet)
+6. Invites + roster claim
+7. Merge logins tool
+8. Ownership transfer
+9. Move club-night engine/roster onto the unified group (club_id = groups.id already holds for existing clubs)
+
+Known issue found: `accounts` is publicly readable (login resolves username -> email), which exposes emails.
+Fix with a SECURITY DEFINER username lookup once profiles are used for sign-in.
+Migration 024 (update_group_expense) is in the repo but not yet applied to the database.
