@@ -119,8 +119,10 @@ export const groupsApi = {
     const row: Record<string, unknown> = {};
     if (patch.name !== undefined) row.display_name = patch.name;
     if (patch.member_type !== undefined) row.member_type = patch.member_type;
-    const { error } = await supabase.from("group_members").update(row).eq("id", memberId);
+    const { data, error } = await supabase.from("group_members").update(row).eq("id", memberId).select("id");
     if (error) throw new Error(error.message);
+    // RLS silently skips rows you may not change, so an empty result means "not allowed"
+    if (!data?.length) throw new Error("Only that person can change their own name");
   },
 
   removeMember: async (memberId: string): Promise<void> => {

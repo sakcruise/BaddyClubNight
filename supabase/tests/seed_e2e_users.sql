@@ -46,7 +46,9 @@ BEGIN
   INSERT INTO public.group_members (id, group_id, member_user_id, display_name, member_type, role) VALUES
     ('e2e00000-0000-4000-8000-0000000000b1', g, 'e2e00000-0000-4000-8000-000000000001', 'E2E Owner',  'male', 'owner'),
     ('e2e00000-0000-4000-8000-0000000000b2', g, 'e2e00000-0000-4000-8000-000000000002', 'E2E Admin',  'male', 'member'),
-    ('e2e00000-0000-4000-8000-0000000000b3', g, 'e2e00000-0000-4000-8000-000000000003', 'E2E Member', 'male', 'member')
+    ('e2e00000-0000-4000-8000-0000000000b3', g, 'e2e00000-0000-4000-8000-000000000003', 'E2E Member', 'male', 'member'),
+    -- placeholder with no login: the organiser may rename this one
+    ('e2e00000-0000-4000-8000-0000000000b4', g, NULL, 'E2E Placeholder', 'male', 'member')
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.group_memberships (group_id, user_id, access, title, permissions) VALUES
