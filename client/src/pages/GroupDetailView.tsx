@@ -630,6 +630,16 @@ export default function GroupDetailView() {
           </div>
         )}
 
+        <button onClick={() => navigate(`/groups/${id}/people`)}
+          className="w-full bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 px-4 py-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all">
+          <span className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gray-100 text-gray-500"><Users size={18} /></span>
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-black text-gray-900 text-sm">People &amp; roles</p>
+            <p className="text-xs font-display font-bold text-gray-400">Admins, titles and who can do what</p>
+          </div>
+          <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+        </button>
+
         {/* ── COSTS (Splitwise-style) ── */}
         {(() => {
           const mine = myMemberId && balances ? (balances[myMemberId] ?? 0) / 100 : 0;
