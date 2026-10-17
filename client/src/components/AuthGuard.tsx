@@ -36,6 +36,12 @@ import ResetPasswordView from "../pages/ResetPasswordView";
 type Status = "loading" | "login" | "reset" | "ok";
 
 function redirectPendingInvite(navigate: ReturnType<typeof useNavigate>) {
+  const clubToken = sessionStorage.getItem("pending_club_invite");
+  if (clubToken) {
+    sessionStorage.removeItem("pending_club_invite");
+    navigate(`/join/${clubToken}`, { replace: true });
+    return;
+  }
   const token = sessionStorage.getItem("pending_invite");
   if (token) {
     sessionStorage.removeItem("pending_invite");

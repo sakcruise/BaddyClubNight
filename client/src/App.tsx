@@ -12,6 +12,7 @@ import GroupPeopleView from "./pages/GroupPeopleView";
 import GroupMoneyView from "./pages/GroupMoneyView";
 import TournamentSetupView from "./pages/TournamentSetupView";
 import TournamentView from "./pages/TournamentView";
+import ClubJoinView from "./pages/ClubJoinView";
 import JoinView from "./pages/JoinView";
 import SessionRsvpView from "./pages/SessionRsvpView";
 import MasterAdminView from "./pages/MasterAdminView";
@@ -78,6 +79,7 @@ export default function App() {
       <Routes>
         {/* Public — invite links must work without a login */}
         <Route path="/groups/join/:token" element={<JoinView />} />
+        <Route path="/join/:token" element={<ClubJoinView />} />
         <Route path="/sessions/:id/rsvp" element={<SessionRsvpView />} />
         {/* Public — app store listings must link to a reachable privacy policy */}
         <Route path="/privacy" element={<PrivacyPolicyView />} />

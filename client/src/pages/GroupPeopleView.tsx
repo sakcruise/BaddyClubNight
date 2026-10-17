@@ -4,6 +4,7 @@ import { ArrowLeft, Crown, ChevronRight, X } from "lucide-react";
 import { accessApi, PERMISSIONS, TITLE_PRESETS } from "../services/access";
 import type { GroupPerson, Permission } from "../services/access";
 import { supabase } from "../lib/supabase";
+import InvitePanel from "../components/groups/InvitePanel";
 
 /** People & roles for one group: who is Admin / Member, their title, their features. */
 export default function GroupPeopleView() {
@@ -27,6 +28,7 @@ export default function GroupPeopleView() {
   const mine = people?.find((p) => p.user_id === me);
   const iAmOwner = !!mine?.is_owner;
   const canManage = iAmOwner || !!mine?.permissions.includes("manage_access");
+  const canInvite = iAmOwner || !!mine?.permissions.includes("manage_members");
 
   return (
     <div className="min-h-screen bg-[#faf8f6] pb-10">
@@ -34,6 +36,8 @@ export default function GroupPeopleView() {
         <button onClick={() => navigate(`/groups/${id}`)} aria-label="Back" className="p-1 -ml-1 text-gray-500"><ArrowLeft size={20} /></button>
         <h1 className="text-lg font-semibold text-gray-900">People &amp; roles</h1>
       </div>
+
+      {canInvite && id && <div className="px-5 pt-4"><InvitePanel groupId={id} onChanged={load} /></div>}
 
       <div className="px-5 pt-4 space-y-2">
         {error && <p className="text-sm text-red-600">{error}</p>}

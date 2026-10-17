@@ -55,4 +55,27 @@ BEGIN
     (g, 'e2e00000-0000-4000-8000-000000000002', 'admin', 'Treasurer', ARRAY['manage_dues','manage_costs']),
     (g, 'e2e00000-0000-4000-8000-000000000003', 'member', NULL, '{}')
   ON CONFLICT (group_id, user_id) DO NOTHING;
+
+  -- A club (kind = 'club') owned by e2e_owner, for invite-link and roster-claim tests.
+  INSERT INTO public.groups (id, owner_id, name, num_courts, theme_key, invite_token, kind)
+  VALUES ('e2e00000-0000-4000-8000-0000000000a1', 'e2e00000-0000-4000-8000-000000000001', 'E2E Test Club', 2, 'orange', 'e2etestinvite0002', 'club')
+  ON CONFLICT (id) DO NOTHING;
+  -- A club's id is also a login id (members.club_id points at accounts, which points at auth.users),
+  -- so the club needs its own login row. Owner of the groups row is e2e_owner.
+  INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+                          raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+                          confirmation_token, recovery_token, email_change, email_change_token_new)
+  VALUES ('00000000-0000-0000-0000-000000000000', 'e2e00000-0000-4000-8000-0000000000a1', 'authenticated', 'authenticated',
+          'e2e_club@baddyapp.internal', extensions.crypt('E2e-Test-Pass-1!', extensions.gen_salt('bf')), now(),
+          '{"provider":"email","providers":["email"]}', '{"account_type":"club","display_name":"E2E Test Club"}',
+          now(), now(), '', '', '', '')
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.accounts (id, user_id, display_name, account_type, admin_name, email)
+  VALUES ('e2e00000-0000-4000-8000-0000000000a1', 'e2e00000-0000-4000-8000-0000000000a1', 'E2E Test Club', 'club', 'E2E Owner', 'e2e_club@baddyapp.internal')
+  ON CONFLICT (id) DO NOTHING;
+  UPDATE public.accounts SET username = 'e2e_club' WHERE id = 'e2e00000-0000-4000-8000-0000000000a1';
+  INSERT INTO public.group_memberships (group_id, user_id, access, permissions)
+  VALUES ('e2e00000-0000-4000-8000-0000000000a1', 'e2e00000-0000-4000-8000-000000000001', 'admin',
+          ARRAY['manage_members','manage_dues','manage_sessions','send_messages','manage_costs','manage_access'])
+  ON CONFLICT (group_id, user_id) DO NOTHING;
 END $$;

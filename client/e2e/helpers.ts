@@ -45,3 +45,17 @@ export async function resetMember() {
   const owner = await apiAs("e2e_owner");
   await owner.rpc("set_member_access", { p_group: GROUP_ID, p_user: MEMBER_ID, p_access: "member", p_title: "", p_permissions: [] });
 }
+
+/** Open a page, reloading if the sandbox connection drops mid-load ("Failed to fetch"). */
+export async function gotoSettled(page: Page, path: string, readyText: RegExp | string, tries = 4) {
+  for (let i = 1; ; i++) {
+    await page.goto(path);
+    const ready = page.getByText(readyText).first();
+    const failed = page.getByText("Failed to fetch").first();
+    const outcome = await Promise.race([
+      ready.waitFor({ timeout: 30_000 }).then(() => "ready"),
+      failed.waitFor({ timeout: 30_000 }).then(() => "failed"),
+    ]).catch(() => "timeout");
+    if (outcome === "ready" || i >= tries) return;
+  }
+}
