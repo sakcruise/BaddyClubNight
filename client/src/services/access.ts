@@ -39,7 +39,22 @@ export interface GroupPerson {
   joined_at: string;
 }
 
+export interface MyGroup {
+  group_id: string;
+  name: string;
+  kind: "small" | "club";
+  access: "admin" | "member";
+  title: string | null;
+  is_owner: boolean;
+  people: number;
+}
+
 export const accessApi = {
+  async myGroups(): Promise<MyGroup[]> {
+    const { data, error } = await supabase.rpc("list_my_groups");
+    if (error) throw new Error(error.message);
+    return (data ?? []) as MyGroup[];
+  },
   async listPeople(groupId: string): Promise<GroupPerson[]> {
     const { data, error } = await supabase.rpc("list_group_people", { p_group: groupId });
     if (error) throw new Error(error.message);

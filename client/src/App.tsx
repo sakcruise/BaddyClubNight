@@ -7,6 +7,7 @@ import AnalyticsView from "./pages/AnalyticsView";
 import ModeChooser from "./pages/ModeChooser";
 import GroupsHomeView from "./pages/GroupsHomeView";
 import GroupDetailView from "./pages/GroupDetailView";
+import MySpacesView from "./pages/MySpacesView";
 import GroupPeopleView from "./pages/GroupPeopleView";
 import GroupMoneyView from "./pages/GroupMoneyView";
 import TournamentSetupView from "./pages/TournamentSetupView";
@@ -53,6 +54,7 @@ function AppRoutes() {
       <Route path="/finance" element={<FinanceView />} />
       <Route path="/settings" element={<SettingsView />} />
       <Route path="/groups" element={<GroupsHomeView />} />
+      <Route path="/spaces" element={<MySpacesView />} />
       <Route path="/groups/:id" element={<GroupDetailView />} />
       <Route path="/groups/:id/money" element={<GroupMoneyView />} />
       <Route path="/groups/:id/people" element={<GroupPeopleView />} />

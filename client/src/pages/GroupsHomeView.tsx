@@ -290,6 +290,10 @@ export default function GroupsHomeView() {
             </p>
           </div>
         </div>
+        <button onClick={() => navigate("/spaces")}
+          className="ml-auto mr-2 px-3 h-8 rounded-full bg-white/15 border border-white/25 text-white text-xs font-display font-bold active:scale-95">
+          Switch
+        </button>
         {/* Avatar button → settings sheet */}
         <button
           onClick={() => setShowSettings(true)}
