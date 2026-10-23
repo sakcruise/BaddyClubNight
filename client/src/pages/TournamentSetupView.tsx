@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { flushSync } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemberStore, useQueueStore, useSessionStore, useMatchStore } from "../store";
 import { tournamentsApi } from "../services/tournaments";
 import type { PairingMode } from "../services/tournaments";
@@ -54,6 +54,9 @@ function swapInto(pairsByGroup: Pairs, groupIndex: number, pairIndex: number, sl
 
 export default function TournamentSetupView() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  // ?edit=<tournamentId> reopens a saved, not-yet-started draft in the review step.
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
   const navigate = useNavigate();
   const { members } = useMemberStore();
 
@@ -229,11 +232,35 @@ export default function TournamentSetupView() {
     setStep("review");
   }
 
+  useEffect(() => {
+    if (!editId) return;
+    tournamentsApi.get(editId).then(({ tournament, players }) => {
+      const groups = Array.from({ length: tournament.num_groups }, (_, g) => {
+        const byPair = new Map<number, string[]>();
+        players.filter((p) => p.group_index === g && p.pair_index != null).forEach((p) => {
+          const arr = byPair.get(p.pair_index!) ?? [];
+          arr.push(p.member_id);
+          byPair.set(p.pair_index!, arr);
+        });
+        return Array.from(byPair.keys()).sort((a, b) => a - b).map((k) => {
+          const [a, b] = byPair.get(k)!;
+          return [a, b] as [string, string];
+        });
+      });
+      setNumGroups(tournament.num_groups);
+      setAdvancePerGroup(tournament.advance_per_group);
+      setPairsByGroup(groups);
+      setReserves(players.filter((p) => p.pair_index == null).map((p) => p.member_id));
+      setStep("review");
+    }).catch((e) => setError(e instanceof Error ? e.message : "Could not open the draft"));
+  }, [editId]);
+
   async function handleConfirm() {
     if (!sessionId) return;
     setCreating(true);
     setError(null);
     try {
+      if (editId) await tournamentsApi.delete(editId);
       const tournament = await tournamentsApi.create(sessionId, pairsByGroup, reserves, advancePerGroup);
       navigate(`/tournament/${tournament.id}`, { replace: true });
     } catch (e) {

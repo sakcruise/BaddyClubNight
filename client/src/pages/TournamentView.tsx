@@ -16,6 +16,7 @@ import TournamentTicker from "../components/tournament/TournamentTicker";
 import TournamentStats from "../components/tournament/TournamentStats";
 import { Trophy, RotateCcw, Play, Radio, Flag, ChevronLeft, ChevronRight, Maximize2, Minimize2, WifiOff, Users, X } from "lucide-react";
 import { isOffline } from "../services/api";
+import { supabase } from "../lib/supabase";
 
 // Below this the board would be unreadable, so we stop shrinking and allow vertical scroll instead.
 const MIN_FIT_ZOOM = 0.4;
@@ -181,6 +182,24 @@ export default function TournamentView() {
     setTournament(bundle.tournament);
     setPlayers(bundle.players);
     setFixtures(bundle.fixtures);
+
+    // Names come from the device's member list, which only holds whoever the last page loaded.
+    // Fill in any player missing from it (club members, group members, guests) from the database.
+    const known = useMemberStore.getState().members;
+    const missing = [...new Set(bundle.players.map((p) => p.member_id))].filter((mid) => !known[mid]);
+    if (missing.length > 0) {
+      const [{ data: clubRows }, { data: groupRows }] = await Promise.all([
+        supabase.from("members").select("*").in("id", missing),
+        supabase.from("group_members").select("*").in("id", missing),
+      ]);
+      (clubRows ?? []).forEach((m: any) => useMemberStore.getState().addMember({
+        id: m.id, name: m.name, member_type: m.member_type ?? "male", level: m.level ?? 2,
+        avatar_url: m.avatar_url ?? undefined, active: m.active ?? true, rank: m.rank ?? null, created_at: m.created_at,
+      }));
+      (groupRows ?? []).forEach((m: any) => useMemberStore.getState().addMember({
+        id: m.id, name: m.display_name, member_type: m.member_type ?? "male", level: 2, active: true, created_at: m.joined_at,
+      }));
+    }
 
     const entries = await Promise.all(
       Array.from({ length: bundle.tournament.num_groups }, (_, g) =>
@@ -593,6 +612,11 @@ export default function TournamentView() {
     }
   }
 
+  function handleEditGroups() {
+    if (!tournament || !session) return;
+    navigate(`/tournament-setup/${session.id}?edit=${tournament.id}`);
+  }
+
   async function handleResetGroups() {
     if (!tournament || !session) return;
     if (!confirm("Reset groups? This deletes the current draft and all scores, and takes you back to re-pick players.")) return;
@@ -948,11 +972,16 @@ export default function TournamentView() {
           <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
             <div>
               <p className="font-display font-bold text-sm text-gray-900">Groups saved — not started yet</p>
-              <p className="text-xs font-body text-gray-500">Review the groups, then start when you're ready to play.</p>
+              <p className="text-xs font-body text-gray-500">Edit the groups if needed, then start when you're ready to play.</p>
             </div>
-            <Button size="md" onClick={handleStartTournament} disabled={busy}>
-              <Play size={14} /> Start tournament
-            </Button>
+            <div className="flex gap-2">
+              <Button size="md" variant="secondary" onClick={handleEditGroups} disabled={busy}>
+                Edit groups
+              </Button>
+              <Button size="md" onClick={handleStartTournament} disabled={busy}>
+                <Play size={14} /> Start tournament
+              </Button>
+            </div>
           </div>
         )}
 
