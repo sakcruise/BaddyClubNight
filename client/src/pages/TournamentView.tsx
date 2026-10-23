@@ -60,7 +60,7 @@ function knockoutRoundLabel(matchCount: number): string {
 
 // The knockout is always eight pairs: the top `advancePerGroup` from every
 // group, then the best of the rest across all groups by average points.
-const DEFAULT_KNOCKOUT_PAIRS = 8;
+const DEFAULT_KNOCKOUT_PAIRS = 4;
 
 /** Preview of the knockout bracket shape before it's generated — same seeding
  * order buildKnockoutBracket uses (rank asc, then group asc; top seed vs
