@@ -112,6 +112,7 @@ export interface KnockoutRoundConfig {
   qf: number; // Quarter-Final points to play
   sf: number; // Semi-Final points to play
   f: number;  // Final points to play
+  size?: 4 | 8; // pairs in the knockout: 4 = semi-finals + final, 8 = quarter-finals too
 }
 
 export interface Tournament {

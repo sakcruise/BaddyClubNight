@@ -60,7 +60,7 @@ function knockoutRoundLabel(matchCount: number): string {
 
 // The knockout is always eight pairs: the top `advancePerGroup` from every
 // group, then the best of the rest across all groups by average points.
-const KNOCKOUT_PAIRS = 8;
+const DEFAULT_KNOCKOUT_PAIRS = 8;
 
 /** Preview of the knockout bracket shape before it's generated — same seeding
  * order buildKnockoutBracket uses (rank asc, then group asc; top seed vs
@@ -69,6 +69,7 @@ const KNOCKOUT_PAIRS = 8;
 function knockoutPreviewRounds(
   numGroups: number,
   advancePerGroup: number,
+  KNOCKOUT_PAIRS: number,
   labelFor: (groupIndex: number, rank: number) => string = (g, r) => qualifierLabel(g, r, advancePerGroup)
 ): Array<{ label: string; matchups: [string, string][] }> {
   const labels: string[] = [];
@@ -120,14 +121,15 @@ export default function TournamentView() {
   // Which group-stage cell has its court chooser open.
   const [courtPickerFor, setCourtPickerFor] = useState<string | null>(null);
   const [showKnockoutConfig, setShowKnockoutConfig] = useState(false);
-  const [knockoutConfig, setKnockoutConfig] = useState({ qf: 11, sf: 13, f: 15 });
+  const [knockoutConfig, setKnockoutConfig] = useState<{ qf: number; sf: number; f: number; size: 4 | 8 }>({ qf: 11, sf: 13, f: 15, size: 4 });
+  const koSize = knockoutConfig.size;
   // Operator-reviewed knockout field. Seeded from selectQualifiers when the dialog opens;
   // any slot can be swapped for another group pair.
   const [koField, setKoField] = useState<KnockoutQualifier[]>([]);
   const [koTie, setKoTie] = useState<KnockoutQualifier[] | null>(null);
   function openKnockoutConfig() {
     if (!tournament) return;
-    const { qualifiers, tiedForLast } = selectQualifiers(standingsByGroup, tournament.advance_per_group);
+    const { qualifiers, tiedForLast } = selectQualifiers(standingsByGroup, tournament.advance_per_group, knockoutConfig.size);
     setKoField(qualifiers);
     setKoTie(tiedForLast);
     setShowKnockoutConfig(true);
@@ -1452,7 +1454,8 @@ export default function TournamentView() {
                 // Round 1 slots track the live standings: whoever leads each group right now is
                 // named in the bracket, and the name updates as scores come in.
                 const livePairs = new Set<number>();
-                const previewRounds = knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group, (g, rank) => {
+                const KNOCKOUT_PAIRS = tournament.knockout_config?.size ?? DEFAULT_KNOCKOUT_PAIRS;
+                const previewRounds = knockoutPreviewRounds(tournament.num_groups, tournament.advance_per_group, KNOCKOUT_PAIRS, (g, rank) => {
                   const s = standingsByGroup[g]?.[rank - 1];
                   const groupHasResult = fixtures.some((f) => f.stage === "group" && f.group_index === g && f.status === "complete");
                   if (!s || !groupHasResult) return qualifierLabel(g, rank, tournament.advance_per_group);
@@ -1733,11 +1736,28 @@ export default function TournamentView() {
               const inField = (q: KnockoutQualifier) => koField.some((k) => pairEq(k.pair, q.pair));
               const label = (q: KnockoutQualifier) => `G${q.groupIndex + 1} #${q.rankInGroup} · ${pairName(q.pair, members)}`;
               const key = (q: KnockoutQualifier) => q.pair.join("-");
-              const slots = KNOCKOUT_PAIRS;
+              const slots = koSize;
               return (
                 <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-display font-bold uppercase tracking-widest text-gray-500 mr-auto">Knockout size</span>
+                    {([4, 8] as const).map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => {
+                          setKnockoutConfig((c) => ({ ...c, size: n }));
+                          const { qualifiers, tiedForLast } = selectQualifiers(standingsByGroup, tournament!.advance_per_group, n);
+                          setKoField(qualifiers);
+                          setKoTie(tiedForLast);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-display font-bold border-2 ${koSize === n ? "bg-orange-500 border-orange-500 text-white" : "bg-white border-orange-200 text-orange-600"}`}
+                      >
+                        {n === 4 ? "4 · Semi-finals + Final" : "8 · Quarter-finals + Semi + Final"}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs font-display font-bold uppercase tracking-widest text-gray-500">Going through ({koField.length} of {KNOCKOUT_PAIRS} pairs)</span>
+                    <span className="text-xs font-display font-bold uppercase tracking-widest text-gray-500">Going through ({koField.length} of {koSize} pairs)</span>
                     <span className="text-[11px] font-body text-gray-400">Top {tournament?.advance_per_group} per group, then best of the rest by avg points</span>
                   </div>
                   {koTie && (
@@ -1809,7 +1829,7 @@ export default function TournamentView() {
               <Button variant="ghost" fullWidth onClick={() => setShowKnockoutConfig(false)}>
                 Cancel
               </Button>
-              <Button fullWidth disabled={busy || koField.length < KNOCKOUT_PAIRS || !!koTie} onClick={handleGenerateKnockout}>
+              <Button fullWidth disabled={busy || koField.length < koSize || !!koTie} onClick={handleGenerateKnockout}>
                 Start Knockout →
               </Button>
             </div>

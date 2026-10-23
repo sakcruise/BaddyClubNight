@@ -14,7 +14,7 @@ import { supabase } from "../lib/supabase";
 import { useMemberStore, useMatchStore, useSessionStore, useTournamentStore } from "../store";
 import { matchesApi, isOffline } from "./api";
 import { v4 as uuid } from "uuid";
-import type { Match, Tournament, TournamentPlayer, TournamentFixture } from "../types";
+import type { Match, Tournament, TournamentPlayer, TournamentFixture, KnockoutRoundConfig } from "../types";
 import {
   snakeDraftGroups,
   pairStrongestWithWeakest,
@@ -509,7 +509,7 @@ export const tournamentsApi = {
    * from the standings via selectQualifiers (top N per group, best-of-rest to 8). */
   generateKnockout: async (
     tournamentId: string,
-    knockoutConfig?: { qf: number; sf: number; f: number },
+    knockoutConfig?: KnockoutRoundConfig,
     qualifiers?: KnockoutQualifier[]
   ): Promise<TournamentFixture[]> => {
     const { tournament } = await tournamentsApi.get(tournamentId);
@@ -519,12 +519,13 @@ export const tournamentsApi = {
       for (let g = 0; g < tournament.num_groups; g++) {
         standingsByGroup[g] = await tournamentsApi.groupStandings(tournamentId, g);
       }
-      const picked = selectQualifiers(standingsByGroup, tournament.advance_per_group);
+      const picked = selectQualifiers(standingsByGroup, tournament.advance_per_group, knockoutConfig?.size ?? 8);
       if (picked.tiedForLast) throw new Error("Two pairs are tied for the last knockout place — pick one in the knockout dialog.");
       field = picked.qualifiers;
     }
-    if (field.length !== 8) {
-      throw new Error(`The knockout needs exactly 8 pairs (have ${field.length}) — there is no bye round.`);
+    const size = knockoutConfig?.size ?? 8;
+    if (field.length !== size) {
+      throw new Error(`The knockout needs exactly ${size} pairs (have ${field.length}) — there is no bye round.`);
     }
     const bracket = buildKnockoutBracket(field);
     const fixtures = await insertKnockoutFixtures(tournamentId, 1, bracket);
