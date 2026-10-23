@@ -53,6 +53,7 @@ function rowToTournament(t: any): Tournament {
     num_groups: t.num_groups,
     advance_per_group: t.advance_per_group,
     status: t.status,
+    started_at: t.started_at ?? null,
     knockout_config: t.knockout_config ?? { qf: 11, sf: 13, f: 15 },
     created_at: t.created_at,
   };
@@ -423,6 +424,17 @@ export const tournamentsApi = {
       .from("tournament_fixtures")
       .update({ team_a_1: teamA[0], team_a_2: teamA[1], team_b_1: teamB[0], team_b_2: teamB[1] })
       .eq("id", fixtureId);
+    if (error) throw new Error(error.message);
+  },
+
+  /** Mark a saved tournament as started so its games can be sent to courts. */
+  startTournament: async (tournamentId: string): Promise<void> => {
+    const started_at = new Date().toISOString();
+    if (isOffline()) {
+      useTournamentStore.getState().patchTournament(tournamentId, { started_at });
+      return;
+    }
+    const { error } = await supabase.from("tournaments").update({ started_at }).eq("id", tournamentId);
     if (error) throw new Error(error.message);
   },
 

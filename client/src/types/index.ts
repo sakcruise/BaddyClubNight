@@ -122,6 +122,7 @@ export interface Tournament {
   advance_per_group: number;
   status: TournamentStatus;
   knockout_config?: KnockoutRoundConfig;
+  started_at?: string | null; // null = groups saved but not started
   created_at: string;
 }
 

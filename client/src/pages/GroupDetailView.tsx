@@ -138,6 +138,12 @@ export default function GroupDetailView() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showModal, setShowModal]       = useState(false);
   const [modalBusy, setModalBusy]       = useState(false);
+  const [savedTournamentId, setSavedTournamentId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!activeSession?.id) { setSavedTournamentId(null); return; }
+    supabase.from("tournaments").select("id").eq("session_id", activeSession.id).maybeSingle()
+      .then(({ data }) => setSavedTournamentId(data?.id ?? null));
+  }, [activeSession?.id]);
   const [upcomingSessions, setUpcomingSessions] = useState<GroupSession[]>([]);
   const [myMemberId, setMyMemberId]     = useState<string | null>(null);
   const [copiedSession, setCopiedSession] = useState<string | null>(null);
@@ -819,6 +825,13 @@ export default function GroupDetailView() {
       {/* Bottom button — owner only */}
       {isOwner && (
         <div className="fixed bottom-0 left-0 right-0 p-4 max-w-xl mx-auto flex flex-col gap-2">
+          {savedTournamentId && (
+            <motion.button whileTap={{ scale: 0.97 }} onClick={() => navigate(`/tournament/${savedTournamentId}`)}
+              className="w-full py-3 rounded-2xl font-display font-black text-white text-base bg-violet-600 shadow-lg flex items-center justify-center gap-2">
+              <Trophy size={18} />
+              Open tournament
+            </motion.button>
+          )}
           <motion.button whileTap={{ scale: 0.97 }} onClick={handleStartTournament} disabled={modalBusy}
             className="w-full py-3 rounded-2xl font-display font-black text-violet-700 text-base bg-white border-2 border-violet-300 shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
             <Trophy size={18} />

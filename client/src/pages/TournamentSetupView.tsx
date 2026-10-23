@@ -754,7 +754,7 @@ export default function TournamentSetupView() {
               <RotateCcw size={16} /> Reshuffle
             </Button>
             <Button size="lg" fullWidth disabled={creating} onClick={handleConfirm}>
-              <Trophy size={18} /> {creating ? "Starting…" : "Confirm & Start Tournament"}
+              <Trophy size={18} /> {creating ? "Saving…" : "Save groups"}
             </Button>
           </div>
         </main>

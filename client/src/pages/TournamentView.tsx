@@ -373,8 +373,23 @@ export default function TournamentView() {
     );
   }
 
+  async function handleStartTournament() {
+    if (!tournament) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await tournamentsApi.startTournament(tournament.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start the tournament");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendToCourts(plan: Array<[TournamentFixture, number]>) {
     if (!session || plan.length === 0) return;
+    if (tournament && !tournament.started_at) { setError("Start the tournament first."); return; }
     setBusy(true);
     setError(null);
     try {
@@ -482,6 +497,7 @@ export default function TournamentView() {
 
   async function handleLaunch(fixture: TournamentFixture, courtId: number) {
     if (!session) return;
+    if (tournament && !tournament.started_at) { setError("Start the tournament first."); return; }
     setBusy(true);
     setError(null);
     try {
@@ -935,6 +951,18 @@ export default function TournamentView() {
          className={`flex flex-col gap-4 shrink-0 ${isMobile ? "w-full px-3 py-3" : "w-max px-5 py-5 m-auto"}`}
        >
         {error && <p className="text-sm font-display font-semibold text-red-600">{error}</p>}
+
+        {!tournament.started_at && tournament.status === "groups" && (
+          <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+            <div>
+              <p className="font-display font-bold text-sm text-gray-900">Groups saved — not started yet</p>
+              <p className="text-xs font-body text-gray-500">Review the groups, then start when you're ready to play.</p>
+            </div>
+            <Button size="md" onClick={handleStartTournament} disabled={busy}>
+              <Play size={14} /> Start tournament
+            </Button>
+          </div>
+        )}
 
         {tournament.status !== "complete" && (() => {
           const stageLabel = tournament.status === "groups" ? "Court" : "KO Court";
