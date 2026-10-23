@@ -1252,7 +1252,7 @@ export default function TournamentView() {
                               const isLeader = !!leader && pairEq(leader.pair, rowS.pair);
                               return (
                                 <tr key={rowS.pair.join("-")} className={isLeader ? "bg-violet-50/70" : ri % 2 === 1 ? "bg-gray-50/60" : "bg-white"}>
-                                  <th scope="row" className={`sticky left-0 z-10 bg-inherit pl-2 pr-3 py-1.5 text-left border-b border-gray-100 whitespace-nowrap ${isLeader ? "shadow-[inset_3px_0_0_0_#7c3aed]" : ""}`}>
+                                  <th scope="row" className={`sticky left-0 z-10 bg-white pl-2 pr-3 py-1.5 text-left border-b border-gray-100 min-w-[150px] max-w-[150px] ${isLeader ? "shadow-[inset_3px_0_0_0_#7c3aed]" : ""}`}>
                                     <div className="flex items-center gap-2">
                                       <span className={`w-5 text-center text-[11px] font-display font-bold tabular-nums ${isLeader ? "text-violet-600" : "text-gray-300"}`}>
                                         {ranked.findIndex((s) => pairEq(s.pair, rowS.pair)) + 1}
@@ -1262,7 +1262,7 @@ export default function TournamentView() {
                                           <Avatar key={pid} name={members[pid]?.name ?? "?"} url={members[pid]?.avatar_url} memberType={members[pid]?.member_type} size="xs" />
                                         ))}
                                       </div>
-                                      <span className={`font-body text-[15px] tracking-tight ${isLeader ? "font-semibold text-gray-900" : "font-medium text-gray-700"}`}>{pairName(rowS.pair, members)}</span>
+                                      <span className={`min-w-0 truncate font-body text-[15px] tracking-tight ${isLeader ? "font-semibold text-gray-900" : "font-medium text-gray-700"}`}>{pairName(rowS.pair, members)}</span>
                                     </div>
                                   </th>
                                   {rows.map((colS, ci) => {
