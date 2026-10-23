@@ -345,8 +345,18 @@ export default function GroupDetailView() {
     setModalBusy(true);
     try {
       const now = new Date().toISOString();
-      const s = await groupsApi.createSession(g.id, g.name, { scheduled_at: now, num_courts: 6, status: "active" });
-      await launchSession(s.id, 6, undefined, now, [], `/tournament-setup/${s.id}`);
+      // Reuse the group's current session if it has no tournament yet, so each tournament
+      // doesn't add another session to the group's history.
+      let sessionId: string | null = null;
+      if (activeSession?.group_id === g.id) {
+        const { data: existing } = await supabase.from("tournaments").select("id").eq("session_id", activeSession.id).maybeSingle();
+        if (!existing) sessionId = activeSession.id;
+      }
+      if (!sessionId) {
+        const s = await groupsApi.createSession(g.id, g.name, { scheduled_at: now, num_courts: 6, status: "active" });
+        sessionId = s.id;
+      }
+      await launchSession(sessionId, 6, undefined, now, [], `/tournament-setup/${sessionId}`);
     } catch (e: any) {
       alert(`Couldn't start the tournament: ${e?.message ?? "unknown error"}`);
     } finally {

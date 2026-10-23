@@ -1202,20 +1202,22 @@ export default function TournamentView() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`flex-1 min-w-0 truncate font-body text-[15px] ${done && aWon ? "font-bold text-emerald-800" : "font-medium text-gray-800"}`}>
-                              {done && aWon && "🥇 "}{pairName(f.team_a, members)}
+                              {pairName(f.team_a, members)}
+                              {done && aWon && <span className="ml-1.5">🥇</span>}
                             </span>
                             {done && (
-                              <span className={`shrink-0 min-w-[2.25rem] text-center rounded-lg px-2 py-0.5 font-display font-black tabular-nums text-base ${aWon ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                              <span className={`shrink-0 w-6 text-right font-display font-black tabular-nums text-lg ${aWon ? "text-emerald-700" : "text-gray-400"}`}>
                                 {m!.score_a}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`flex-1 min-w-0 truncate font-body text-[15px] ${done && !aWon ? "font-bold text-emerald-800" : "font-medium text-gray-800"}`}>
-                              {done && !aWon && "🥇 "}{pairName(f.team_b, members)}
+                              {pairName(f.team_b, members)}
+                              {done && !aWon && <span className="ml-1.5">🥇</span>}
                             </span>
                             {done && (
-                              <span className={`shrink-0 min-w-[2.25rem] text-center rounded-lg px-2 py-0.5 font-display font-black tabular-nums text-base ${!aWon ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                              <span className={`shrink-0 w-6 text-right font-display font-black tabular-nums text-lg ${!aWon ? "text-emerald-700" : "text-gray-400"}`}>
                                 {m!.score_b}
                               </span>
                             )}
