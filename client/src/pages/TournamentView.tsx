@@ -115,6 +115,12 @@ export default function TournamentView() {
   const [showRoster, setShowRoster] = useState(false);
   // Per-court dropdown choice, keyed by court id, before "Send to court" is tapped.
   const [courtChoice, setCourtChoice] = useState<Record<number, string>>({});
+  // Group stage can show the full group sheets (grid) or every match as a list. Remembered per device.
+  const [matchView, setMatchView] = useState<"grid" | "list">(() => (localStorage.getItem("tournament-match-view") === "list" ? "list" : "grid"));
+  function chooseMatchView(v: "grid" | "list") {
+    setMatchView(v);
+    localStorage.setItem("tournament-match-view", v);
+  }
   // Knockout card whose pairs are being edited (pending fixtures only).
   const [editingKoFixture, setEditingKoFixture] = useState<string | null>(null);
   const [showResetKnockout, setShowResetKnockout] = useState(false);
@@ -1155,8 +1161,87 @@ export default function TournamentView() {
               </div>
             )}
 
+            {tournament.status === "groups" && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-display font-bold uppercase tracking-widest text-gray-500">Matches</span>
+                <div className="inline-flex rounded-xl border-2 border-orange-200 overflow-hidden">
+                  {(["grid", "list"] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => chooseMatchView(v)}
+                      className={`px-3 py-1.5 text-xs font-display font-bold ${matchView === v ? "bg-orange-500 text-white" : "bg-white text-orange-600"}`}
+                    >
+                      {v === "grid" ? "Grid" : "List"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tournament.status === "groups" && matchView === "list" && (() => {
+              const groupFixtures = fixtures
+                .filter((f) => f.stage === "group" && f.team_a && f.team_b)
+                .sort((a, b) => (a.group_index ?? 0) - (b.group_index ?? 0) || a.round - b.round);
+              const shown = groupFixtures;
+              return (
+                <div className="flex flex-col gap-2">
+                  {shown.map((f) => {
+                    const m = f.match_id ? matches.find((x) => x.id === f.match_id) : undefined;
+                    const done = f.status === "complete" && m?.score_a != null && m?.score_b != null;
+                    const aWon = done && m!.score_a! > m!.score_b!;
+                    const accent = GROUP_ACCENTS[(f.group_index ?? 0) % GROUP_ACCENTS.length];
+                    return (
+                      <div key={f.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 flex items-center gap-3">
+                        <span className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-xs text-white ${accent.badge}`}>
+                          G{(f.group_index ?? 0) + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className={`truncate font-body text-[15px] ${done && aWon ? "font-bold text-emerald-700" : "font-medium text-gray-800"}`}>
+                            {pairName(f.team_a, members)}
+                            {done && <span className="ml-2 tabular-nums">{m!.score_a}</span>}
+                          </div>
+                          <div className={`truncate font-body text-[15px] ${done && !aWon ? "font-bold text-emerald-700" : "font-medium text-gray-800"}`}>
+                            {pairName(f.team_b, members)}
+                            {done && <span className="ml-2 tabular-nums">{m!.score_b}</span>}
+                          </div>
+                          <div className="text-[11px] font-body text-gray-400 mt-0.5">
+                            {f.status === "active" && m ? `Court ${m.court_id} · live` : done ? "Final" : "Not played yet"}
+                          </div>
+                        </div>
+                        {f.status === "pending" && (
+                          <button
+                            onClick={() => handlePlayFirstFree(f)}
+                            disabled={busy}
+                            className="shrink-0 h-11 px-3 rounded-xl bg-orange-500 text-white font-display font-bold text-xs active:scale-95 transition-all disabled:opacity-40"
+                          >
+                            Play
+                          </button>
+                        )}
+                        {f.status === "active" && (
+                          <button
+                            onClick={() => setScoringFixture(f)}
+                            className="shrink-0 h-11 px-3 rounded-xl bg-emerald-600 text-white font-display font-bold text-xs active:scale-95 transition-all"
+                          >
+                            Score
+                          </button>
+                        )}
+                        {done && (
+                          <button
+                            onClick={() => setScoringFixture(f)}
+                            className="shrink-0 h-11 px-3 rounded-xl border-2 border-gray-200 text-gray-600 font-display font-bold text-xs active:scale-95 transition-all"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {/* Groups in 2-column grid layout (3 per column) */}
-            {(tournament.status === "groups" || showFullGroups) && (
+            {(tournament.status === "groups" || showFullGroups) && (matchView === "grid" || tournament.status !== "groups") && (
             <div
               ref={groupsGridRef}
               className={`grid gap-6 ${isMobile ? "w-full gap-4" : tournament.status === "groups" ? "flex-1 min-w-0" : "flex-shrink-0 w-max"}`}
