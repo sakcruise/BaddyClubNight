@@ -185,6 +185,21 @@ export default function TournamentView() {
     setPlayers(bundle.players);
     setFixtures(bundle.fixtures);
 
+    // Matches started from this tournament must be on this device for the score box to open;
+    // reloading the page or reopening the group clears the device's match list.
+    const matchIds = bundle.fixtures.map((f) => f.match_id).filter((mid): mid is string => !!mid);
+    const knownMatches = useMatchStore.getState().matches;
+    const missingMatches = matchIds.filter((mid) => !knownMatches.some((m) => m.id === mid));
+    if (missingMatches.length > 0) {
+      const { data: matchRows } = await supabase.from("matches").select("*").in("id", missingMatches);
+      (matchRows ?? []).forEach((m: any) => useMatchStore.getState().addMatch({
+        id: m.id, session_id: m.session_id, court_id: m.court_id,
+        team_a: [m.team_a_1, m.team_a_2], team_b: [m.team_b_1, m.team_b_2],
+        score_a: m.score_a ?? undefined, score_b: m.score_b ?? undefined,
+        result: m.result, started_at: m.started_at, ended_at: m.ended_at ?? undefined,
+      }));
+    }
+
     // Names come from the device's member list, which only holds whoever the last page loaded.
     // Fill in any player missing from it (club members, group members, guests) from the database.
     const known = useMemberStore.getState().members;
