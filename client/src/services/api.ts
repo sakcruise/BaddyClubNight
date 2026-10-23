@@ -152,6 +152,13 @@ export const authApi = {
     const resolvedEmail = await clubsApi.findEmail(usernameOrEmail) ?? usernameOrEmail.trim();
     const { data, error } = await supabase.auth.signInWithPassword({ email: resolvedEmail, password });
     if (error) throw new Error(error.message);
+    // A phone can keep showing an old build or stale data from the service-worker cache.
+    // Clear it on every sign-in and ask the worker to pick up the newest version.
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    navigator.serviceWorker?.getRegistration().then((r) => r?.update()).catch(() => {});
     const user = data.user!;
     const meta = user.user_metadata ?? {};
     return {
