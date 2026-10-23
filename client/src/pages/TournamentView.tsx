@@ -465,6 +465,13 @@ export default function TournamentView() {
     await handleResetFixture(fixture);
   }
 
+  // Play sends the match straight to the lowest-numbered free court (court 1 first).
+  function handlePlayFirstFree(fixture: TournamentFixture) {
+    const free = [...idleCourts].sort((a, b) => a.id - b.id);
+    if (free.length === 0) { setError("No court is free right now."); return; }
+    sendToCourts([[fixture, free[0].id]]);
+  }
+
   // Live matches can be moved to another court (someone's already on the one we sent them to).
   async function handleMoveCourt(fixture: TournamentFixture, courtId: number) {
     const match = fixture.match_id ? matches.find((m) => m.id === fixture.match_id) : undefined;
@@ -1366,9 +1373,9 @@ export default function TournamentView() {
                                           </div>
                                         ) : (
                                           <button
-                                            onClick={() => setCourtPickerFor(fixture.id)}
+                                            onClick={() => handlePlayFirstFree(fixture)}
                                             disabled={busy}
-                                            title={courtForGroup(g) ? `Usually court ${courtForGroup(g)!.id}` : undefined}
+                                            title="Send to the first free court"
                                             className="w-full min-h-[44px] flex items-center justify-center gap-1 rounded-lg py-2 bg-violet-100 border border-violet-300 text-violet-800
                                                        active:bg-violet-200 active:scale-95 transition-all disabled:opacity-50"
                                           >
