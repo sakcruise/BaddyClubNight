@@ -425,7 +425,8 @@ export default function TournamentView() {
   }
 
   async function sendToCourts(plan: Array<[TournamentFixture, number]>) {
-    if (!session || plan.length === 0) return;
+    if (plan.length === 0) return;
+    if (!session) { setError("No active session on this device — reopen the tournament from the group page."); return; }
     if (tournament && !tournament.started_at) { setError("Start the tournament first."); return; }
     setBusy(true);
     setError(null);
@@ -1161,8 +1162,11 @@ export default function TournamentView() {
               </div>
             )}
 
+            {error && tournament.status === "groups" && (
+              <p className="text-sm font-display font-semibold text-red-600">{error}</p>
+            )}
             {tournament.status === "groups" && (
-              <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-display font-bold uppercase tracking-widest text-gray-500">Matches</span>
                 <div className="inline-flex rounded-xl border-2 border-orange-200 overflow-hidden">
                   {(["grid", "list"] as const).map((v) => (
