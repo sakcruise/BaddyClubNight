@@ -1064,7 +1064,7 @@ export default function TournamentView() {
             return `${prefix}: ${pairName(f.team_a, members)} vs ${pairName(f.team_b, members)}`;
           };
           return (
-            <section className="flex flex-col gap-2">
+            <section className={`flex flex-col gap-2 ${isMobile ? "sticky top-0 z-30 bg-gray-50/95 backdrop-blur pt-1 pb-2" : ""}`}>
               <div className="flex items-center justify-between gap-3 flex-wrap px-1">
                 <h2 className="text-[11px] font-display font-bold text-gray-500 uppercase tracking-widest">
                   Courts ({stageCourts.length} available) · {pool.length} match{pool.length === 1 ? "" : "es"} waiting
