@@ -987,25 +987,13 @@ export default function TournamentView() {
       {isMobile && (
         <AnimatePresence>
           {tickerOpen && (
-            <>
-              <motion.div
-                key="ticker-backdrop"
-                className="fixed inset-0 bg-black/30 z-40"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={() => setTickerOpen(false)}
-              />
-              <motion.div
-                key="ticker-panel"
-                className="fixed top-0 right-0 bottom-0 w-[88vw] max-w-sm bg-white z-50 shadow-2xl overflow-y-auto"
-                initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-                transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              >
-                <div className="flex items-center justify-between px-4 pt-3">
-                  <span className="font-display font-bold text-sm text-gray-900">Live</span>
-                  <button onClick={() => setTickerOpen(false)} aria-label="Close live ticker" className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">
-                    <X size={18} />
-                  </button>
-                </div>
+            <motion.div
+              key="ticker-strip"
+              className="fixed top-2 left-2 right-2 z-40 flex items-start gap-2 rounded-2xl bg-white/95 backdrop-blur shadow-xl border border-orange-200 p-2 max-h-[38vh] overflow-y-auto"
+              initial={{ x: "110%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "110%", opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 30 }}
+            >
+              <div className="flex-1 min-w-0">
                 <TournamentTicker
                   tournament={tournament}
                   fixtures={fixtures}
@@ -1014,8 +1002,11 @@ export default function TournamentView() {
                   members={members}
                   courts={courts}
                 />
-              </motion.div>
-            </>
+              </div>
+              <button onClick={() => setTickerOpen(false)} aria-label="Close live news" className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+                <X size={16} />
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
       )}
