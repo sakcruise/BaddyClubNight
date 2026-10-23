@@ -201,13 +201,20 @@ export default function GroupDetailView() {
       .order("date", { ascending: false })
       .then(({ data }) => setPastSessions((data ?? []) as Session[]))
       .then(undefined, (e) => console.error("past sessions fetch failed:", e));
-    supabase.from("tournaments").select("id, status, started_at, created_at, sessions!inner(group_id, date)")
-      .eq("sessions.group_id", id)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setGroupTournaments((data ?? []).map((t: any) => ({
-        id: t.id, status: t.status, started_at: t.started_at, created_at: t.created_at, date: t.sessions?.date ?? "",
-      }))))
-      .then(undefined, (e) => console.error("tournaments fetch failed:", e));
+    (async () => {
+      const { data: groupSessions, error: sErr } = await supabase.from("sessions").select("id, date").eq("group_id", id);
+      if (sErr) throw sErr;
+      const sessionDate = new Map((groupSessions ?? []).map((gs: any) => [gs.id, gs.date as string]));
+      if (sessionDate.size === 0) { setGroupTournaments([]); return; }
+      const { data: ts, error: tErr } = await supabase.from("tournaments")
+        .select("id, status, started_at, created_at, session_id")
+        .in("session_id", Array.from(sessionDate.keys()))
+        .order("created_at", { ascending: false });
+      if (tErr) throw tErr;
+      setGroupTournaments((ts ?? []).map((t: any) => ({
+        id: t.id, status: t.status, started_at: t.started_at, created_at: t.created_at, date: sessionDate.get(t.session_id) ?? "",
+      })));
+    })().catch((e) => console.error("tournaments fetch failed:", e));
   }, [id]);
 
   // Self-heal: if the owner has no member row in their own group (e.g. they
