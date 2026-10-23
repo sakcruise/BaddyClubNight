@@ -203,6 +203,7 @@ export default function TournamentSetupView() {
   const [numGroups, setNumGroups] = useState(4);
   const [pairingMode, setPairingMode] = useState<PairingMode>("balanced");
   const [advancePerGroup, setAdvancePerGroup] = useState(2);
+  const [groupCourts, setGroupCourts] = useState(() => Math.max(1, useSessionStore.getState().courts.length || 6));
   const [pairsByGroup, setPairsByGroup] = useState<Pairs>([]);
   const [reserves, setReserves] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
@@ -260,6 +261,7 @@ export default function TournamentSetupView() {
     setCreating(true);
     setError(null);
     try {
+      useSessionStore.getState().setCourts(Array.from({ length: groupCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
       if (editId) await tournamentsApi.delete(editId);
       const tournament = await tournamentsApi.create(sessionId, pairsByGroup, reserves, advancePerGroup);
       navigate(`/tournament/${tournament.id}`, { replace: true });
@@ -613,6 +615,16 @@ export default function TournamentSetupView() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Courts for the group stage</label>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setGroupCourts((n) => Math.max(1, n - 1))} className="w-11 h-11 rounded-xl bg-violet-100 border-2 border-violet-200 font-display font-black text-xl text-violet-600 hover:bg-violet-200 active:scale-95 transition-all">−</button>
+                <div className="flex-1 h-11 rounded-xl border-2 border-violet-300 text-center flex items-center justify-center font-display font-black text-2xl text-violet-600">{groupCourts}</div>
+                <button onClick={() => setGroupCourts((n) => Math.min(10, n + 1))} className="w-11 h-11 rounded-xl bg-violet-100 border-2 border-violet-200 font-display font-black text-xl text-violet-600 hover:bg-violet-200 active:scale-95 transition-all">+</button>
+              </div>
+              <p className="text-[11px] font-body text-gray-400 mt-1.5">Knockout uses the first 3 courts.</p>
             </div>
 
             <div>
