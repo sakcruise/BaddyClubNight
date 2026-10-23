@@ -584,7 +584,7 @@ export default function TournamentView() {
   // Group matches are sudden death to 11. Knockout rounds play to whatever the
   // operator set when generating the bracket (QF / SF / Final).
   function targetPointsFor(fixture: TournamentFixture): number {
-    if (fixture.stage === "group") return 11;
+    if (fixture.stage === "group") return tournament?.group_points ?? 11;
     const cfg = tournament?.knockout_config ?? { qf: 11, sf: 13, f: 15 };
     const roundSize = fixtures.filter((f) => f.stage === "knockout" && f.round === fixture.round).length;
     if (roundSize === 1) return cfg.f;

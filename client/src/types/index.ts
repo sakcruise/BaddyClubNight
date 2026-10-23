@@ -125,6 +125,7 @@ export interface Tournament {
   knockout_config?: KnockoutRoundConfig;
   started_at?: string | null; // null = groups saved but not started
   group_courts?: number | null; // courts for the group stage; null = all session courts
+  group_points?: number | null; // points to win a group match; null = 11
   created_at: string;
 }
 

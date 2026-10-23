@@ -203,6 +203,7 @@ export default function TournamentSetupView() {
   const [numGroups, setNumGroups] = useState(4);
   const [pairingMode, setPairingMode] = useState<PairingMode>("balanced");
   const [advancePerGroup, setAdvancePerGroup] = useState(2);
+  const [groupPoints, setGroupPoints] = useState(11);
   const [groupCourts, setGroupCourts] = useState(() => Math.max(1, useSessionStore.getState().courts.length || 6));
   const [pairsByGroup, setPairsByGroup] = useState<Pairs>([]);
   const [reserves, setReserves] = useState<string[]>([]);
@@ -263,7 +264,7 @@ export default function TournamentSetupView() {
     try {
       useSessionStore.getState().setCourts(Array.from({ length: groupCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
       if (editId) await tournamentsApi.delete(editId);
-      const tournament = await tournamentsApi.create(sessionId, pairsByGroup, reserves, advancePerGroup, groupCourts);
+      const tournament = await tournamentsApi.create(sessionId, pairsByGroup, reserves, advancePerGroup, groupCourts, groupPoints);
       navigate(`/tournament/${tournament.id}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create the tournament");
@@ -615,6 +616,23 @@ export default function TournamentSetupView() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-display font-bold text-gray-600 mb-1.5 block uppercase tracking-widest">Points to win a group match</label>
+              <div className="flex gap-2">
+                {[11, 15, 21].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setGroupPoints(p)}
+                    className={`flex-1 h-11 rounded-xl border-2 font-display font-black text-lg transition-all active:scale-95
+                      ${groupPoints === p ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-violet-200 text-violet-600"}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] font-body text-gray-400 mt-1.5">Group matches are first to this score (sudden death at one point short).</p>
             </div>
 
             <div>
