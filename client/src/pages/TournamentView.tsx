@@ -115,6 +115,8 @@ export default function TournamentView() {
   const [showRoster, setShowRoster] = useState(false);
   // Per-court dropdown choice, keyed by court id, before "Send to court" is tapped.
   const [courtChoice, setCourtChoice] = useState<Record<number, string>>({});
+  // Phones: the live ticker slides in from the right and can be closed; this remembers whether it's open.
+  const [tickerOpen, setTickerOpen] = useState(true);
   // Group stage can show the full group sheets (grid) or every match as a list. Remembered per device.
   const [matchView, setMatchView] = useState<"grid" | "list">(() => (localStorage.getItem("tournament-match-view") === "list" ? "list" : "grid"));
   function chooseMatchView(v: "grid" | "list") {
@@ -982,6 +984,41 @@ export default function TournamentView() {
         members={members}
         courts={courts}
       />}
+      {isMobile && (
+        <AnimatePresence>
+          {tickerOpen && (
+            <>
+              <motion.div
+                key="ticker-backdrop"
+                className="fixed inset-0 bg-black/30 z-40"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setTickerOpen(false)}
+              />
+              <motion.div
+                key="ticker-panel"
+                className="fixed top-0 right-0 bottom-0 w-[88vw] max-w-sm bg-white z-50 shadow-2xl overflow-y-auto"
+                initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+                transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              >
+                <div className="flex items-center justify-between px-4 pt-3">
+                  <span className="font-display font-bold text-sm text-gray-900">Live</span>
+                  <button onClick={() => setTickerOpen(false)} aria-label="Close live ticker" className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">
+                    <X size={18} />
+                  </button>
+                </div>
+                <TournamentTicker
+                  tournament={tournament}
+                  fixtures={fixtures}
+                  standingsByGroup={standingsByGroup}
+                  matches={matches}
+                  members={members}
+                  courts={courts}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      )}
       {!isMobile && <TournamentStats
         tournament={tournament}
         fixtures={fixtures}
@@ -1002,6 +1039,11 @@ export default function TournamentView() {
          className={`flex flex-col gap-4 shrink-0 ${isMobile ? "w-full px-3 py-3" : "w-max px-5 py-5 m-auto"}`}
        >
         {error && <p className="text-sm font-display font-semibold text-red-600">{error}</p>}
+        {isMobile && !tickerOpen && (
+          <button onClick={() => setTickerOpen(true)} className="self-start inline-flex items-center gap-1.5 rounded-full bg-white border border-orange-200 px-3 py-1.5 text-xs font-display font-bold text-orange-600 shadow-sm">
+            <Radio size={12} /> Live
+          </button>
+        )}
 
         {!tournament.started_at && tournament.status === "groups" && (
           <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
