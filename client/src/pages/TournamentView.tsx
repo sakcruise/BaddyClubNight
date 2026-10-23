@@ -1038,16 +1038,16 @@ export default function TournamentView() {
 
 
         {!tournament.started_at && tournament.status === "groups" && (
-          <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+          <div className={`rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 flex gap-3 ${isMobile ? "flex-col" : "items-center justify-between flex-wrap"}`}>
             <div>
               <p className="font-display font-bold text-sm text-gray-900">Groups saved — not started yet</p>
               <p className="text-xs font-body text-gray-500">Edit the groups if needed, then start when you're ready to play.</p>
             </div>
-            <div className="flex gap-2">
-              <Button size="md" variant="secondary" onClick={handleEditGroups} disabled={busy}>
+            <div className={`flex gap-2 ${isMobile ? "flex-col-reverse" : ""}`}>
+              <Button size="md" variant="secondary" fullWidth={isMobile} onClick={handleEditGroups} disabled={busy}>
                 Edit groups
               </Button>
-              <Button size="md" onClick={handleStartTournament} disabled={busy}>
+              <Button size="md" fullWidth={isMobile} onClick={handleStartTournament} disabled={busy}>
                 <Play size={14} /> Start tournament
               </Button>
             </div>
@@ -1073,7 +1073,14 @@ export default function TournamentView() {
                   🎲 Randomly assign courts
                 </Button>
               </div>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 150 : 200}px, 1fr))` }}>
+              <div
+                className="grid gap-2"
+                style={{
+                  gridTemplateColumns: isMobile
+                    ? `repeat(${stageCourts.length <= 3 ? Math.max(1, stageCourts.length) : 2}, minmax(0, 1fr))`
+                    : `repeat(auto-fill, minmax(200px, 1fr))`,
+                }}
+              >
                 {[...stageCourts].sort((a, b) => a.id - b.id).map((court) => {
                   const live = fixtures.find((f) => f.status === "active" && f.match_id && matches.find((m) => m.id === f.match_id)?.court_id === court.id);
                   const liveMatch = live?.match_id ? matches.find((m) => m.id === live.match_id) : undefined;
