@@ -1187,8 +1187,45 @@ export default function TournamentView() {
                 .filter((f) => f.stage === "group" && f.team_a && f.team_b)
                 .sort((a, b) => (a.group_index ?? 0) - (b.group_index ?? 0) || a.round - b.round);
               const shown = groupFixtures;
+              const groupIdxs = Array.from({ length: tournament.num_groups }, (_, g) => g);
               return (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-4">
+                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+                    {groupIdxs.map((g) => {
+                      const rows = standingsByGroup[g] ?? [];
+                      const accent = GROUP_ACCENTS[g % GROUP_ACCENTS.length];
+                      return (
+                        <div key={g} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                          <div className={`px-3 py-2 border-b font-display font-bold text-sm text-gray-900 ${accent.header}`}>Group {g + 1} standings</div>
+                          <table className="w-full text-sm font-body">
+                            <thead>
+                              <tr className="text-[10px] uppercase tracking-wider text-gray-400">
+                                <th className="text-left font-semibold px-3 py-1">Pair</th>
+                                <th className="text-center font-semibold px-1">W–L</th>
+                                <th className="text-right font-semibold px-3">Diff</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((r, i) => (
+                                <tr key={r.pair.join("-")} className={i === 0 ? "bg-violet-50/70" : ""}>
+                                  <td className="px-3 py-1.5 truncate max-w-[140px]">
+                                    <span className="text-gray-400 mr-1.5 tabular-nums">{i + 1}</span>
+                                    <span className={i === 0 ? "font-semibold text-gray-900" : "text-gray-700"}>{pairName(r.pair, members)}</span>
+                                  </td>
+                                  <td className="text-center tabular-nums font-semibold text-gray-700">{r.wins}–{r.losses}</td>
+                                  <td className={`text-right px-3 tabular-nums font-semibold ${r.pointDiff >= 0 ? "text-emerald-700" : "text-red-600"}`}>{r.pointDiff > 0 ? "+" : ""}{r.pointDiff}</td>
+                                </tr>
+                              ))}
+                              {rows.length === 0 && (
+                                <tr><td colSpan={3} className="px-3 py-2 text-xs text-gray-400">No results yet</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-col gap-2">
                   {shown.map((f) => {
                     const m = f.match_id ? matches.find((x) => x.id === f.match_id) : undefined;
                     const done = f.status === "complete" && m?.score_a != null && m?.score_b != null;
@@ -1254,6 +1291,7 @@ export default function TournamentView() {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               );
             })()}
