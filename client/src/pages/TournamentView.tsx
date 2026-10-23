@@ -1200,13 +1200,25 @@ export default function TournamentView() {
                           G{(f.group_index ?? 0) + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className={`truncate font-body text-[15px] ${done && aWon ? "font-bold text-emerald-700" : "font-medium text-gray-800"}`}>
-                            {pairName(f.team_a, members)}
-                            {done && <span className="ml-2 tabular-nums">{m!.score_a}</span>}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`flex-1 min-w-0 truncate font-body text-[15px] ${done && aWon ? "font-bold text-emerald-800" : "font-medium text-gray-800"}`}>
+                              {done && aWon && "🥇 "}{pairName(f.team_a, members)}
+                            </span>
+                            {done && (
+                              <span className={`shrink-0 min-w-[2.25rem] text-center rounded-lg px-2 py-0.5 font-display font-black tabular-nums text-base ${aWon ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                                {m!.score_a}
+                              </span>
+                            )}
                           </div>
-                          <div className={`truncate font-body text-[15px] ${done && !aWon ? "font-bold text-emerald-700" : "font-medium text-gray-800"}`}>
-                            {pairName(f.team_b, members)}
-                            {done && <span className="ml-2 tabular-nums">{m!.score_b}</span>}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`flex-1 min-w-0 truncate font-body text-[15px] ${done && !aWon ? "font-bold text-emerald-800" : "font-medium text-gray-800"}`}>
+                              {done && !aWon && "🥇 "}{pairName(f.team_b, members)}
+                            </span>
+                            {done && (
+                              <span className={`shrink-0 min-w-[2.25rem] text-center rounded-lg px-2 py-0.5 font-display font-black tabular-nums text-base ${!aWon ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                                {m!.score_b}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] font-body text-gray-400 mt-0.5">
                             {f.status === "active" && m ? `Court ${m.court_id} · live` : done ? "Final" : "Not played yet"}
