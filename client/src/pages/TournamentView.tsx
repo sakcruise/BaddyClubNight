@@ -125,7 +125,11 @@ export default function TournamentView() {
   }, []);
   useEffect(() => () => window.clearTimeout(tickerHideTimer.current), []);
   // Group stage can show the full group sheets (grid) or every match as a list. Remembered per device.
-  const [matchView, setMatchView] = useState<"grid" | "list">(() => (localStorage.getItem("tournament-match-view") === "list" ? "list" : "grid"));
+  const [matchView, setMatchView] = useState<"grid" | "list">(() => {
+    const saved = localStorage.getItem("tournament-match-view");
+    if (saved === "list" || saved === "grid") return saved;
+    return window.matchMedia("(max-width: 900px)").matches ? "list" : "grid";
+  });
   function chooseMatchView(v: "grid" | "list") {
     setMatchView(v);
     localStorage.setItem("tournament-match-view", v);
