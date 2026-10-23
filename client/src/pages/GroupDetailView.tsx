@@ -154,6 +154,7 @@ export default function GroupDetailView() {
   const [groupMatches, setGroupMatches] = useState<Match[]>([]);
   const [sessionsPlayed, setSessionsPlayed] = useState(0);
   const [pastSessions, setPastSessions] = useState<Session[]>([]);
+  const [groupTournaments, setGroupTournaments] = useState<Array<{ id: string; status: string; started_at: string | null; created_at: string; date: string }>>([]);
   const [expandedPastId, setExpandedPastId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [balances, setBalances] = useState<Record<string, number> | null>(null);
@@ -200,6 +201,13 @@ export default function GroupDetailView() {
       .order("date", { ascending: false })
       .then(({ data }) => setPastSessions((data ?? []) as Session[]))
       .then(undefined, (e) => console.error("past sessions fetch failed:", e));
+    supabase.from("tournaments").select("id, status, started_at, created_at, sessions!inner(group_id, date)")
+      .eq("sessions.group_id", id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setGroupTournaments((data ?? []).map((t: any) => ({
+        id: t.id, status: t.status, started_at: t.started_at, created_at: t.created_at, date: t.sessions?.date ?? "",
+      }))))
+      .then(undefined, (e) => console.error("tournaments fetch failed:", e));
   }, [id]);
 
   // Self-heal: if the owner has no member row in their own group (e.g. they
@@ -696,6 +704,30 @@ export default function GroupDetailView() {
                     <span className="badge bg-green-100 text-green-700 text-xs px-2 py-0.5 font-black">{p.wins}W</span>
                     <span className="badge bg-gray-200 text-gray-500 text-xs px-2 py-0.5 font-black">{p.matches_played} GP</span>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── TOURNAMENTS ── */}
+        {groupTournaments.length > 0 && (
+          <div className="bg-white border border-violet-200 rounded-3xl shadow-md shadow-black/5 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+              <Trophy size={15} className="text-violet-500" />
+              <span className="font-display font-black text-gray-900 text-sm">Tournaments</span>
+              <span className="ml-auto text-xs font-display font-bold text-gray-400">{groupTournaments.length}</span>
+            </div>
+            <div className="border-t border-gray-100 max-h-48 overflow-y-auto">
+              {groupTournaments.map((t) => {
+                const label = t.status === "complete" ? "Finished" : t.status === "knockout" ? "Knockout" : t.started_at ? "In progress" : "Not started";
+                return (
+                  <button key={t.id} onClick={() => navigate(`/tournament/${t.id}`)}
+                    className="w-full flex items-center gap-3 px-4 py-3 border-b border-gray-50 text-left hover:bg-violet-50 active:bg-violet-100">
+                    <span className="font-display font-bold text-sm text-gray-900">{t.date || t.created_at.slice(0, 10)}</span>
+                    <span className="ml-auto text-[11px] font-display font-bold text-violet-600">{label}</span>
+                    <ChevronRight size={14} className="text-gray-300" />
+                  </button>
                 );
               })}
             </div>
