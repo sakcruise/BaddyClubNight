@@ -288,6 +288,7 @@ export default function GroupDetailView() {
     venue?: string,
     scheduledAt?: string,
     goingMemberIds: string[] = [],
+    afterPath = "/",
   ) {
     const g = group!;
     const members: Member[] = g.members.map((m) => ({
@@ -322,7 +323,21 @@ export default function GroupDetailView() {
         useQueueStore.getState().setQueue(queue);
       } catch { /* MainView will reload the queue */ }
     }
-    navigate("/");
+    navigate(afterPath);
+  }
+
+  async function handleStartTournament() {
+    const g = group!;
+    setModalBusy(true);
+    try {
+      const now = new Date().toISOString();
+      const s = await groupsApi.createSession(g.id, g.name, { scheduled_at: now, num_courts: 6, status: "active" });
+      await launchSession(s.id, 6, undefined, now, [], `/tournament-setup/${s.id}`);
+    } catch (e: any) {
+      alert(`Couldn't start the tournament: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setModalBusy(false);
+    }
   }
 
   async function handleModalConfirm({ scheduled_at, venue, num_courts, startNow }: {
@@ -803,7 +818,12 @@ export default function GroupDetailView() {
 
       {/* Bottom button — owner only */}
       {isOwner && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 max-w-xl mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 p-4 max-w-xl mx-auto flex flex-col gap-2">
+          <motion.button whileTap={{ scale: 0.97 }} onClick={handleStartTournament} disabled={modalBusy}
+            className="w-full py-3 rounded-2xl font-display font-black text-violet-700 text-base bg-white border-2 border-violet-300 shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
+            <Trophy size={18} />
+            Start a Tournament
+          </motion.button>
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowModal(true)}
             className="w-full py-4 rounded-2xl font-display font-black text-white text-base bg-gradient-to-r from-purple-600 to-purple-500 shadow-2xl shadow-purple-500/30 flex items-center justify-center gap-2">
             <CalendarPlus size={20} />

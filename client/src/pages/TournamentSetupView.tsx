@@ -91,6 +91,9 @@ export default function TournamentSetupView() {
     if (!sessionId) return;
     queueApi.get(sessionId).then((res) => setQueue(res.queue)).catch(() => {});
     // Fresh roster so archived members drop out and new ones appear, even on a direct load.
+    // A group's tournament uses the group's own members (already in the store); only club
+    // nights should refresh from the club roster.
+    if (useSessionStore.getState().session?.group_id) return;
     membersApi.list()
       .then((res) => {
         // list() excludes guests; keep any already in the store so checked-in guests still resolve.
