@@ -123,6 +123,7 @@ export interface Tournament {
   status: TournamentStatus;
   knockout_config?: KnockoutRoundConfig;
   started_at?: string | null; // null = groups saved but not started
+  group_courts?: number | null; // courts for the group stage; null = all session courts
   created_at: string;
 }
 

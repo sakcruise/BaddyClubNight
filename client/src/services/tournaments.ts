@@ -54,6 +54,7 @@ function rowToTournament(t: any): Tournament {
     advance_per_group: t.advance_per_group,
     status: t.status,
     started_at: t.started_at ?? null,
+    group_courts: t.group_courts ?? null,
     knockout_config: t.knockout_config ?? { qf: 11, sf: 13, f: 15 },
     created_at: t.created_at,
   };
@@ -259,7 +260,8 @@ export const tournamentsApi = {
     sessionId: string,
     pairsByGroup: Array<[string, string]>[],
     reserves: string[],
-    advancePerGroup = 1
+    advancePerGroup = 1,
+    groupCourts: number | null = null
   ): Promise<Tournament> => {
     const members = useMemberStore.getState().members;
     const numGroups = pairsByGroup.length;
@@ -301,7 +303,7 @@ export const tournamentsApi = {
     const clubId = await getClubId();
     const { data: tRow, error: tErr } = await supabase
       .from("tournaments")
-      .insert({ club_id: clubId, session_id: sessionId, num_groups: numGroups, advance_per_group: advancePerGroup })
+      .insert({ club_id: clubId, session_id: sessionId, num_groups: numGroups, advance_per_group: advancePerGroup, group_courts: groupCourts })
       .select()
       .single();
     const tournament = rowToTournament(check(tRow, tErr));

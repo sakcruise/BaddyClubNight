@@ -263,7 +263,7 @@ export default function TournamentSetupView() {
     try {
       useSessionStore.getState().setCourts(Array.from({ length: groupCourts }, (_, i) => ({ id: i + 1, status: "idle" as const })));
       if (editId) await tournamentsApi.delete(editId);
-      const tournament = await tournamentsApi.create(sessionId, pairsByGroup, reserves, advancePerGroup);
+      const tournament = await tournamentsApi.create(sessionId, pairsByGroup, reserves, advancePerGroup, groupCourts);
       navigate(`/tournament/${tournament.id}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create the tournament");

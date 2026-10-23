@@ -368,7 +368,10 @@ export default function TournamentView() {
     .every((f) => f.status === "complete");
   // Round robin spreads over all six courts; the knockout is played on courts 1–3 only.
   const KNOCKOUT_COURTS = 3;
-  const stageCourts = tournament?.status === "groups" ? courts : courts.filter((c) => c.id <= KNOCKOUT_COURTS);
+  const groupStageCount = tournament?.group_courts ?? courts.length;
+  const stageCourts = tournament?.status === "groups"
+    ? courts.filter((c) => c.id <= groupStageCount)
+    : courts.filter((c) => c.id <= KNOCKOUT_COURTS);
   const idleCourts = stageCourts.filter((c) => c.status === "idle");
 
   // Matches waiting for a court in the current stage: not started, both pairs
