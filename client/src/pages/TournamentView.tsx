@@ -949,6 +949,7 @@ export default function TournamentView() {
         <button
           onClick={toggleFullscreen}
           title={isFullscreen ? "Exit full screen" : "Full screen"}
+          style={isMobile ? { display: "none" } : undefined}
           aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-xs font-display font-semibold hover:bg-gray-100 transition-all"
         >
@@ -973,15 +974,15 @@ export default function TournamentView() {
         </div>
       </header>
 
-      <TournamentTicker
+      {!isMobile && <TournamentTicker
         tournament={tournament}
         fixtures={fixtures}
         standingsByGroup={standingsByGroup}
         matches={matches}
         members={members}
         courts={courts}
-      />
-      <TournamentStats
+      />}
+      {!isMobile && <TournamentStats
         tournament={tournament}
         fixtures={fixtures}
         players={players}
@@ -989,7 +990,7 @@ export default function TournamentView() {
         matches={matches}
         members={members}
         courts={courts}
-      />
+      />}
 
       <main
         ref={fitOuterRef}
@@ -1111,7 +1112,7 @@ export default function TournamentView() {
           );
         })()}
 
-        {fixtures.some((f) => f.stage === "group") && (
+        {!isMobile && fixtures.some((f) => f.stage === "group") && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-display font-semibold text-gray-400 px-1">
             <span className="flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 rounded-lg bg-violet-100 border border-violet-300 text-violet-800 px-1.5 py-0.5">
