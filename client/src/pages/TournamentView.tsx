@@ -1031,7 +1031,7 @@ export default function TournamentView() {
                   🎲 Randomly assign courts
                 </Button>
               </div>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${stageCourts.length}, minmax(200px, 1fr))` }}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 150 : 200}px, 1fr))` }}>
                 {[...stageCourts].sort((a, b) => a.id - b.id).map((court) => {
                   const live = fixtures.find((f) => f.status === "active" && f.match_id && matches.find((m) => m.id === f.match_id)?.court_id === court.id);
                   const liveMatch = live?.match_id ? matches.find((m) => m.id === live.match_id) : undefined;
