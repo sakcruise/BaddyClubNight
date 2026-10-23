@@ -35,13 +35,6 @@ const GROUP_ACCENTS = [
   { header: "bg-teal-50 border-teal-100", badge: "bg-teal-600", bar: "bg-teal-500", text: "text-teal-600" },
 ];
 
-// Champions from before the app kept records. Years the app has run are read from
-// completed tournaments and take precedence over these.
-const PAST_CHAMPIONS: Array<{ year: number; winners: string }> = [
-  { year: 2025, winners: "Sakthi & Dilone" },
-  { year: 2024, winners: "Sid & Hilary" },
-];
-
 function pairName(ids: [string, string] | null, members: ReturnType<typeof useMemberStore.getState>["members"]) {
   if (!ids) return "Bye";
   return ids.map((id) => members[id]?.name?.split(" ")[0] ?? "?").join(" & ");
@@ -316,7 +309,6 @@ export default function TournamentView() {
   // Header honours board: seeded years plus every completed tournament (newest first).
   const championsByYear = useMemo(() => {
     const byYear = new Map<number, { year: number; winners: string }>();
-    for (const c of PAST_CHAMPIONS) byYear.set(c.year, c);
     for (const c of champions) byYear.set(c.year, { year: c.year, winners: pairName(c.pair, members) });
     return Array.from(byYear.values()).sort((a, b) => b.year - a.year);
   }, [champions, members]);
