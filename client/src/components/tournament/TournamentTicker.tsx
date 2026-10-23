@@ -12,6 +12,8 @@ interface Props {
   matches: Match[];
   members: Members;
   courts: Court[];
+  /** Fires when a result or leader change is announced (e.g. to pop the ticker up on a phone). */
+  onAnnounce?: () => void;
 }
 
 const ROTATE_MS = 7000;
@@ -261,7 +263,9 @@ export default function TournamentTicker(props: Props) {
       queue.current.push(text);
       advance();
       restartTimer();
+      props.onAnnounce?.();
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [advance, restartTimer]
   );
 

@@ -115,8 +115,15 @@ export default function TournamentView() {
   const [showRoster, setShowRoster] = useState(false);
   // Per-court dropdown choice, keyed by court id, before "Send to court" is tapped.
   const [courtChoice, setCourtChoice] = useState<Record<number, string>>({});
-  // Phones: the live ticker slides in from the right and can be closed; this remembers whether it's open.
-  const [tickerOpen, setTickerOpen] = useState(true);
+  // Phones: the live news strip pops up when something is announced, then closes on its own.
+  const [tickerOpen, setTickerOpen] = useState(false);
+  const tickerHideTimer = useRef<number>();
+  const flashTicker = useCallback(() => {
+    setTickerOpen(true);
+    window.clearTimeout(tickerHideTimer.current);
+    tickerHideTimer.current = window.setTimeout(() => setTickerOpen(false), 6000);
+  }, []);
+  useEffect(() => () => window.clearTimeout(tickerHideTimer.current), []);
   // Group stage can show the full group sheets (grid) or every match as a list. Remembered per device.
   const [matchView, setMatchView] = useState<"grid" | "list">(() => (localStorage.getItem("tournament-match-view") === "list" ? "list" : "grid"));
   function chooseMatchView(v: "grid" | "list") {
@@ -985,30 +992,28 @@ export default function TournamentView() {
         courts={courts}
       />}
       {isMobile && (
-        <AnimatePresence>
-          {tickerOpen && (
-            <motion.div
-              key="ticker-strip"
-              className="fixed top-2 left-2 right-2 z-40 flex items-start gap-2 rounded-2xl bg-white/95 backdrop-blur shadow-xl border border-orange-200 p-2 max-h-[38vh] overflow-y-auto"
-              initial={{ x: "110%", opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: "110%", opacity: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 30 }}
-            >
-              <div className="flex-1 min-w-0">
-                <TournamentTicker
-                  tournament={tournament}
-                  fixtures={fixtures}
-                  standingsByGroup={standingsByGroup}
-                  matches={matches}
-                  members={members}
-                  courts={courts}
-                />
-              </div>
-              <button onClick={() => setTickerOpen(false)} aria-label="Close live news" className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
-                <X size={16} />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div
+          className="fixed top-2 left-2 right-2 z-40 flex items-start gap-2 rounded-2xl bg-white/95 backdrop-blur shadow-xl border border-orange-200 p-2 max-h-[38vh] overflow-y-auto"
+          initial={false}
+          animate={tickerOpen ? { x: 0, opacity: 1 } : { x: "110%", opacity: 0 }}
+          style={{ pointerEvents: tickerOpen ? "auto" : "none" }}
+          transition={{ type: "spring", stiffness: 320, damping: 30 }}
+        >
+          <div className="flex-1 min-w-0">
+            <TournamentTicker
+              tournament={tournament}
+              fixtures={fixtures}
+              standingsByGroup={standingsByGroup}
+              matches={matches}
+              members={members}
+              courts={courts}
+              onAnnounce={flashTicker}
+            />
+          </div>
+          <button onClick={() => setTickerOpen(false)} aria-label="Close live news" className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+            <X size={16} />
+          </button>
+        </motion.div>
       )}
       {!isMobile && <TournamentStats
         tournament={tournament}
@@ -1030,11 +1035,7 @@ export default function TournamentView() {
          className={`flex flex-col gap-4 shrink-0 ${isMobile ? "w-full px-3 py-3" : "w-max px-5 py-5 m-auto"}`}
        >
         {error && <p className="text-sm font-display font-semibold text-red-600">{error}</p>}
-        {isMobile && !tickerOpen && (
-          <button onClick={() => setTickerOpen(true)} className="self-start inline-flex items-center gap-1.5 rounded-full bg-white border border-orange-200 px-3 py-1.5 text-xs font-display font-bold text-orange-600 shadow-sm">
-            <Radio size={12} /> Live
-          </button>
-        )}
+
 
         {!tournament.started_at && tournament.status === "groups" && (
           <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
