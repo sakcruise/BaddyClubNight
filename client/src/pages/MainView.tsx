@@ -473,15 +473,15 @@ export default function MainView() {
           {mobileTab === "live" ? (
             // Courts + Queue stacked on one screen — no more tab-switching between matches
             <div className="h-full flex flex-col gap-3">
-              <div className="glass-card flex flex-col p-4 flex-shrink-0" style={{ height: "42%", overflow: "hidden" }}>
-                <CourtsView />
+              <div className="glass-card flex flex-col p-3 flex-shrink-0" style={{ height: "30%", overflow: "hidden" }}>
+                <CourtsView mobile />
               </div>
-              <div className="glass-card flex flex-col p-4 flex-1" style={{ minHeight: 0, overflow: "hidden" }}>
-                <div className="section-header flex-shrink-0 mb-2">
-                  <span className="text-orange-600 text-sm font-black">#</span>
-                  <span className="section-title text-sm ml-2">Queue</span>
+              <div className="glass-card flex flex-col p-3 flex-1" style={{ minHeight: 0, overflow: "hidden" }}>
+                <div className="section-header flex-shrink-0 mb-1">
+                  <span className="text-orange-600 text-xs font-black">#</span>
+                  <span className="section-title text-xs ml-1.5">Queue</span>
                 </div>
-                <div className="flex-1 flex flex-col" style={{ minHeight: 0, overflow: "hidden" }}><CheckInPanel /></div>
+                <div className="flex-1 flex flex-col" style={{ minHeight: 0, overflow: "hidden" }}><CheckInPanel mobile /></div>
               </div>
             </div>
           ) : (

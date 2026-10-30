@@ -27,15 +27,16 @@ interface Props {
   onGo?: () => void;
   pitstop?: PitstopState;
   onLaunchPitstop?: () => void;
-  autoPickEnabled?: boolean;   // show "waiting" state instead of Go when no pitstop yet
+  autoPickEnabled?: boolean;
   completing?: boolean;
   onEditPairs?: () => void;
   editingPairs?: boolean;
   onSavePairs?: (matchId: string, teamA: [string, string], teamB: [string, string]) => Promise<void>;
   onCancelEditPairs?: () => void;
+  compact?: boolean;
 }
 
-export default function CourtCard({ court, match, onComplete, onGo, pitstop, onLaunchPitstop, autoPickEnabled, completing, onEditPairs, editingPairs, onSavePairs, onCancelEditPairs }: Props) {
+export default function CourtCard({ court, match, onComplete, onGo, pitstop, onLaunchPitstop, autoPickEnabled, completing, onEditPairs, editingPairs, onSavePairs, onCancelEditPairs, compact }: Props) {
   const { members } = useMemberStore();
   const [showScore, setShowScore] = useState(false);
   const [scoreA, setScoreA] = useState(0);
@@ -81,6 +82,93 @@ export default function CourtCard({ court, match, onComplete, onGo, pitstop, onL
       onComplete(match.id);
     }
     setShowScore(false);
+  }
+
+  if (compact) {
+    return (
+      <div
+        className={`rounded-xl flex flex-col gap-1 p-2 transition-all duration-300 relative
+          ${isPlaying ? "court-glow border border-green-400/50" : "border border-gray-100 bg-gray-50/50"}`}
+        style={isPlaying ? { background: "linear-gradient(135deg, #f0fdf4, #dcfce7 60%, #f0fdf4)" } : {}}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-display font-black text-xs
+              ${isPlaying ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+              {court.id}
+            </div>
+            {isPlaying && (
+              <span className="text-[9px] font-display font-black text-green-700 bg-green-100 rounded-md px-1.5 py-0.5 tabular-nums">
+                {timer}
+              </span>
+            )}
+          </div>
+          {isPlaying ? (
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+            </span>
+          ) : (
+            <span className="text-[9px] font-display font-bold text-gray-400">Free</span>
+          )}
+        </div>
+        {isPlaying ? (
+          <div className="flex items-center gap-1">
+            <div className="flex-1 text-center">
+              {teamA.map((m) => (
+                <div key={m.id} className="text-[10px] font-display font-bold text-gray-700 leading-tight truncate">{m.name.split(" ")[0]}</div>
+              ))}
+            </div>
+            <span className="text-gray-300 text-[9px] font-black">vs</span>
+            <div className="flex-1 text-center">
+              {teamB.map((m) => (
+                <div key={m.id} className="text-[10px] font-display font-bold text-gray-700 leading-tight truncate">{m.name.split(" ")[0]}</div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-0.5">
+            {onGo ? (
+              <button onClick={onGo} className="w-full py-1 rounded-lg font-display font-black text-[10px] bg-gradient-to-r from-orange-500 to-orange-400 text-white active:scale-95 transition-all">
+                Go!
+              </button>
+            ) : onLaunchPitstop ? (
+              <button onClick={onLaunchPitstop} className="w-full py-1 rounded-lg font-display font-black text-[10px] bg-gradient-to-r from-yellow-400 to-yellow-300 text-yellow-900 active:scale-95 transition-all">
+                Launch
+              </button>
+            ) : autoPickEnabled ? (
+              <span className="text-[9px] font-display font-bold text-yellow-600 animate-pulse">⏳ Waiting…</span>
+            ) : (
+              <span className="text-[9px] text-gray-400">🏸</span>
+            )}
+          </div>
+        )}
+        {isPlaying && !showScore && !editingPairs && onComplete && (
+          <button
+            onClick={() => { setScoreA(0); setScoreB(0); setShowScore(true); }}
+            disabled={completing}
+            className="w-full py-1 rounded-lg font-display font-bold text-[10px] bg-green-500 text-white active:scale-95 transition-all"
+          >
+            {completing ? "…" : "Done"}
+          </button>
+        )}
+        {showScore && isPlaying && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-center gap-1">
+              <ScoreInput label="" value={scoreA} onChange={setScoreA} />
+              <span className="text-gray-300 font-black text-xs">–</span>
+              <ScoreInput label="" value={scoreB} onChange={setScoreB} />
+            </div>
+            <div className="flex gap-1">
+              <button onClick={() => handleDone(false)} disabled={completing}
+                className="flex-1 py-1 rounded-lg border border-gray-200 text-gray-500 text-[10px] font-display font-bold">Skip</button>
+              <button onClick={() => handleDone(true)} disabled={completing}
+                className="flex-1 py-1 rounded-lg bg-green-500 text-white text-[10px] font-display font-bold">{completing ? "…" : "✓"}</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (

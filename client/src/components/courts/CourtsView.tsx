@@ -7,7 +7,7 @@ import { matchesApi, queueApi } from "../../services/api";
 import { autoPick, recentTeamPairs } from "../../utils/autoPick";
 import type { PitstopState } from "../../types";
 
-export default function CourtsView() {
+export default function CourtsView({ mobile }: { mobile?: boolean } = {}) {
   const { courts, updateCourtStatus, session, clubConfig } = useSessionStore();
   const { matches, updateMatch } = useMatchStore();
   const { queue, activeMemberIds, setActiveMemberIds, openPicker, setQueue, pitstops, removeFirstPitstop, addPitstops } = useQueueStore();
@@ -232,18 +232,18 @@ export default function CourtsView() {
     <div className="flex flex-col h-full gap-3 min-h-0">
 
       {/* Section header */}
-      <div className="section-header mb-0">
-        <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-          <LayoutGrid size={18} className="text-green-600" />
+      <div className={`section-header mb-0 ${mobile ? "mb-0" : ""}`}>
+        <div className={`${mobile ? "w-7 h-7" : "w-9 h-9"} rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0`}>
+          <LayoutGrid size={mobile ? 14 : 18} className="text-green-600" />
         </div>
-        <span className="section-title">Courts</span>
-        <span className="ml-auto badge bg-green-100 text-green-700 text-xs">
+        <span className={mobile ? "text-xs font-display font-black text-gray-800 tracking-tight" : "section-title"}>Courts</span>
+        <span className={`ml-auto badge bg-green-100 text-green-700 ${mobile ? "text-[10px] px-2 py-0.5" : "text-xs"}`}>
           {Object.keys(activeMatches).length}/{courts.length} active
         </span>
       </div>
 
-      {/* Courts grid — single column on mobile, computed columns from md+ */}
-      <div className={`flex-1 grid grid-cols-1 ${desktopColsClass} gap-3 content-start overflow-y-auto min-h-0`}>
+      {/* Courts grid — 2-col on mobile (compact), computed columns from md+ */}
+      <div className={`flex-1 grid ${mobile ? "grid-cols-2" : "grid-cols-1"} ${desktopColsClass} ${mobile ? "gap-1.5" : "gap-3"} content-start overflow-y-auto min-h-0`}>
         {(() => {
           // Only the first idle court gets the pitstop launch button (avoids ambiguity)
           const firstIdleCourtId = courts.find((c) => c.status !== "playing")?.id ?? null;
@@ -253,6 +253,7 @@ export default function CourtsView() {
               key={court.id}
               court={court}
               match={activeMatches[court.id]}
+              compact={mobile}
               onComplete={court.status === "playing" && activeMatches[court.id]
                 ? (id, a, b, s) => handleComplete(id, a, b, s)
                 : undefined}

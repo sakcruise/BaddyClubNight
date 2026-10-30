@@ -11,7 +11,7 @@ import PitstopCard from "./PitstopCard";
 import { effectiveStatus } from "../../utils/memberStatus";
 
 function ReorderQueueItem({
-  q, idx, member, loadingId, onRequestRemove, formatTime,
+  q, idx, member, loadingId, onRequestRemove, formatTime, compact,
 }: {
   q: QueuePosition;
   idx: number;
@@ -19,6 +19,7 @@ function ReorderQueueItem({
   loadingId: string | null;
   onRequestRemove: (id: string, name: string) => void;
   formatTime: (iso: string) => string;
+  compact?: boolean;
 }) {
   const controls = useDragControls();
   const members = useMemberStore((s) => s.members);
@@ -37,7 +38,7 @@ function ReorderQueueItem({
       value={q}
       dragListener={false}
       dragControls={controls}
-      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-colors ${rowBg}`}
+      className={`flex items-center ${compact ? "gap-1.5 px-2 py-1" : "gap-2.5 px-3 py-2"} ${compact ? "rounded-lg" : "rounded-xl"} border transition-colors ${rowBg}`}
       style={{ listStyle: "none", touchAction: "pan-y" }}
       whileDrag={{ scale: 1.02, boxShadow: "0 6px 20px rgba(0,0,0,0.10)", zIndex: 10, backgroundColor: "rgb(var(--p-50))", borderColor: "#fdba74" }}
     >
@@ -45,35 +46,37 @@ function ReorderQueueItem({
         className="touch-none cursor-grab active:cursor-grabbing text-gray-400 hover:text-orange-400 flex-shrink-0 select-none"
         onPointerDown={(e) => controls.start(e)}
       >
-        <GripVertical size={16} />
+        <GripVertical size={compact ? 13 : 16} />
       </span>
-      <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-display font-black text-xs flex-shrink-0
+      <div className={`${compact ? "w-5 h-5 rounded-md text-[10px]" : "w-6 h-6 rounded-lg text-xs"} flex items-center justify-center font-display font-black flex-shrink-0
         ${isFirst ? "bg-orange-400 text-white" : "bg-gray-100 text-gray-500"}`}>
         {idx + 1}
       </div>
-      <Avatar name={member.name} memberType={member.member_type as any} size="sm" />
+      {!compact && <Avatar name={member.name} memberType={member.member_type as any} size="sm" />}
       <div className="flex-1 min-w-0">
-        <div className="font-display font-bold text-base text-gray-900 truncate leading-tight">{member.name}</div>
-        <div className="text-[10px] text-gray-400 font-display">
-          {formatTime(q.checked_in_at)}
-          {member.member_type === "guest" && <span className="ml-1 text-purple-400 font-black">GUEST</span>}
-          {effectiveStatus(members[member.id] ?? member) === "paused" && <span className="ml-1 text-amber-500 font-black">PAUSED</span>}
-          {effectiveStatus(members[member.id] ?? member) === "lapsed" && <span className="ml-1 text-red-500 font-black">LAPSED</span>}
-        </div>
+        <div className={`font-display font-bold ${compact ? "text-sm" : "text-base"} text-gray-900 truncate leading-tight`}>{member.name}</div>
+        {!compact && (
+          <div className="text-[10px] text-gray-400 font-display">
+            {formatTime(q.checked_in_at)}
+            {member.member_type === "guest" && <span className="ml-1 text-purple-400 font-black">GUEST</span>}
+            {effectiveStatus(members[member.id] ?? member) === "paused" && <span className="ml-1 text-amber-500 font-black">PAUSED</span>}
+            {effectiveStatus(members[member.id] ?? member) === "lapsed" && <span className="ml-1 text-red-500 font-black">LAPSED</span>}
+          </div>
+        )}
       </div>
       <button
         onClick={() => onRequestRemove(member.id, member.name)}
         disabled={loadingId === member.id}
-        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500 transition-colors disabled:opacity-40"
+        className={`flex-shrink-0 ${compact ? "p-1" : "p-1.5"} rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500 transition-colors disabled:opacity-40`}
         title="Remove from queue"
       >
-        <UserMinus size={13} />
+        <UserMinus size={compact ? 11 : 13} />
       </button>
     </Reorder.Item>
   );
 }
 
-export default function CheckInPanel() {
+export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
   const { members, addMember } = useMemberStore();
   const { queue, setQueue, picker, closePicker, setPickerId, togglePick, removeFromQueue, reorderQueue, activeMemberIds, setActiveMemberIds, openPicker, addPitstop, removePitstopAt, updatePitstopAt } = useQueueStore();
   // Explicit selector so CheckInPanel re-renders whenever pitstops array changes
@@ -692,18 +695,18 @@ export default function CheckInPanel() {
   const total = checkedInCount + onCourtCount;
 
   return (
-    <div className="flex flex-col gap-3 flex-1 min-h-0">
+    <div className={`flex flex-col ${mobile ? "gap-1.5" : "gap-3"} flex-1 min-h-0`}>
 
       {/* Stats — In Queue / On Court / Total */}
-      <div className="flex gap-2 flex-shrink-0">
+      <div className={`flex ${mobile ? "gap-1.5" : "gap-2"} flex-shrink-0`}>
         {[
           { label: "In Queue", value: checkedInCount, color: "text-gray-800" },
           { label: "On Court", value: onCourtCount,   color: "text-green-600" },
           { label: "Total",    value: total,           color: "text-orange-600" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="flex-1 rounded-2xl bg-gray-50 border border-gray-100 px-2 py-2 text-center">
-            <div className={`text-2xl font-display font-black ${color}`}>{value}</div>
-            <div className="text-[10px] text-gray-400 font-display font-bold leading-tight">{label}</div>
+          <div key={label} className={`flex-1 ${mobile ? "rounded-xl" : "rounded-2xl"} bg-gray-50 border border-gray-100 ${mobile ? "px-1.5 py-1" : "px-2 py-2"} text-center`}>
+            <div className={`${mobile ? "text-base" : "text-2xl"} font-display font-black ${color}`}>{value}</div>
+            <div className={`${mobile ? "text-[8px]" : "text-[10px]"} text-gray-400 font-display font-bold leading-tight`}>{label}</div>
           </div>
         ))}
       </div>
@@ -713,48 +716,77 @@ export default function CheckInPanel() {
         <motion.div
           initial={{ scale: 0.97, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="rounded-2xl shadow-lg shadow-orange-500/25"
+          className={`${mobile ? "rounded-xl" : "rounded-2xl"} shadow-lg shadow-orange-500/25 flex-shrink-0`}
           style={{ background: "linear-gradient(135deg, rgb(var(--p-600)) 0%, rgb(var(--p-500)) 50%, rgb(var(--p-400)) 100%)" }}
         >
-          <div className="px-4 pt-3 pb-1 relative">
-            {/* Avatar — top right, slightly overflowing */}
-            {/* Avatar + mute button stacked in top-right */}
-            <div className="absolute top-1 right-1 flex flex-col items-center gap-1">
-              <ShoutingAvatar memberType={firstMember.member_type as any} name={firstMember.name} phase={shoutPhase} />
+          {mobile ? (
+            <div className="px-3 py-2 flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-white/80 text-[9px] font-display font-black uppercase tracking-wider">
+                  🔥 Court {freeCourt.id} free!
+                </div>
+                <div className="text-white font-display font-black text-sm leading-tight truncate">
+                  {readyToGo ? BANNER_MSGS[shoutPhase] : `${firstName}, pick your team!`}
+                </div>
+              </div>
               <button
                 onClick={() => {
                   const next = !muted;
                   setMuted(next);
                   if (next) window.speechSynthesis?.cancel();
                 }}
-                className="text-white/70 hover:text-white transition-colors text-lg leading-none"
+                className="text-white/70 hover:text-white transition-colors text-sm leading-none flex-shrink-0"
                 title={muted ? "Unmute" : "Mute announcements"}
               >
                 {muted ? "🔇" : "🔊"}
               </button>
-            </div>
-            <div className="pr-14">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-lg">🔥</span>
-                <span className="text-white/80 text-[10px] font-display font-black uppercase tracking-widest flex-1">
-                  Court {freeCourt.id} is free!
-                </span>
-              </div>
-              <div className="text-white font-display font-black text-xl leading-tight transition-all duration-300">
-                {readyToGo ? BANNER_MSGS[shoutPhase] : `${firstName}, pick your team!`}
-              </div>
-              <div className="text-orange-100 text-xs font-display font-semibold mt-0.5 mb-3">
-                ⚡ You're up — choose 3 legends to smash with
-              </div>
               <button
                 onClick={() => handleGo(firstMember.id)}
-                className="w-full py-2.5 rounded-xl bg-white text-orange-600 font-display font-black text-sm
-                           hover:bg-orange-50 active:scale-95 transition-all shadow-sm mb-3"
+                className="py-1.5 px-3 rounded-lg bg-white text-orange-600 font-display font-black text-xs
+                           active:scale-95 transition-all flex-shrink-0"
               >
-                🏸 Let's Go!
+                Let's Go!
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="px-4 pt-3 pb-1 relative">
+              <div className="absolute top-1 right-1 flex flex-col items-center gap-1">
+                <ShoutingAvatar memberType={firstMember.member_type as any} name={firstMember.name} phase={shoutPhase} />
+                <button
+                  onClick={() => {
+                    const next = !muted;
+                    setMuted(next);
+                    if (next) window.speechSynthesis?.cancel();
+                  }}
+                  className="text-white/70 hover:text-white transition-colors text-lg leading-none"
+                  title={muted ? "Unmute" : "Mute announcements"}
+                >
+                  {muted ? "🔇" : "🔊"}
+                </button>
+              </div>
+              <div className="pr-14">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-lg">🔥</span>
+                  <span className="text-white/80 text-[10px] font-display font-black uppercase tracking-widest flex-1">
+                    Court {freeCourt.id} is free!
+                  </span>
+                </div>
+                <div className="text-white font-display font-black text-xl leading-tight transition-all duration-300">
+                  {readyToGo ? BANNER_MSGS[shoutPhase] : `${firstName}, pick your team!`}
+                </div>
+                <div className="text-orange-100 text-xs font-display font-semibold mt-0.5 mb-3">
+                  ⚡ You're up — choose 3 legends to smash with
+                </div>
+                <button
+                  onClick={() => handleGo(firstMember.id)}
+                  className="w-full py-2.5 rounded-xl bg-white text-orange-600 font-display font-black text-sm
+                             hover:bg-orange-50 active:scale-95 transition-all shadow-sm mb-3"
+                >
+                  🏸 Let's Go!
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -846,6 +878,7 @@ export default function CheckInPanel() {
                     loadingId={loadingId}
                     onRequestRemove={(id, name) => setPendingRemove({ id, name })}
                     formatTime={formatTime}
+                    compact={mobile}
                   />
                   {swapping && (
                     <button
