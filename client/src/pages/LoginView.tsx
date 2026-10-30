@@ -203,6 +203,8 @@ export default function LoginView() {
           if (window.confirm("Clear all cached data? This won't affect your account — just resets any stale local data.")) {
             localStorage.clear();
             sessionStorage.clear();
+            if ("caches" in window) caches.keys().then(names => names.forEach(n => caches.delete(n)));
+            if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
             window.location.reload();
           }
         }}

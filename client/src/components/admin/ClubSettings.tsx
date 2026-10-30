@@ -413,6 +413,8 @@ export default function ClubSettings() {
             if (window.confirm("Clear all cached data? You'll be signed out and any unsaved changes will be lost.")) {
               localStorage.clear();
               sessionStorage.clear();
+              if ("caches" in window) caches.keys().then(names => names.forEach(n => caches.delete(n)));
+              if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
               window.location.reload();
             }
           }}
