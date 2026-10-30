@@ -473,7 +473,7 @@ export default function MainView() {
           {mobileTab === "live" ? (
             // Courts + Queue stacked on one screen — no more tab-switching between matches
             <div className="h-full flex flex-col gap-3">
-              <div className="glass-card flex flex-col p-3 flex-shrink-0" style={{ height: "30%", overflow: "hidden" }}>
+              <div className="glass-card flex flex-col p-3 flex-shrink-0" style={{ height: `${Math.min(40, Math.max(15, Math.ceil((session?.num_courts ?? 1) / 2) * 15))}%`, overflow: "hidden" }}>
                 <CourtsView mobile />
               </div>
               <div className="glass-card flex flex-col p-3 flex-1" style={{ minHeight: 0, overflow: "hidden" }}>

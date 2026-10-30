@@ -531,40 +531,40 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
     const canProceed = hasPicker && picked.length === 3;
 
     return (
-      <div className="flex flex-col gap-3 flex-1 min-h-0">
+      <div className={`flex flex-col ${mobile ? "gap-1.5" : "gap-3"} flex-1 min-h-0`}>
 
         {/* Header */}
-        <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-orange-500">
+        <div className={`${mobile ? "rounded-xl px-3 py-2" : "rounded-2xl px-4 py-3"} flex items-center justify-between bg-orange-500`}>
           <div>
-            <div className="text-white font-display font-black text-sm">
-              {picker.target_court === 0 ? "🏎️ Pitstop" : `Court ${picker.target_court}`} — Pick 3 Players
+            <div className={`text-white font-display font-black ${mobile ? "text-xs" : "text-sm"}`}>
+              {picker.target_court === 0 ? "🏎️ Pitstop" : `Court ${picker.target_court}`} — Pick 3
             </div>
-            <div className="text-white/80 text-xs font-display font-semibold mt-0.5">
-              {pickerMember ? `${pickerMember.name.split(" ")[0]} is picking · ${picked.length}/3 selected` : `${picked.length}/3 selected`}
+            <div className={`text-white/80 ${mobile ? "text-[10px]" : "text-xs"} font-display font-semibold mt-0.5`}>
+              {pickerMember ? `${pickerMember.name.split(" ")[0]} is picking · ${picked.length}/3` : `${picked.length}/3 selected`}
             </div>
           </div>
           <button
             onClick={closePicker}
-            className="p-1.5 rounded-xl bg-white/20 text-white hover:bg-white/30 transition-colors"
+            className={`${mobile ? "p-1 rounded-lg" : "p-1.5 rounded-xl"} bg-white/20 text-white hover:bg-white/30 transition-colors`}
           >
-            <X size={16} />
+            <X size={mobile ? 14 : 16} />
           </button>
         </div>
 
         {/* Picker identity card */}
         {pickerMember && (
-          <div className="flex items-center gap-3 bg-orange-50 border-2 border-orange-300 rounded-2xl px-3 py-2.5">
-            <Avatar name={pickerMember.name} memberType={pickerMember.member_type} size="sm" />
+          <div className={`flex items-center ${mobile ? "gap-2 rounded-xl px-2 py-1.5 border" : "gap-3 rounded-2xl px-3 py-2.5 border-2"} bg-orange-50 border-orange-300`}>
+            {!mobile && <Avatar name={pickerMember.name} memberType={pickerMember.member_type} size="sm" />}
             <div className="flex-1 min-w-0">
-              <div className="font-display font-black text-sm text-orange-800 truncate">
+              <div className={`font-display font-black ${mobile ? "text-xs" : "text-sm"} text-orange-800 truncate`}>
                 👑 {pickerMember.name}
               </div>
-              <div className="text-xs text-orange-500 font-display">Picking the team</div>
+              {!mobile && <div className="text-xs text-orange-500 font-display">Picking the team</div>}
             </div>
             <button
               onClick={handlePass}
-              className="text-xs border border-orange-300 text-orange-600 px-2.5 py-1 rounded-lg
-                         font-display font-bold hover:bg-orange-100 active:scale-95 transition-all"
+              className={`text-xs border border-orange-300 text-orange-600 ${mobile ? "px-2 py-0.5" : "px-2.5 py-1"} rounded-lg
+                         font-display font-bold hover:bg-orange-100 active:scale-95 transition-all`}
             >
               Pass ↓
             </button>
@@ -572,30 +572,28 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
         )}
 
         {/* Progress dots */}
-        <div className="flex gap-2 px-1">
+        <div className={`flex ${mobile ? "gap-1.5" : "gap-2"} px-1`}>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className={`flex-1 h-1.5 rounded-full transition-all duration-300
+              className={`flex-1 ${mobile ? "h-1" : "h-1.5"} rounded-full transition-all duration-300
                 ${i < picked.length ? "bg-orange-500" : "bg-gray-200"}`}
             />
           ))}
         </div>
 
         {/* Top-8 rule banner */}
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2">
-          <span className="text-amber-600 text-sm flex-shrink-0">🏸</span>
-          <p className="text-amber-800 font-display font-bold text-xs">
+        <div className={`flex items-center gap-2 bg-amber-50 border border-amber-200 ${mobile ? "rounded-lg px-2 py-1" : "rounded-2xl px-3 py-2"}`}>
+          <span className={`text-amber-600 ${mobile ? "text-xs" : "text-sm"} flex-shrink-0`}>🏸</span>
+          <p className={`text-amber-800 font-display font-bold ${mobile ? "text-[10px]" : "text-xs"}`}>
             Top 8 rule — pick from the first 8 in the queue
           </p>
         </div>
 
         {/* Queue list — scrollable */}
-        <div className="flex-1 space-y-2 pr-1" style={{ minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
+        <div className={`flex-1 ${mobile ? "space-y-1" : "space-y-2"} pr-1`} style={{ minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
           {(() => {
             const TOP = 7; // picker is #1, so candidates #2–8 = 7 slots
-            // Pre-filter: exclude the picker, anyone already on court, and anyone
-            // already earmarked for a pitstop (they're committed to that group already)
             const allCandidates = sortedQueue.filter((q) => {
               if (!members[q.member_id]) return false;
               if (q.member_id === picker.picker_id) return false;
@@ -614,7 +612,7 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
               <>
                 {visible.map((q, idx) => {
                   const member = members[q.member_id]!;
-                  const isOutsideTop8 = idx >= TOP; // only when showAll
+                  const isOutsideTop8 = idx >= TOP;
                   const isSelected = picked.includes(q.member_id);
                   const canSelect = isSelected || picked.length < 3;
 
@@ -623,7 +621,7 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
                       key={q.member_id}
                       layout
                       onClick={() => canSelect && togglePick(q.member_id)}
-                      className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all
+                      className={`flex items-center ${mobile ? "gap-2 p-2 rounded-xl border" : "gap-3 p-3 rounded-2xl border-2"} transition-all
                         ${isSelected
                           ? "bg-orange-500 border-orange-400 cursor-pointer"
                           : isOutsideTop8
@@ -633,22 +631,24 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
                               : "bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed"
                         }`}
                     >
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0
-                        font-display font-black text-xs
+                      <div className={`${mobile ? "w-5 h-5 rounded-md text-[10px]" : "w-7 h-7 rounded-lg text-xs"} flex items-center justify-center flex-shrink-0
+                        font-display font-black
                         ${isSelected ? "bg-white/30 text-white" : "bg-gray-100 text-gray-500"}`}
                       >
                         {idx + 1}
                       </div>
-                      <Avatar name={member.name} memberType={member.member_type} size="sm" />
+                      {!mobile && <Avatar name={member.name} memberType={member.member_type} size="sm" />}
                       <div className="flex-1 min-w-0">
-                        <div className={`font-display font-bold text-sm truncate ${isSelected ? "text-white" : isOutsideTop8 ? "text-gray-500" : "text-gray-900"}`}>
+                        <div className={`font-display font-bold ${mobile ? "text-sm" : "text-sm"} truncate ${isSelected ? "text-white" : isOutsideTop8 ? "text-gray-500" : "text-gray-900"}`}>
                           {member.name}
                         </div>
-                        <div className={`text-xs font-display ${isSelected ? "text-orange-100" : "text-gray-400"}`}>
-                          {formatTime(q.checked_in_at)}
-                        </div>
+                        {!mobile && (
+                          <div className={`text-xs font-display ${isSelected ? "text-orange-100" : "text-gray-400"}`}>
+                            {formatTime(q.checked_in_at)}
+                          </div>
+                        )}
                       </div>
-                      {isSelected && <span className="text-white text-lg flex-shrink-0">✓</span>}
+                      {isSelected && <span className={`text-white ${mobile ? "text-sm" : "text-lg"} flex-shrink-0`}>✓</span>}
                     </motion.div>
                   );
                 })}
@@ -657,8 +657,8 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
                 {hiddenCount > 0 && (
                   <button
                     onClick={() => setShowAllCandidates((v) => !v)}
-                    className="w-full text-xs font-display font-bold text-orange-500 hover:text-orange-700
-                               bg-orange-50 border border-orange-200 py-2 rounded-xl transition-colors"
+                    className={`w-full text-xs font-display font-bold text-orange-500 hover:text-orange-700
+                               bg-orange-50 border border-orange-200 ${mobile ? "py-1.5 rounded-lg" : "py-2 rounded-xl"} transition-colors`}
                   >
                     {showAllCandidates
                       ? "▲ Hide players outside top 8"
@@ -671,11 +671,11 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
         </div>
 
         {/* Choose Pairs button */}
-        <div className="sticky bottom-0 pt-2 pb-1 bg-white/90 backdrop-blur-sm">
+        <div className="sticky bottom-0 pt-1 pb-1 bg-white/90 backdrop-blur-sm">
           <button
             onClick={handleGoToPairs}
             disabled={!canProceed}
-            className={`w-full py-3.5 rounded-2xl font-display font-black text-base flex items-center justify-center gap-2
+            className={`w-full ${mobile ? "py-2.5 rounded-xl text-sm" : "py-3.5 rounded-2xl text-base"} font-display font-black flex items-center justify-center gap-2
               transition-all active:scale-95
               ${canProceed
                 ? "bg-gradient-to-r from-green-500 to-green-400 text-white shadow-lg shadow-green-500/30 hover:from-green-600 hover:to-green-500"
