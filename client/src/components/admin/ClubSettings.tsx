@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSessionStore } from "../../store";
-import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag, Zap, Wallet } from "lucide-react";
+import { MapPin, Clock, MessageCircle, Building2, Check, Palette, ShoppingBag, Zap, Wallet, Trash2 } from "lucide-react";
 import { THEMES, applyTheme } from "../../styles/themes";
 import type { ThemeKey } from "../../styles/themes";
 import OfflineMode from "../shared/OfflineMode";
@@ -396,6 +396,31 @@ export default function ClubSettings() {
             );
           })}
         </div>
+      </div>
+
+      {/* Clear Cache */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-red-500">
+          <Trash2 size={16} />
+          <span className="font-display font-bold text-sm uppercase tracking-wider">Clear Cache</span>
+        </div>
+        <p className="text-xs text-gray-400 font-body">
+          Clears all locally stored data (queue state, session cache, preferences). Your account and server data are not affected.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm("Clear all cached data? You'll be signed out and any unsaved changes will be lost.")) {
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
+            }
+          }}
+          className="w-full py-3 rounded-2xl font-display font-bold text-sm border-2 border-red-200 text-red-600
+                     hover:bg-red-50 active:scale-95 transition-all"
+        >
+          Clear Cache &amp; Reload
+        </button>
       </div>
 
       {/* Save button */}

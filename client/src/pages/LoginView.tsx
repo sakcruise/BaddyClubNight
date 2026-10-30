@@ -196,6 +196,21 @@ export default function LoginView() {
         </form>
       )}
 
+      {/* Clear cache link */}
+      <button
+        type="button"
+        onClick={() => {
+          if (window.confirm("Clear all cached data? This won't affect your account — just resets any stale local data.")) {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.reload();
+          }
+        }}
+        className="mt-6 text-[11px] text-gray-400 font-display font-bold hover:text-red-500 transition-colors"
+      >
+        Clear Cache
+      </button>
+
       {/* ── Forgot Password ── */}
       {mode === "forgot" && (
         <div className="w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 p-6 flex flex-col gap-4">
