@@ -38,7 +38,7 @@ function ReorderQueueItem({
       dragListener={false}
       dragControls={controls}
       className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-colors ${rowBg}`}
-      style={{ listStyle: "none" }}
+      style={{ listStyle: "none", touchAction: "pan-y" }}
       whileDrag={{ scale: 1.02, boxShadow: "0 6px 20px rgba(0,0,0,0.10)", zIndex: 10, backgroundColor: "rgb(var(--p-50))", borderColor: "#fdba74" }}
     >
       <span
@@ -588,7 +588,7 @@ export default function CheckInPanel() {
         </div>
 
         {/* Queue list — scrollable */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 scroll-smooth">
+        <div className="flex-1 space-y-2 pr-1" style={{ minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
           {(() => {
             const TOP = 7; // picker is #1, so candidates #2–8 = 7 slots
             // Pre-filter: exclude the picker, anyone already on court, and anyone
@@ -820,7 +820,7 @@ export default function CheckInPanel() {
       )}
 
       {/* Queue list — scrollable, shows who's next to play (excludes on-court players) */}
-      <motion.div layoutScroll className="flex-1 overflow-y-auto min-h-0 pr-1">
+      <div className="flex-1 pr-1" style={{ minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
         {visibleQueue.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 opacity-40">
             <span className="text-3xl">🏸</span>
@@ -862,7 +862,7 @@ export default function CheckInPanel() {
             })}
           </Reorder.Group>
         )}
-      </motion.div>
+      </div>
 
       <ConfirmDialog
         open={!!pendingRemove}

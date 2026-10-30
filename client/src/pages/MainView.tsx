@@ -367,7 +367,7 @@ export default function MainView() {
       </div>
 
       {/* ── Desktop: 3-Column Layout ── */}
-      <main className="flex-1 min-h-0 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-hidden" style={{ WebkitOverflowScrolling: "touch" }}>
 
         {/* Desktop layout */}
         <div className="hidden md:grid md:grid-cols-[0.8fr_2fr_1fr] gap-3 p-3 h-full overflow-hidden">
@@ -469,19 +469,19 @@ export default function MainView() {
         </div>
 
         {/* Mobile: single panel based on tab */}
-        <div className="md:hidden h-full overflow-hidden p-3 pb-0">
+        <div className="md:hidden h-full p-3 pb-0" style={{ overflow: "hidden" }}>
           {mobileTab === "live" ? (
             // Courts + Queue stacked on one screen — no more tab-switching between matches
             <div className="h-full flex flex-col gap-3">
-              <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0" style={{ height: "42%" }}>
+              <div className="glass-card flex flex-col p-4 flex-shrink-0" style={{ height: "42%", overflow: "hidden" }}>
                 <CourtsView />
               </div>
-              <div className="glass-card overflow-hidden flex flex-col p-4 min-h-0 flex-1">
+              <div className="glass-card flex flex-col p-4 flex-1" style={{ minHeight: 0, overflow: "hidden" }}>
                 <div className="section-header flex-shrink-0 mb-2">
                   <span className="text-orange-600 text-sm font-black">#</span>
                   <span className="section-title text-sm ml-2">Queue</span>
                 </div>
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden"><CheckInPanel /></div>
+                <div className="flex-1 flex flex-col" style={{ minHeight: 0, overflow: "hidden" }}><CheckInPanel /></div>
               </div>
             </div>
           ) : (
