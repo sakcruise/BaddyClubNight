@@ -513,9 +513,9 @@ export default function GroupDetailView() {
             { icon: <CalendarCheck size={16} />, value: sessionsPlayed, label: sessionsPlayed === 1 ? "Session" : "Sessions", grad: "from-blue-500 to-blue-400" },
             { icon: <Swords size={16} />, value: completedMatches.length, label: completedMatches.length === 1 ? "Game" : "Games", grad: "from-orange-500 to-orange-400" },
           ].map((s, i) => (
-            <div key={i} className={`rounded-2xl bg-gradient-to-br ${s.grad} p-3 text-white shadow-lg shadow-black/10 flex flex-col gap-1`}>
+            <div key={i} className={`rounded-2xl bg-gradient-to-br ${s.grad} p-2.5 text-white shadow-lg shadow-black/10 flex flex-col gap-0.5`}>
               <div className="opacity-80">{s.icon}</div>
-              <div className="font-display font-black text-2xl leading-none tabular-nums">{s.value}</div>
+              <div className="font-display font-black text-xl leading-none tabular-nums">{s.value}</div>
               <div className="text-[10px] font-display font-bold uppercase tracking-wider opacity-80">{s.label}</div>
             </div>
           ))}
@@ -574,7 +574,7 @@ export default function GroupDetailView() {
               <div className="p-4 flex flex-col gap-3">
                 {/* Date / time / venue / courts */}
                 <div>
-                  <p className="font-display font-black text-gray-900 text-xl leading-tight">{dayLabel}</p>
+                  <p className="font-display font-black text-gray-900 text-lg leading-tight">{dayLabel}</p>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <span className="flex items-center gap-1 text-gray-500 text-sm font-display font-bold">
                       <Clock size={13} /> {time}

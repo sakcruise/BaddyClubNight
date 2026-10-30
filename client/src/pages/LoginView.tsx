@@ -51,23 +51,23 @@ export default function LoginView() {
 
         <div className="w-full max-w-sm flex flex-col gap-3">
           <button onClick={() => { setSetupType("club"); setChooseType(false); setShowSetup(true); }}
-            className="w-full bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 shadow-md shadow-black/5 text-left active:scale-95 transition-transform">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center flex-shrink-0">
-              <Building2 size={26} className="text-white" />
+            className="w-full bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-3 shadow-md shadow-black/5 text-left active:scale-95 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center flex-shrink-0">
+              <Building2 size={22} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-display font-black text-gray-900 text-lg">A Club</div>
+              <div className="font-display font-black text-gray-900 text-base">A Club</div>
               <div className="text-gray-500 text-sm font-display">Fixed venue & nights, permanent roster</div>
             </div>
           </button>
 
           <button onClick={() => { setSetupType("group"); setChooseType(false); setShowSetup(true); }}
-            className="w-full bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 shadow-md shadow-black/5 text-left active:scale-95 transition-transform">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center flex-shrink-0">
-              <Users size={26} className="text-white" />
+            className="w-full bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-3 shadow-md shadow-black/5 text-left active:scale-95 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-purple-400 flex items-center justify-center flex-shrink-0">
+              <Users size={22} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-display font-black text-gray-900 text-lg">A Group of Friends</div>
+              <div className="font-display font-black text-gray-900 text-base">A Group of Friends</div>
               <div className="text-gray-500 text-sm font-display">Casual play any day, split the costs & invite friends</div>
             </div>
           </button>
@@ -133,18 +133,18 @@ export default function LoginView() {
     <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-gray-50">
 
       {/* Logo */}
-      <div className="flex flex-col items-center gap-3 mb-8">
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">
-          <ShuttlecockIcon size={56} />
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-3 shadow-lg shadow-orange-500/25">
+          <ShuttlecockIcon size={40} />
         </div>
-        <h1 className="font-display font-black text-gray-900 text-3xl tracking-tight">Badminton</h1>
+        <h1 className="font-display font-black text-gray-900 text-2xl tracking-tight">Badminton</h1>
         <p className="text-orange-500 font-display font-semibold text-sm">Game night, sorted</p>
       </div>
 
       {/* ── Sign In ── */}
       {mode === "login" && (
         <form onSubmit={handleSignIn}
-          className="w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 p-6 flex flex-col gap-4">
+          className="w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-md shadow-black/5 p-5 flex flex-col gap-3">
           <div>
             <h2 className="font-display font-black text-gray-900 text-xl">Sign In 👋</h2>
             <p className="text-gray-500 text-sm font-display mt-0.5">Enter your login details.</p>

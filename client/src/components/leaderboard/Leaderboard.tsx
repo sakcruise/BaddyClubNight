@@ -200,9 +200,9 @@ function MatchRow({ match, members, onUpdated, onDeleted, matchNumber }: {
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-3">
+    <div className="bg-white border border-gray-100 rounded-2xl p-2.5">
       {/* Header row: match number + court badge + edit buttons */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gray-100 text-gray-400 font-display font-black text-xs
                           flex items-center justify-center flex-shrink-0">
@@ -322,8 +322,8 @@ export default function Leaderboard() {
 
       {/* Section header */}
       <div className="section-header">
-        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-          <Trophy size={18} className="text-amber-600" />
+        <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <Trophy size={16} className="text-amber-600" />
         </div>
         <span className="section-title">Leaderboard</span>
         <span className="ml-auto badge bg-amber-100 text-amber-600 text-xs">
@@ -363,17 +363,17 @@ export default function Leaderboard() {
             <p className="text-gray-500 font-display font-bold text-sm">No matches yet!</p>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-0">
             {stats.map((s, idx) => {
               const medal = MEDALS[idx];
               return (
                 <div
                   key={s.member_id}
-                  className={`flex items-center gap-3 p-3 rounded-2xl border
+                  className={`flex items-center gap-2 p-2.5 rounded-2xl border
                     ${medal ? `${medal.bg} ${medal.border}` : "bg-white border-gray-100"}`}
                 >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0
-                    font-display font-black text-sm text-white
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0
+                    font-display font-black text-xs text-white
                     ${medal ? medal.numBg : "bg-gray-300"}`}
                   >
                     {idx + 1}
@@ -383,16 +383,16 @@ export default function Leaderboard() {
                     <div className="font-display font-black text-gray-900 text-sm truncate leading-tight">
                       {s.member?.name ?? "Unknown"}
                     </div>
-                    <div className="text-gray-400 text-xs font-display">
+                    <div className="text-gray-400 text-[11px] font-display">
                       {s.matches_played} match{s.matches_played !== 1 ? "es" : ""}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                     <div className="flex items-center gap-1">
-                      <span className="badge bg-green-100 text-green-700 text-xs px-2 py-0.5 font-black">{s.wins}W</span>
-                      <span className="badge bg-red-100 text-red-600 text-xs px-2 py-0.5 font-black">{s.losses}L</span>
+                      <span className="badge bg-green-100 text-green-700 text-[11px] px-1.5 py-0.5 font-black">{s.wins}W</span>
+                      <span className="badge bg-red-100 text-red-600 text-[11px] px-1.5 py-0.5 font-black">{s.losses}L</span>
                     </div>
-                    <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all"
                         style={{ width: `${Math.round(s.win_rate * 100)}%` }}
@@ -414,7 +414,7 @@ export default function Leaderboard() {
             <p className="text-gray-500 font-display font-bold text-sm">No matches yet!</p>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-0">
             {completedMatches.map((match, idx) => (
               <MatchRow
                 key={match.id}

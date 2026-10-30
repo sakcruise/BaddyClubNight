@@ -32,11 +32,11 @@ export default function ResetPasswordView() {
       className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6"
       style={{ background: "linear-gradient(160deg, rgb(var(--p-900)) 0%, rgb(var(--p-700)) 40%, rgb(var(--p-600)) 80%, rgb(var(--p-500)) 100%)" }}
     >
-      <div className="flex flex-col items-center gap-3 mb-8">
-        <div className="bg-white/15 rounded-3xl p-4 backdrop-blur-sm border border-white/20 shadow-2xl">
-          <ShuttlecockIcon size={56} />
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <div className="bg-white/15 rounded-2xl p-3 backdrop-blur-sm border border-white/20 shadow-2xl">
+          <ShuttlecockIcon size={40} />
         </div>
-        <h1 className="font-display font-black text-white text-3xl tracking-tight">Badminton Club</h1>
+        <h1 className="font-display font-black text-white text-2xl tracking-tight">Badminton Club</h1>
         <p className="text-orange-200 font-display font-semibold text-sm">Club Night Manager</p>
       </div>
 

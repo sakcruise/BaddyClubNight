@@ -441,55 +441,58 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
     const canConfirm = teamA.length === 2 && teamB.length === 2;
 
     return (
-      <div className="flex flex-col gap-3 flex-1 min-h-0">
+      <div className={`flex flex-col ${mobile ? "gap-1.5" : "gap-3"} flex-1 min-h-0`}>
         {/* Header */}
-        <div className="rounded-2xl px-4 py-3 flex items-center justify-between bg-blue-600">
+        <div className={`${mobile ? "rounded-xl px-3 py-2" : "rounded-2xl px-4 py-3"} flex items-center justify-between bg-blue-600`}>
           <div>
-            <div className="text-white font-display font-black text-sm">
+            <div className={`text-white font-display font-black ${mobile ? "text-xs" : "text-sm"}`}>
               Court {picker.target_court} — Choose Pairs
             </div>
-            <div className="text-white/80 text-xs font-display font-semibold mt-0.5">
-              Tap a player to switch teams
-            </div>
+            {!mobile && (
+              <div className="text-white/80 text-xs font-display font-semibold mt-0.5">
+                Tap a player to switch teams
+              </div>
+            )}
           </div>
           <button
             onClick={() => { setPairsStep(false); setPairs({}); }}
             className="p-1.5 rounded-xl bg-white/20 text-white hover:bg-white/30 transition-colors"
           >
-            <X size={16} />
+            <X size={mobile ? 14 : 16} />
           </button>
         </div>
 
         {/* Teams */}
-        <div className="flex flex-col gap-3 flex-1">
+        <div className={`flex flex-col ${mobile ? "gap-1.5" : "gap-3"} flex-1`}>
           {(["A", "B"] as const).map((team) => {
             const teamMembers = allFour.filter((id) => pairs[id] === team);
             return (
               <div
                 key={team}
-                className={`rounded-2xl p-3 border-2 ${team === "A" ? "bg-blue-50 border-blue-300" : "bg-orange-50 border-orange-300"}`}
+                className={`${mobile ? "rounded-xl p-2 border" : "rounded-2xl p-3 border-2"} ${team === "A" ? "bg-blue-50 border-blue-300" : "bg-orange-50 border-orange-300"}`}
               >
-                <div className={`font-display font-black text-sm mb-2 ${team === "A" ? "text-blue-700" : "text-orange-700"}`}>
+                <div className={`font-display font-black ${mobile ? "text-xs mb-1" : "text-sm mb-2"} ${team === "A" ? "text-blue-700" : "text-orange-700"}`}>
                   Team {team} {teamMembers.length === 2 ? "✓" : `(${teamMembers.length}/2)`}
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className={`flex flex-col ${mobile ? "gap-1" : "gap-2"}`}>
                   {teamMembers.map((id) => {
                     const m = members[id];
                     return (
                       <button
                         key={id}
                         onClick={() => togglePairTeam(id)}
-                        className={`flex items-center gap-2 p-2 rounded-xl bg-white border-2 w-full text-left transition-all active:scale-95
+                        className={`flex items-center ${mobile ? "gap-1.5 p-1.5 rounded-lg border" : "gap-2 p-2 rounded-xl border-2"} bg-white w-full text-left transition-all active:scale-95
                           ${team === "A" ? "border-blue-200 hover:border-blue-400" : "border-orange-200 hover:border-orange-400"}`}
                       >
-                        <Avatar name={m?.name ?? ""} memberType={m?.member_type} size="sm" />
-                        <span className="font-display font-bold text-sm text-gray-900 flex-1">{m?.name}</span>
-                        <span className="text-xs text-gray-400">tap to switch</span>
+                        {!mobile && <Avatar name={m?.name ?? ""} memberType={m?.member_type} size="sm" />}
+                        {mobile && <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white font-display font-black text-[9px] flex-shrink-0 ${m?.member_type === "female" ? "bg-pink-500" : m?.member_type === "guest" ? "bg-purple-500" : "bg-blue-500"}`}>{(m?.name ?? "?").charAt(0).toUpperCase()}</span>}
+                        <span className={`font-display font-bold ${mobile ? "text-xs" : "text-sm"} text-gray-900 flex-1`}>{m?.name}</span>
+                        {!mobile && <span className="text-xs text-gray-400">tap to switch</span>}
                       </button>
                     );
                   })}
                   {teamMembers.length < 2 && (
-                    <div className={`h-10 rounded-xl border-2 border-dashed flex items-center justify-center text-xs
+                    <div className={`${mobile ? "h-8 rounded-lg border border-dashed" : "h-10 rounded-xl border-2 border-dashed"} flex items-center justify-center text-xs
                       ${team === "A" ? "border-blue-300 text-blue-400" : "border-orange-300 text-orange-400"}`}>
                       + 1 more player
                     </div>
@@ -504,14 +507,14 @@ export default function CheckInPanel({ mobile }: { mobile?: boolean } = {}) {
         <div className="flex gap-2 pt-1">
           <button
             onClick={() => { setPairsStep(false); setPairs({}); }}
-            className="flex-1 py-3 rounded-2xl font-display font-black text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all active:scale-95"
+            className={`flex-1 ${mobile ? "py-2 rounded-xl text-xs" : "py-3 rounded-2xl text-sm"} font-display font-black bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all active:scale-95`}
           >
             ← Back
           </button>
           <button
             onClick={handleStartMatch}
             disabled={!canConfirm || confirming}
-            className={`flex-1 py-3 rounded-2xl font-display font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-95
+            className={`flex-1 ${mobile ? "py-2 rounded-xl text-xs" : "py-3 rounded-2xl text-sm"} font-display font-black flex items-center justify-center gap-2 transition-all active:scale-95
               ${canConfirm && !confirming
                 ? "bg-gradient-to-r from-green-500 to-green-400 text-white shadow-lg shadow-green-500/30"
                 : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}

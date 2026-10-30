@@ -44,12 +44,12 @@ function StatCard({ label, value, sub, colour = "orange", icon }: {
     purple: "bg-purple-50 border-purple-200 text-purple-700",
   };
   return (
-    <div className={`rounded-2xl border p-4 flex flex-col gap-1 ${colours[colour] ?? colours.orange}`}>
-      <div className="flex items-center gap-2 opacity-70 text-xs font-display font-bold uppercase tracking-wider">
+    <div className={`rounded-2xl border p-3 flex flex-col gap-0.5 ${colours[colour] ?? colours.orange}`}>
+      <div className="flex items-center gap-1.5 opacity-70 text-[11px] font-display font-bold uppercase tracking-wider">
         {icon}{label}
       </div>
-      <div className="font-display font-black text-2xl">{value}</div>
-      {sub && <div className="text-xs font-display font-semibold opacity-60">{sub}</div>}
+      <div className="font-display font-black text-lg sm:text-2xl">{value}</div>
+      {sub && <div className="text-[11px] font-display font-semibold opacity-60">{sub}</div>}
     </div>
   );
 }

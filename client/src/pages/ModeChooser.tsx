@@ -29,9 +29,9 @@ export default function ModeChooser() {
           transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
           className="inline-block mb-4"
         >
-          <ShuttlecockIcon size={72} />
+          <ShuttlecockIcon size={52} />
         </motion.div>
-        <h1 className="text-white font-display font-black text-3xl leading-tight mb-1">How will you play?</h1>
+        <h1 className="text-white font-display font-black text-2xl leading-tight mb-1">How will you play?</h1>
         <p className="text-orange-200 text-sm font-display font-semibold">You can switch anytime</p>
       </div>
 

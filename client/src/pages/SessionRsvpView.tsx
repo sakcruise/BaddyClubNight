@@ -127,12 +127,12 @@ export default function SessionRsvpView() {
       style={{ background: "linear-gradient(135deg, #581c87 0%, #7c3aed 60%, #a855f7 100%)" }}>
 
       {/* Header */}
-      <div className="flex flex-col items-center gap-3 pt-10 pb-6 px-5">
-        <div className="bg-white/15 rounded-2xl p-3 backdrop-blur-sm border border-white/20">
-          <ShuttlecockIcon size={36} />
+      <div className="flex flex-col items-center gap-2 pt-6 pb-4 px-5">
+        <div className="bg-white/15 rounded-2xl p-2.5 backdrop-blur-sm border border-white/20">
+          <ShuttlecockIcon size={28} />
         </div>
-        <h1 className="font-display font-black text-white text-2xl text-center">{data.group_name}</h1>
-        <p className="text-purple-200 font-display font-semibold text-sm">Badminton Session</p>
+        <h1 className="font-display font-black text-white text-xl text-center">{data.group_name}</h1>
+        <p className="text-purple-200 font-display font-semibold text-xs">Badminton Session</p>
       </div>
 
       <div className="flex-1 px-4 pb-10 max-w-sm w-full mx-auto flex flex-col gap-4">

@@ -83,7 +83,7 @@ export default function HomeView() {
         style={{ background: "radial-gradient(circle, rgb(var(--p-400)), transparent)" }} />
 
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
+      <header className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="bg-white/15 rounded-2xl p-2 backdrop-blur-sm border border-white/20">
             <ShuttlecockIcon size={32} />
@@ -108,18 +108,18 @@ export default function HomeView() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 pb-12 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-center px-5 pb-8 gap-4">
 
         {/* Hero */}
         <div className="text-center">
           <motion.div
             animate={{ y: [0, -10, 0] }}
             transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-            className="inline-block mb-4"
+            className="inline-block mb-3"
           >
-            <ShuttlecockIcon size={80} />
+            <ShuttlecockIcon size={56} />
           </motion.div>
-          <h2 className="text-white font-display font-black text-4xl leading-tight mb-1">
+          <h2 className="text-white font-display font-black text-2xl leading-tight mb-1">
             Welcome, {displayName}! 👋
           </h2>
           <p className="text-orange-200 text-sm font-display font-semibold">
@@ -134,10 +134,10 @@ export default function HomeView() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => setPanel(panel === "start" ? null : "start")}
-            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left"
+            className="w-full bg-white rounded-2xl p-4 flex items-center gap-3 shadow-2xl shadow-black/20 text-left"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-orange-500/30">
-              <Play size={22} className="text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-orange-500/30">
+              <Play size={18} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-display font-black text-gray-900 text-base">Start Club Night</div>
@@ -157,7 +157,7 @@ export default function HomeView() {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-4 flex flex-col gap-3 shadow-xl">
                   {/* Club name already shown top-left in the header — no need to repeat it here */}
                   {/* Courts */}
                   <div>
@@ -270,10 +270,10 @@ export default function HomeView() {
             whileTap={{ scale: 0.97 }}
             onClick={handleStartTournament}
             disabled={!displayName.trim() || startingTournament}
-            className="w-full bg-white rounded-2xl p-5 flex items-center gap-4 shadow-2xl shadow-black/20 text-left disabled:opacity-50"
+            className="w-full bg-white rounded-2xl p-4 flex items-center gap-3 shadow-2xl shadow-black/20 text-left disabled:opacity-50"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-500/30">
-              <Trophy size={22} className="text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-500/30">
+              <Trophy size={18} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-display font-black text-gray-900 text-base">
@@ -297,8 +297,8 @@ export default function HomeView() {
                 key={label}
                 whileTap={{ scale: 0.95 }}
                 onClick={action}
-                className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-4
-                           flex flex-col items-center gap-2 hover:bg-white/25 transition-all"
+                className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-3
+                           flex flex-col items-center gap-1.5 hover:bg-white/25 transition-all"
               >
                 <Icon size={20} className="text-white" />
                 <span className="text-white text-xs font-display font-bold">{label}</span>

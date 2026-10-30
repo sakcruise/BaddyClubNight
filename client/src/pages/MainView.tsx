@@ -485,12 +485,12 @@ export default function MainView() {
               </div>
             </div>
           ) : (
-            <div className="glass-card h-full overflow-hidden flex flex-col p-4 min-h-0">
+            <div className="glass-card h-full overflow-hidden flex flex-col p-3 min-h-0">
               {mobileTab === "checkins" && (
                 <>
-                  <div className="section-header flex-shrink-0 mb-2">
-                    <span className="text-sky-600 text-sm font-black">✓</span>
-                    <span className="section-title text-sm ml-2">Check-ins</span>
+                  <div className="section-header flex-shrink-0 mb-1">
+                    <span className="text-sky-600 text-xs font-black">✓</span>
+                    <span className="section-title text-xs ml-1.5">Check-ins</span>
                   </div>
                   <div className="overflow-y-auto min-h-0 flex-1"><CheckInGrid /></div>
                 </>

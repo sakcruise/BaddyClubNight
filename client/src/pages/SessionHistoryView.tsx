@@ -76,14 +76,14 @@ function SessionDetailPanel({ summary, members }: { summary: SessionSummary; mem
         stats.length === 0 ? (
           <div className="text-center py-8 text-gray-400 font-display font-bold">No scored matches</div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {stats.map((s, idx) => {
               const medal = MEDALS[idx];
               return (
                 <div key={s.member_id}
-                  className={`flex items-center gap-3 p-3 rounded-2xl border
+                  className={`flex items-center gap-2 p-2.5 rounded-2xl border
                     ${medal ? `${medal.bg} ${medal.border}` : "bg-white border-gray-100"}`}>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-display font-black text-sm text-white
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-display font-black text-xs text-white
                     ${medal ? medal.numBg : "bg-gray-300"}`}>
                     {idx + 1}
                   </div>

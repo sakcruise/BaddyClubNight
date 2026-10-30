@@ -86,11 +86,11 @@ export default function SetupView({ onBack, accountType = "club" }: { onBack?: (
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-gray-50">
 
-      <div className="flex flex-col items-center gap-3 mb-8">
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-4 shadow-lg shadow-orange-500/25">
-          <ShuttlecockIcon size={56} />
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-3 shadow-lg shadow-orange-500/25">
+          <ShuttlecockIcon size={40} />
         </div>
-        <h1 className="font-display font-black text-gray-900 text-3xl tracking-tight">
+        <h1 className="font-display font-black text-gray-900 text-2xl tracking-tight">
           {isGroup ? "Badminton" : "Badminton Club"}
         </h1>
         <p className="text-orange-500 font-display font-semibold text-sm">

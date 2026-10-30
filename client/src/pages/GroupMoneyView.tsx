@@ -162,11 +162,11 @@ export default function GroupMoneyView() {
 
         {/* Your status */}
         {myMemberId && !loading && (
-          <div className={`rounded-3xl p-5 text-white shadow-lg ${myBalance > 0.004 ? "bg-gradient-to-br from-green-500 to-green-400" : myBalance < -0.004 ? "bg-gradient-to-br from-orange-500 to-red-400" : "bg-gradient-to-br from-gray-500 to-gray-400"}`}>
+          <div className={`rounded-3xl p-4 text-white shadow-lg ${myBalance > 0.004 ? "bg-gradient-to-br from-green-500 to-green-400" : myBalance < -0.004 ? "bg-gradient-to-br from-orange-500 to-red-400" : "bg-gradient-to-br from-gray-500 to-gray-400"}`}>
             <div className="flex items-center gap-2 opacity-80 text-xs font-display font-bold uppercase tracking-wider">
               <Wallet size={14} /> Your balance
             </div>
-            <p className="font-display font-black text-3xl mt-1 tabular-nums">
+            <p className="font-display font-black text-2xl mt-1 tabular-nums">
               {myBalance > 0.004 ? `You are owed ${money(myBalance)}` : myBalance < -0.004 ? `You owe ${money(myBalance)}` : "All settled up"}
             </p>
             {transfers.filter((t) => t.from === myMemberId || t.to === myMemberId).map((t) => (
