@@ -14,14 +14,15 @@ import EndNightCheers from "../components/shared/EndNightCheers";
 import MemberManagement from "../components/admin/MemberManagement";
 import ClubSettings from "../components/admin/ClubSettings";
 import PaymentsPanel from "../components/admin/PaymentsPanel";
+import WebsiteEditor from "../components/admin/WebsiteEditor";
 import GroupSettings from "../components/groups/GroupSettings";
 import GroupMemberManager from "../components/groups/GroupMemberManager";
 import HomeView from "./HomeView";
 import { sessionsApi, queueApi, matchesApi, membersApi } from "../services/api";
 import { groupsApi } from "../services/groups";
-import { X, Users, Cog, LogOut, History, LayoutGrid, Trophy, Menu, Maximize2, Minimize2, Wallet } from "lucide-react";
+import { X, Users, Cog, LogOut, History, LayoutGrid, Trophy, Menu, Maximize2, Minimize2, Wallet, Globe } from "lucide-react";
 
-type Drawer = "members" | "settings" | "payments" | "menu" | null;
+type Drawer = "members" | "settings" | "payments" | "website" | "menu" | null;
 type MobileTab = "live" | "checkins" | "leaderboard";
 
 export default function MainView() {
@@ -549,6 +550,7 @@ export default function MainView() {
                   {drawer === "members" ? (session.group_id ? "Members" : "Club Roster")
                     : drawer === "settings" ? (session.group_id ? "Settings" : "Club Settings")
                     : drawer === "payments" ? "Payments"
+                    : drawer === "website" ? "Website Editor"
                     : "Menu"}
                 </span>
                 <button onClick={() => setDrawer(null)}
@@ -585,6 +587,12 @@ export default function MainView() {
                       <Wallet size={18} className="text-orange-500" /> Payments
                     </button>
                   )}
+                  {!session.group_id && (
+                    <button onClick={() => setDrawer("website")}
+                      className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-gray-800 font-display font-bold text-sm">
+                      <Globe size={18} className="text-orange-500" /> Website
+                    </button>
+                  )}
                   <button onClick={handleEndNight} disabled={ending}
                     className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-600 font-display font-bold text-sm">
                     <LogOut size={18} /> {ending ? "Ending…" : session.group_id ? "End Session" : "End Night"}
@@ -604,6 +612,7 @@ export default function MainView() {
                   ? <GroupSettings groupId={session.group_id} />
                   : <ClubSettings />)}
                 {drawer === "payments" && !session.group_id && <PaymentsPanel />}
+                {drawer === "website" && !session.group_id && <WebsiteEditor />}
               </div>
             </motion.div>
           </>
